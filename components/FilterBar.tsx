@@ -1,3 +1,10 @@
+type FilterValues = {
+  category: string;
+  neighborhood: string;
+  town: string;
+  sort: string;
+};
+
 type FilterBarProps = {
   category: string;
   neighborhood: string;
@@ -6,12 +13,7 @@ type FilterBarProps = {
   categories: string[];
   neighborhoods: string[];
   towns: string[];
-  onChange: (next: {
-    category: string;
-    neighborhood: string;
-    town: string;
-    sort: string;
-  }) => void;
+  onChange: (next: FilterValues) => void;
 };
 
 export function FilterBar({
@@ -24,14 +26,14 @@ export function FilterBar({
   towns,
   onChange,
 }: FilterBarProps) {
-  const update = (field: keyof FilterBarProps, value: string) => {
+  const update = (field: keyof FilterValues, value: string) => {
     onChange({
       category,
       neighborhood,
       town,
       sort,
       [field]: value,
-    } as FilterBarProps);
+    });
   };
 
   return (

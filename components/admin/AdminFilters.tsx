@@ -1,9 +1,15 @@
+type FilterValues = {
+  status: string;
+  category: string;
+  sort: string;
+};
+
 type AdminFiltersProps = {
   status: string;
   category: string;
   sort: string;
   categories: string[];
-  onChange: (next: { status: string; category: string; sort: string }) => void;
+  onChange: (next: FilterValues) => void;
 };
 
 export function AdminFilters({
@@ -13,8 +19,8 @@ export function AdminFilters({
   categories,
   onChange,
 }: AdminFiltersProps) {
-  const update = (field: keyof AdminFiltersProps, value: string) => {
-    onChange({ status, category, sort, [field]: value } as AdminFiltersProps);
+  const update = (field: keyof FilterValues, value: string) => {
+    onChange({ status, category, sort, [field]: value });
   };
 
   return (
