@@ -1,26 +1,101 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand palette */
+  --color-black: #000000;
+  --color-dark: #1a1a1a;
+  --color-medium: #666666;
+  --color-secondary-white: #dbdbdb;
+  --color-off-white: #fafafa;
+  --color-riviera-blue: #2b8aa8;
+  --color-muted-blue: #57959f;
+  --color-dusty-purple: #8d6fa2;
+  --color-deep-purple: #300d57;
+
+  /* UI tokens */
+  --color-text: var(--color-dark);
+  --color-surface: #ffffff;
+  --color-panel: #ffffff;
+  --color-border: rgba(0, 0, 0, 0.1);
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-background: var(--color-surface);
+  --color-foreground: var(--color-text);
+  --color-primary: var(--color-riviera-blue);
+  --color-accent: var(--color-muted-blue);
+  --color-muted: var(--color-medium);
+  --color-panel: var(--color-panel);
+  --color-border: var(--color-border);
+  --radius-lg: var(--radius-lg);
+  --radius-md: var(--radius-md);
+  --radius-sm: var(--radius-sm);
+  --font-sans: var(--font-red-hat);
+  --font-serif: var(--font-newsreader);
+  --font-masthead: var(--font-masthead);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-red-hat), "Inter", system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shadow-soft {
+  box-shadow: var(--shadow-soft);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+.anchored {
+  scroll-margin-top: 96px;
+}
+
+.headline {
+  font-family: var(--font-newsreader), "Georgia", serif;
+  letter-spacing: -0.015em;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-medium);
+}
+
+.card-surface {
+  background: #ffffff;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+}
+
+.masthead {
+  font-family: var(--font-masthead), "Didot", "Bodoni MT", serif;
+  letter-spacing: -0.02em;
+}
+
+/* Focus styles */
+:where(a, button, input, select, textarea) {
+  outline: none;
+}
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-riviera-blue);
+  outline-offset: 3px;
+  border-radius: 8px;
 }
