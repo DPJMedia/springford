@@ -224,7 +224,12 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
       const slug = generateSlug(title);
       const tagsArray = tags ? tags.split(",").map((t) => t.trim()) : null;
 
-      let status: "draft" | "published" | "scheduled" = article?.status || "draft";
+      // Ensure status is one of the allowed values
+      const currentStatus = article?.status;
+      const validStatuses: ("draft" | "published" | "scheduled")[] = ["draft", "published", "scheduled"];
+      const isValidStatus = currentStatus && validStatuses.includes(currentStatus as any);
+      
+      let status: "draft" | "published" | "scheduled" = (isValidStatus ? currentStatus : "draft") as "draft" | "published" | "scheduled";
       let publishedAt = article?.published_at || null;
       let scheduledTime = null;
 
