@@ -94,6 +94,25 @@ export default function UsersAdminPage() {
     }
   }
 
+  async function toggleNewsletterStatus(userId: string, currentStatus: boolean) {
+    const action = currentStatus ? "revoke" : "grant";
+    if (!confirm(`Are you sure you want to ${action} newsletter subscription for this user?`)) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("user_profiles")
+      .update({ newsletter_subscribed: !currentStatus })
+      .eq("id", userId);
+
+    if (!error) {
+      loadUsers();
+      alert(`Newsletter subscription ${action === "grant" ? "granted" : "revoked"}!`);
+    } else {
+      alert("Error updating user: " + error.message);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center">
@@ -130,7 +149,7 @@ export default function UsersAdminPage() {
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Stats */}
-        <div className="grid gap-3 mb-6 md:grid-cols-3">
+        <div className="grid gap-3 mb-6 md:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg bg-blue-50 text-blue-700 p-3 border border-gray-200">
             <p className="text-xs font-medium opacity-80">Total Users</p>
             <p className="text-2xl font-bold mt-1">{users.length}</p>
@@ -145,6 +164,12 @@ export default function UsersAdminPage() {
             <p className="text-xs font-medium opacity-80">Regular Users</p>
             <p className="text-2xl font-bold mt-1">
               {users.filter(u => !u.is_admin && !u.is_super_admin).length}
+            </p>
+          </div>
+          <div className="rounded-lg bg-[#3391af]/10 text-[#3391af] p-3 border border-gray-200">
+            <p className="text-xs font-medium opacity-80">Newsletter Subscribers</p>
+            <p className="text-2xl font-bold mt-1">
+              {users.filter(u => u.newsletter_subscribed).length}
             </p>
           </div>
         </div>
@@ -168,6 +193,7 @@ export default function UsersAdminPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">User</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Role</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Newsletter</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Joined</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-[color:var(--color-dark)]">Actions</th>
               </tr>
@@ -193,45 +219,77 @@ export default function UsersAdminPage() {
                       {user.is_super_admin ? "Super Admin" : user.is_admin ? "Admin" : "User"}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-sm">
+                    {user.newsletter_subscribed ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-xs font-semibold">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Subscribed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-xs font-semibold">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Not Subscribed
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm text-[color:var(--color-medium)]">
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {user.id !== currentUser.id ? (
-                      <div className="flex justify-end gap-2">
-                        {!user.is_super_admin && (
-                          <>
+                    <div className="flex justify-end gap-2 flex-wrap">
+                      {/* Newsletter subscription - can modify for yourself too */}
+                      <button
+                        onClick={() => toggleNewsletterStatus(user.id, user.newsletter_subscribed || false)}
+                        className={`text-xs font-semibold hover:underline ${
+                          user.newsletter_subscribed ? "text-red-600" : "text-green-600"
+                        }`}
+                      >
+                        {user.newsletter_subscribed ? "Revoke Newsletter" : "Grant Newsletter"}
+                      </button>
+                      
+                      {/* Admin/Super Admin controls - only for other users */}
+                      {user.id !== currentUser.id && (
+                        <>
+                          <span className="text-[color:var(--color-medium)]">|</span>
+                          {!user.is_super_admin && (
+                            <>
+                              <button
+                                onClick={() => toggleAdminStatus(user.id, user.is_admin)}
+                                className={`text-xs font-semibold hover:underline ${
+                                  user.is_admin ? "text-red-600" : "text-[color:var(--color-riviera-blue)]"
+                                }`}
+                              >
+                                {user.is_admin ? "Remove Admin" : "Make Admin"}
+                              </button>
+                              <span className="text-[color:var(--color-medium)]">|</span>
+                              <button
+                                onClick={() => toggleSuperAdminStatus(user.id, user.is_super_admin)}
+                                className="text-xs font-semibold text-purple-600 hover:underline"
+                              >
+                                Make Super Admin
+                              </button>
+                            </>
+                          )}
+                          {user.is_super_admin && (
                             <button
-                              onClick={() => toggleAdminStatus(user.id, user.is_admin)}
-                              className={`text-xs font-semibold hover:underline ${
-                                user.is_admin ? "text-red-600" : "text-[color:var(--color-riviera-blue)]"
-                              }`}
+                              onClick={() => toggleSuperAdminStatus(user.id, true)}
+                              className="text-xs font-semibold text-red-600 hover:underline"
                             >
-                              {user.is_admin ? "Remove Admin" : "Make Admin"}
+                              Remove Super Admin
                             </button>
-                            <span className="text-[color:var(--color-medium)]">|</span>
-                            <button
-                              onClick={() => toggleSuperAdminStatus(user.id, user.is_super_admin)}
-                              className="text-xs font-semibold text-purple-600 hover:underline"
-                            >
-                              Make Super Admin
-                            </button>
-                          </>
-                        )}
-                        {user.is_super_admin && (
-                          <button
-                            onClick={() => toggleSuperAdminStatus(user.id, true)}
-                            className="text-xs font-semibold text-red-600 hover:underline"
-                          >
-                            Remove Super Admin
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-[color:var(--color-medium)]">
-                        You (Cannot modify)
-                      </span>
-                    )}
+                          )}
+                        </>
+                      )}
+                      {user.id === currentUser.id && (
+                        <span className="text-xs text-[color:var(--color-medium)]">
+                          (Admin roles locked)
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

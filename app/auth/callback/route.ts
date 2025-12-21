@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
+  const newsletterParam = searchParams.get('newsletter')
 
   if (code) {
     const cookieStore = await cookies()
@@ -33,7 +34,19 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!error && data.session) {
+    if (!error && data.session && data.user) {
+      // Handle newsletter subscription preference
+      const newsletterSubscribed = newsletterParam === 'true' || 
+        (data.user.user_metadata?.newsletter_subscribed === true)
+      
+      if (newsletterSubscribed) {
+        // Update user profile with newsletter preference
+        await supabase
+          .from('user_profiles')
+          .update({ newsletter_subscribed: true })
+          .eq('id', data.user.id)
+      }
+      
       // Create response with redirect
       const redirectUrl = `${origin}/auth/confirm`
       const response = NextResponse.redirect(redirectUrl)

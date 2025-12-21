@@ -1,37 +1,166 @@
-export function NewsletterForm() {
-  return (
-    <div className="relative overflow-hidden rounded-lg bg-white p-3 shadow-soft ring-1 ring-[color:var(--color-border)] md:p-4">
-      <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-purple-50 opacity-50" />
-      <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4">
-        <div className="max-w-xl">
-          <p className="eyebrow text-xs text-[color:var(--color-medium)]">Newsletter</p>
-          <h3 className="headline mt-0.5 text-lg font-semibold text-[color:var(--color-dark)]">
-            Stay ahead with the Spring-Ford briefing
-          </h3>
-          <p className="mt-0.5 text-xs text-[color:var(--color-medium)] leading-relaxed">
-            Weekly highlights on neighborhood stories, council agendas, and upcoming
-            meetings. No spam. Ever.
-          </p>
-        </div>
-        <form
-          className="flex w-full flex-col gap-1.5 md:w-[280px] md:flex-row md:items-center"
-          onSubmit={(e) => e.preventDefault()}
-        >
-          <input
-            type="email"
-            required
-            placeholder="you@example.com"
-            className="w-full rounded-full border border-[color:var(--color-border)] bg-white px-3 py-1.5 text-sm placeholder:text-[color:var(--color-medium)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-riviera-blue)]"
-          />
-          <button
-            type="submit"
-            className="inline-flex h-8 items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)] px-4 text-sm font-semibold text-white transition hover:bg-opacity-90 whitespace-nowrap"
-          >
-            Subscribe
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
+"use client"
 
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { ThankYouModal } from './ThankYouModal'
+import Link from 'next/link'
+
+export function NewsletterForm() {
+  const [user, setUser] = useState<any>(null)
+  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [showThankYou, setShowThankYou] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const supabase = createClient()
+
+  useEffect(() => {
+    checkUserStatus()
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkUserStatus()
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function checkUserStatus() {
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    
+    if (currentUser) {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('newsletter_subscribed')
+        .eq('id', currentUser.id)
+        .single()
+      
+      setIsSubscribed(profile?.newsletter_subscribed || false)
+      setUser(currentUser)
+    } else {
+      setUser(null)
+      setIsSubscribed(false)
+    }
+    
+    setLoading(false)
+  }
+
+  async function handleSubscribe(e: React.FormEvent) {
+    e.preventDefault()
+    if (!user) return
+
+    setSubmitting(true)
+    
+    try {
+      // Update user profile
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ newsletter_subscribed: true })
+        .eq('id', user.id)
+
+      if (updateError) {
+        console.error('Update error:', updateError)
+        throw updateError
+      }
+
+      // Show thank you modal immediately (before setting isSubscribed to prevent component unmount)
+      setShowThankYou(true)
+
+      // Call API to send welcome email (optional, won't fail if it doesn't work)
+      try {
+        const response = await fetch('/api/newsletter/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: user.email }),
+        })
+        if (!response.ok) {
+          console.error('Failed to send welcome email')
+        }
+      } catch (emailError) {
+        console.error('Email error (non-blocking):', emailError)
+      }
+
+      // Update subscription status after showing modal
+      setIsSubscribed(true)
+    } catch (error) {
+      console.error('Error subscribing to newsletter:', error)
+      alert('Failed to subscribe. Please try again.')
+      setSubmitting(false)
+    }
+  }
+
+  // Don't show anything while loading
+  if (loading) {
+    return null
+  }
+
+  // Don't show if user is already subscribed (unless showing thank you modal)
+  if (isSubscribed && !showThankYou) {
+    return null
+  }
+
+  // Show signup prompt if user is not logged in
+  if (!user) {
+    return (
+      <div className="relative overflow-hidden rounded-lg bg-[color:var(--color-riviera-blue)] p-3 shadow-soft ring-1 ring-[color:var(--color-border)] md:p-4">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-blue-500/20 opacity-50" />
+        <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-6">
+          <div className="max-w-xl">
+            <p className="eyebrow text-xs !text-white">Join Our Community</p>
+            <h3 className="headline mt-0.5 text-lg font-semibold text-white text-shimmer">
+              Sign up today for exclusive access
+            </h3>
+            <p className="mt-0.5 text-xs text-white/90 leading-relaxed">
+              Create a free account to get personalized news, save articles, and subscribe to our premium newsletter with exclusive neighborhood insights.
+            </p>
+          </div>
+          <div className="flex-shrink-0">
+            <Link
+              href="/signup"
+              className="inline-flex h-10 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-[color:var(--color-riviera-blue)] transition hover:bg-gray-50 shadow-sm whitespace-nowrap"
+            >
+              Create Account
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show newsletter form for logged-in users who haven't subscribed
+  return (
+    <>
+      <div className="relative overflow-hidden rounded-lg bg-white p-3 shadow-soft ring-1 ring-[color:var(--color-border)] md:p-4">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-purple-50 opacity-50" />
+        <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-6">
+          <div className="max-w-xl flex-1">
+            <p className="eyebrow text-xs text-[color:var(--color-medium)]">Newsletter</p>
+            <h3 className="headline mt-0.5 text-lg font-semibold text-[color:var(--color-dark)]">
+              Stay ahead with the Spring-Ford briefing
+            </h3>
+            <p className="mt-0.5 text-xs text-[color:var(--color-medium)] leading-relaxed">
+              Weekly highlights on neighborhood stories, council agendas, and upcoming
+              meetings. No spam. Ever.
+            </p>
+          </div>
+          <form
+            className="flex-shrink-0"
+            onSubmit={handleSubscribe}
+          >
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)] px-6 text-sm font-semibold text-white transition hover:bg-opacity-90 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            >
+              {submitting ? 'Subscribing...' : 'Subscribe'}
+            </button>
+          </form>
+        </div>
+      </div>
+      
+      <ThankYouModal isOpen={showThankYou} onClose={() => {
+        setShowThankYou(false)
+        setSubmitting(false)
+      }} />
+    </>
+  )
+}

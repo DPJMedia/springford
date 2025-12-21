@@ -5,12 +5,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-async function signInWithGoogle() {
+async function signInWithGoogle(newsletterSubscribed: boolean) {
   const supabase = createClient();
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: `${window.location.origin}/auth/callback?newsletter=${newsletterSubscribed ? 'true' : 'false'}`,
       queryParams: {
         access_type: 'offline',
         prompt: 'consent',
@@ -85,6 +85,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -122,6 +123,7 @@ export default function SignupPage() {
         data: {
           full_name: fullName,
           username: username,
+          newsletter_subscribed: newsletterSubscribed,
         },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
@@ -198,7 +200,7 @@ export default function SignupPage() {
           {/* Google Sign In */}
           <button
             type="button"
-            onClick={signInWithGoogle}
+            onClick={() => signInWithGoogle(newsletterSubscribed)}
             className="w-full flex items-center justify-center gap-3 rounded-lg border-2 border-[color:var(--color-border)] px-4 py-2.5 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition mb-4"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -337,6 +339,20 @@ export default function SignupPage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Newsletter Subscription Checkbox */}
+            <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-md border border-[color:var(--color-border)]">
+              <input
+                id="newsletter"
+                type="checkbox"
+                checked={newsletterSubscribed}
+                onChange={(e) => setNewsletterSubscribed(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-[color:var(--color-border)] text-[color:var(--color-riviera-blue)] focus:ring-[color:var(--color-riviera-blue)]"
+              />
+              <label htmlFor="newsletter" className="text-xs text-[color:var(--color-medium)] leading-relaxed cursor-pointer">
+                Sign up for our newsletter to receive weekly highlights on neighborhood stories, council agendas, and upcoming meetings. No spam. Ever.
+              </label>
             </div>
 
             {error && (

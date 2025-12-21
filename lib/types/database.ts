@@ -20,6 +20,7 @@ export interface UserProfile {
   account_number: string | null;
   is_admin: boolean;
   is_super_admin: boolean;
+  newsletter_subscribed: boolean;
   created_at: string;
   updated_at: string;
 }
