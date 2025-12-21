@@ -30,7 +30,6 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
   const [article, setArticle] = useState<Article>(initialArticle);
   const [relatedArticles, setRelatedArticles] = useState<Article[]>([]);
   const supabase = createClient();
-  const router = useRouter();
 
   useEffect(() => {
     // Increment view count
