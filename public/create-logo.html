@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<body>
+<canvas id="canvas" width="1200" height="630"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+ctx.fillStyle = '#3391af';
+ctx.fillRect(0, 0, 1200, 630);
+ctx.fillStyle = 'white';
+ctx.font = 'bold 72px Arial';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText('Spring-Ford Press', 600, 280);
+ctx.font = '32px Arial';
+ctx.fillText('Neighborhood-First Reporting', 600, 350);
+const link = document.createElement('a');
+link.download = 'springford-press-logo.png';
+link.href = canvas.toDataURL();
+link.click();
+</script>
+</body>
+</html>

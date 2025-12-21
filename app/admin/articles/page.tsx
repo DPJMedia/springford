@@ -17,6 +17,7 @@ interface Article {
   created_at: string;
   author_name: string | null;
   view_count: number;
+  share_count: number;
 }
 
 export default function ArticlesManagementPage() {
@@ -88,7 +89,7 @@ export default function ArticlesManagementPage() {
     // Then fetch all articles
     let query = supabase
       .from("articles")
-      .select("id, title, section, status, published_at, scheduled_for, created_at, author_name, view_count")
+      .select("id, title, section, status, published_at, scheduled_for, created_at, author_name, view_count, share_count")
       .order("created_at", { ascending: false });
 
     if (filter !== "all") {
@@ -260,6 +261,9 @@ export default function ArticlesManagementPage() {
                     Views
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)] uppercase tracking-wider">
+                    Shares
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)] uppercase tracking-wider">
                     Date
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-semibold text-[color:var(--color-dark)] uppercase tracking-wider">
@@ -305,6 +309,9 @@ export default function ArticlesManagementPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-[color:var(--color-medium)]">
                       {article.view_count}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[color:var(--color-medium)]">
+                      {article.share_count || 0}
                     </td>
                     <td className="px-6 py-4 text-sm text-[color:var(--color-medium)]">
                       {new Date(article.published_at || article.created_at).toLocaleDateString()}

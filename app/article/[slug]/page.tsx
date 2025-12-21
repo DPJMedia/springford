@@ -5,10 +5,11 @@ import { use } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { ShareButton } from "@/components/ShareButton";
+import { ArticleMetadata } from "@/components/ArticleMetadata";
 import type { Article } from "@/lib/types/database";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Head from "next/head";
 
 // Ad Placement Component
 function AdPlaceholder({ size, position }: { size: string; position: string }) {
@@ -115,20 +116,19 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
   const wasUpdated = article.published_at && article.updated_at && 
     new Date(article.updated_at).getTime() > new Date(article.published_at).getTime() + 60000;
 
+  const articleUrl = `/article/${article.slug}`
+  const fullArticleUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}${articleUrl}`
+    : `https://springford.press${articleUrl}`
+
   return (
     <>
-      <Head>
-        <title>{article.meta_title || article.title} | Spring-Ford Press</title>
-        <meta name="description" content={article.meta_description || article.excerpt || article.title} />
-        <meta property="og:title" content={article.meta_title || article.title} />
-        <meta property="og:description" content={article.meta_description || article.excerpt || ""} />
-        {article.image_url && <meta property="og:image" content={article.image_url} />}
-        <meta property="og:type" content="article" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={article.meta_title || article.title} />
-        <meta name="twitter:description" content={article.meta_description || article.excerpt || ""} />
-        {article.image_url && <meta name="twitter:image" content={article.image_url} />}
-      </Head>
+      <ArticleMetadata
+        title={article.meta_title || article.title}
+        description={article.meta_description || article.excerpt || article.title}
+        imageUrl={article.image_url}
+        articleUrl={articleUrl}
+      />
       <Header />
       <main className="bg-[color:var(--color-surface)] min-h-screen">
         <article className="mx-auto max-w-4xl px-4 py-8">
@@ -165,6 +165,8 @@ export default function ArticlePage({ params }: { params: Promise<{ slug: string
                 <span className="font-semibold text-[color:var(--color-dark)]">{article.author_name}</span>
                 <span>•</span>
                 <span>{article.view_count} views</span>
+                <span>•</span>
+                <ShareButton articleTitle={article.title} articleUrl={articleUrl} articleId={article.id} />
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-xs">

@@ -50,6 +50,7 @@ export interface Article {
   meta_title: string | null;
   meta_description: string | null;
   view_count: number;
+  share_count: number;
   is_featured: boolean;
   is_breaking: boolean;
   breaking_news_duration: number; // Hours to stay as breaking news
