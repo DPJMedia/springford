@@ -50,6 +50,7 @@ export default function AdsManagerPage() {
     runtime_seconds: null as number | null,
     display_order: 0,
     is_active: true,
+    fill_section: true, // Default to fill section
   });
   // Per-slot fill section settings
   const [slotFillSettings, setSlotFillSettings] = useState<Record<string, boolean>>({});
