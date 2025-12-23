@@ -63,7 +63,7 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
         if (!authorProfile && cleanAuthorName.includes('@')) {
           const { data: emailProfile } = await supabase
             .from("user_profiles")
-            .select("avatar_url, full_name, email")
+            .select("avatar_url, full_name, email, username")
             .eq("email", cleanAuthorName)
             .limit(1)
             .maybeSingle();

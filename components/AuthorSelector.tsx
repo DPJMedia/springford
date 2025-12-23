@@ -40,7 +40,7 @@ export function AuthorSelector({ value, onChange }: AuthorSelectorProps) {
   async function fetchAdmins() {
     const { data } = await supabase
       .from('user_profiles')
-      .select('id, email, full_name, is_admin, is_super_admin')
+      .select('*')
       .or('is_admin.eq.true,is_super_admin.eq.true')
       .order('full_name', { ascending: true })
 
