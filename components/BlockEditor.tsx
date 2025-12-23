@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { RichTextEditor } from "./RichTextEditor";
 
 export interface ContentBlock {
   id: string;
@@ -165,11 +166,9 @@ export function BlockEditor({ blocks, onChange }: BlockEditorProps) {
 
           {/* Block content */}
           {block.type === "text" ? (
-            <textarea
+            <RichTextEditor
               value={block.content || ""}
-              onChange={(e) => updateBlock(block.id, { content: e.target.value })}
-              rows={8}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(value) => updateBlock(block.id, { content: value })}
               placeholder="Write your content here..."
             />
           ) : (

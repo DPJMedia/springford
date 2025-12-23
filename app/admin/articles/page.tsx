@@ -18,6 +18,7 @@ interface Article {
   author_name: string | null;
   view_count: number;
   share_count: number;
+  image_url?: string | null;
 }
 
 export default function ArticlesManagementPage() {
@@ -25,12 +26,25 @@ export default function ArticlesManagementPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [editorsPicks, setEditorsPicks] = useState<string[]>([]);
+  const [mostReadOverrides, setMostReadOverrides] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
     checkAdminAndFetchArticles();
+    
+    // Load saved placements from localStorage
+    const savedPicks = localStorage.getItem("editorsPicks");
+    if (savedPicks) {
+      setEditorsPicks(JSON.parse(savedPicks));
+    }
+    
+    const savedOverrides = localStorage.getItem("mostReadOverrides");
+    if (savedOverrides) {
+      setMostReadOverrides(JSON.parse(savedOverrides));
+    }
     
     // Set up auto-refresh every 30 seconds to check for scheduled articles
     const refreshInterval = setInterval(() => {
@@ -92,7 +106,7 @@ export default function ArticlesManagementPage() {
       .select("id, title, section, status, published_at, scheduled_for, created_at, author_name, view_count, share_count")
       .order("created_at", { ascending: false });
 
-    if (filter !== "all") {
+    if (filter !== "all" && filter !== "placements") {
       query = query.eq("status", filter);
     }
 
@@ -222,11 +236,144 @@ export default function ArticlesManagementPage() {
             >
               Scheduled
             </button>
+            <button
+              onClick={() => setFilter("placements")}
+              className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                filter === "placements"
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
+              }`}
+            >
+              Article Placements
+            </button>
           </div>
         </div>
 
-        {/* Articles Table */}
-        {loading ? (
+        {/* Article Placements View */}
+        {filter === "placements" ? (
+          <div className="space-y-6">
+            {/* Editor's Picks Section */}
+            <div className="bg-white rounded-lg p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <svg className="w-6 h-6 text-[color:var(--color-riviera-blue)]" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+                <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Editor's Picks</h2>
+              </div>
+              <p className="text-sm text-[color:var(--color-medium)] mb-4">
+                Select up to 3 published articles to feature in the Editor's Picks section on the homepage.
+              </p>
+              <div className="space-y-3">
+                {loading ? (
+                  <p className="text-sm text-gray-500">Loading articles...</p>
+                ) : (
+                  [0, 1, 2].map((index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-gray-500 w-8">#{index + 1}</span>
+                      <select
+                        value={editorsPicks[index] || ""}
+                        onChange={(e) => {
+                          const newPicks = [...editorsPicks];
+                          newPicks[index] = e.target.value;
+                          setEditorsPicks(newPicks);
+                        }}
+                        className="flex-1 border border-gray-300 rounded-md px-4 py-2"
+                      >
+                        <option value="">Select an article...</option>
+                        {articles
+                          .filter((a) => a.status === "published")
+                          .map((article) => (
+                            <option key={article.id} value={article.id}>
+                              {article.title}
+                            </option>
+                          ))}
+                      </select>
+                      {editorsPicks[index] && (
+                        <button
+                          onClick={() => {
+                            const newPicks = [...editorsPicks];
+                            newPicks[index] = "";
+                            setEditorsPicks(newPicks);
+                          }}
+                          className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  const filteredPicks = editorsPicks.filter(Boolean);
+                  localStorage.setItem("editorsPicks", JSON.stringify(filteredPicks));
+                  alert(`Editor's Picks saved successfully! (${filteredPicks.length} articles selected)`);
+                }}
+                className="mt-4 px-6 py-2 bg-[color:var(--color-riviera-blue)] text-white rounded-md font-semibold hover:bg-opacity-90 transition"
+              >
+                Save Editor's Picks
+              </button>
+            </div>
+
+            {/* Most Read Section */}
+            <div className="bg-white rounded-lg p-6 shadow-sm">
+              <h2 className="text-xl font-bold text-[color:var(--color-dark)] mb-4">Most Read Articles</h2>
+              <p className="text-sm text-[color:var(--color-medium)] mb-4">
+                Top 5 articles by view count. You can remove articles from this list if needed.
+              </p>
+              {loading ? (
+                <p className="text-sm text-gray-500">Loading articles...</p>
+              ) : articles.filter((a) => a.status === "published" && !mostReadOverrides.includes(a.id)).length === 0 ? (
+                <p className="text-sm text-gray-500">No published articles found.</p>
+              ) : (
+                <div className="space-y-3">
+                  {articles
+                    .filter((a) => a.status === "published" && !mostReadOverrides.includes(a.id))
+                    .sort((a, b) => b.view_count - a.view_count)
+                    .slice(0, 5)
+                    .map((article, index) => (
+                    <div key={article.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl font-black text-gray-300">{index + 1}</span>
+                        <div>
+                          <h4 className="font-bold text-[color:var(--color-dark)]">{article.title}</h4>
+                          <p className="text-xs text-[color:var(--color-medium)]">
+                            {article.view_count.toLocaleString()} views
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Remove "${article.title}" from Most Read?`)) {
+                            const newOverrides = [...mostReadOverrides, article.id];
+                            setMostReadOverrides(newOverrides);
+                            localStorage.setItem("mostReadOverrides", JSON.stringify(newOverrides));
+                          }
+                        }}
+                        className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-md transition"
+                      >
+                        Hide
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {mostReadOverrides.length > 0 && (
+                <button
+                  onClick={() => {
+                    setMostReadOverrides([]);
+                    localStorage.removeItem("mostReadOverrides");
+                    alert("Most Read overrides cleared!");
+                  }}
+                  className="mt-4 px-6 py-2 bg-gray-200 text-[color:var(--color-dark)] rounded-md font-semibold hover:bg-gray-300 transition"
+                >
+                  Reset Hidden Articles
+                </button>
+              )}
+            </div>
+          </div>
+        ) : loading ? (
           <div className="text-center py-12">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[color:var(--color-riviera-blue)] border-r-transparent"></div>
           </div>

@@ -5,18 +5,32 @@ import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { NewsletterForm } from "@/components/NewsletterForm";
+import { AdDisplay } from "@/components/AdDisplay";
 import type { Article } from "@/lib/types/database";
 import Link from "next/link";
 
-// Ad Placement Component
-function AdPlaceholder({ size, position }: { size: string; position: string }) {
+// Ad slot wrapper component with numbering for admins
+function AdSlot({ 
+  slot, 
+  number, 
+  label, 
+  className = "",
+  isAdmin
+}: { 
+  slot: string; 
+  number: number; 
+  label: string; 
+  className?: string;
+  isAdmin: boolean;
+}) {
   return (
-    <div className="bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-dashed border-gray-400 rounded-lg flex items-center justify-center p-6">
-      <div className="text-center">
-        <div className="text-3xl mb-2">📢</div>
-        <p className="font-bold text-gray-700 text-sm mb-1">{size}</p>
-        <p className="text-xs text-gray-600">{position}</p>
-      </div>
+    <div className="relative">
+      {isAdmin && (
+        <div className="absolute -top-8 left-0 bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold z-10">
+          Section {number}: {label}
+        </div>
+      )}
+      <AdDisplay adSlot={slot} className={className} />
     </div>
   );
 }
@@ -211,19 +225,41 @@ function NewsSection({
 export default function Home() {
   const [heroArticle, setHeroArticle] = useState<Article | null>(null);
   const [featuredArticles, setFeaturedArticles] = useState<Article[]>([]);
+  const [editorsPicks, setEditorsPicks] = useState<Article[]>([]);
   const [latestArticles, setLatestArticles] = useState<Article[]>([]);
+  const [springCityArticles, setSpringCityArticles] = useState<Article[]>([]);
+  const [royersfordArticles, setRoyersfordArticles] = useState<Article[]>([]);
+  const [limerickArticles, setLimerickArticles] = useState<Article[]>([]);
+  const [upperProvidenceArticles, setUpperProvidenceArticles] = useState<Article[]>([]);
+  const [schoolDistrictArticles, setSchoolDistrictArticles] = useState<Article[]>([]);
   const [politicsArticles, setPoliticsArticles] = useState<Article[]>([]);
   const [businessArticles, setBusinessArticles] = useState<Article[]>([]);
-  const [localArticles, setLocalArticles] = useState<Article[]>([]);
-  const [sportsArticles, setSportsArticles] = useState<Article[]>([]);
-  const [worldArticles, setWorldArticles] = useState<Article[]>([]);
-  const [technologyArticles, setTechnologyArticles] = useState<Article[]>([]);
-  const [entertainmentArticles, setEntertainmentArticles] = useState<Article[]>([]);
+  const [eventsArticles, setEventsArticles] = useState<Article[]>([]);
   const [opinionArticles, setOpinionArticles] = useState<Article[]>([]);
   const [breakingNews, setBreakingNews] = useState<Article[]>([]);
   const [trendingArticles, setTrendingArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
+
+  // Check if user is admin (to show ad section numbers)
+  useEffect(() => {
+    async function checkAdmin() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile && (profile.role === "admin" || profile.role === "super_admin")) {
+          setIsAdmin(true);
+        }
+      }
+    }
+    checkAdmin();
+  }, []);
 
   useEffect(() => {
     fetchArticles();
@@ -283,6 +319,36 @@ export default function Home() {
       setFeaturedArticles(featuredData);
     }
 
+    // Fetch Editor's Picks from localStorage
+    const savedPicks = localStorage.getItem("editorsPicks");
+    if (savedPicks) {
+      try {
+        const pickIds = JSON.parse(savedPicks);
+        if (pickIds && pickIds.length > 0) {
+          const { data: picksData } = await supabase
+            .from("articles")
+            .select("*")
+            .in("id", pickIds)
+            .eq("status", "published");
+          
+          if (picksData) {
+            // Sort by the order in savedPicks
+            const sortedPicks = pickIds
+              .map((id: string) => picksData.find((a) => a.id === id))
+              .filter(Boolean);
+            setEditorsPicks(sortedPicks);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading editor's picks:", error);
+      }
+    }
+    
+    // Fallback to featured articles if no editor's picks
+    if (!savedPicks && featuredData) {
+      setEditorsPicks(featuredData.slice(0, 3));
+    }
+
     // Fetch latest articles
     const { data: latestData } = await supabase
       .from("articles")
@@ -299,13 +365,14 @@ export default function Home() {
 
     // Fetch articles by section
     const sections = [
+      { name: 'spring-city', setter: setSpringCityArticles },
+      { name: 'royersford', setter: setRoyersfordArticles },
+      { name: 'limerick', setter: setLimerickArticles },
+      { name: 'upper-providence', setter: setUpperProvidenceArticles },
+      { name: 'school-district', setter: setSchoolDistrictArticles },
       { name: 'politics', setter: setPoliticsArticles },
       { name: 'business', setter: setBusinessArticles },
-      { name: 'local', setter: setLocalArticles },
-      { name: 'sports', setter: setSportsArticles },
-      { name: 'world', setter: setWorldArticles },
-      { name: 'technology', setter: setTechnologyArticles },
-      { name: 'entertainment', setter: setEntertainmentArticles },
+      { name: 'events', setter: setEventsArticles },
       { name: 'opinion', setter: setOpinionArticles },
     ];
 
@@ -380,9 +447,15 @@ export default function Home() {
             <NewsletterForm />
           </section>
 
-          {/* TOP AD SPACE */}
-          <section className="mb-8">
-            <AdPlaceholder size="LEADERBOARD (728x90)" position="Top Banner - High Visibility" />
+          {/* AD SECTION 1 */}
+          <section className="mb-8 relative pt-8">
+            <AdSlot 
+              slot="homepage-banner-top" 
+              number={1} 
+              label="Banner Below Hero" 
+              className="w-full"
+              isAdmin={isAdmin}
+            />
           </section>
 
           {loading ? (
@@ -416,9 +489,15 @@ export default function Home() {
                     )}
                   </section>
 
-                  {/* MID-CONTENT AD */}
-                  <div>
-                    <AdPlaceholder size="LARGE RECTANGLE (336x280)" position="Mid-Content Ad" />
+                  {/* AD SECTION 5 - MAIN CONTENT TOP */}
+                  <div className="relative pt-8">
+                    <AdSlot 
+                      slot="homepage-content-top" 
+                      number={5} 
+                      label="Main Content Top" 
+                      className="w-full"
+                      isAdmin={isAdmin}
+                    />
                   </div>
 
                   {/* Latest News */}
@@ -428,17 +507,69 @@ export default function Home() {
                     sectionName="latest"
                   />
 
+                  {/* Spring City */}
+                  <NewsSection 
+                    title="Spring City" 
+                    articles={springCityArticles} 
+                    sectionName="spring-city"
+                  />
+
+                  {/* Royersford */}
+                  <NewsSection 
+                    title="Royersford" 
+                    articles={royersfordArticles} 
+                    sectionName="royersford"
+                  />
+
+                  {/* AD SECTION 6 - MAIN CONTENT MIDDLE 1 */}
+                  <div className="relative pt-8">
+                    <AdSlot 
+                      slot="homepage-content-middle-1" 
+                      number={6} 
+                      label="Main Content Middle 1" 
+                      className="w-full"
+                      isAdmin={isAdmin}
+                    />
+                  </div>
+
+                  {/* Limerick */}
+                  <NewsSection 
+                    title="Limerick" 
+                    articles={limerickArticles} 
+                    sectionName="limerick"
+                  />
+
+                  {/* Upper Providence */}
+                  <NewsSection 
+                    title="Upper Providence" 
+                    articles={upperProvidenceArticles} 
+                    sectionName="upper-providence"
+                  />
+
+                  {/* School District */}
+                  <NewsSection 
+                    title="School District" 
+                    articles={schoolDistrictArticles} 
+                    sectionName="school-district"
+                  />
+
+                  {/* AD SECTION 7 - MAIN CONTENT MIDDLE 2 */}
+                  <div className="relative pt-8">
+                    <AdSlot 
+                      slot="homepage-content-middle-2" 
+                      number={7} 
+                      label="Main Content Middle 2" 
+                      className="w-full"
+                      isAdmin={isAdmin}
+                    />
+                  </div>
+
                   {/* Politics */}
                   <NewsSection 
                     title="Politics" 
                     articles={politicsArticles} 
                     sectionName="politics"
                   />
-
-                  {/* BETWEEN SECTIONS AD */}
-                  <div>
-                    <AdPlaceholder size="MEDIUM RECTANGLE (300x250)" position="Between Sections" />
-                  </div>
 
                   {/* Business */}
                   <NewsSection 
@@ -447,44 +578,11 @@ export default function Home() {
                     sectionName="business"
                   />
 
-                  {/* Local */}
+                  {/* Events */}
                   <NewsSection 
-                    title="Local" 
-                    articles={localArticles} 
-                    sectionName="local"
-                  />
-
-                  {/* BETWEEN SECTIONS AD */}
-                  <div>
-                    <AdPlaceholder size="MEDIUM RECTANGLE (300x250)" position="Between Sections" />
-                  </div>
-
-                  {/* Sports */}
-                  <NewsSection 
-                    title="Sports" 
-                    articles={sportsArticles} 
-                    sectionName="sports"
-                  />
-
-                  {/* World */}
-                  <NewsSection 
-                    title="World" 
-                    articles={worldArticles} 
-                    sectionName="world"
-                  />
-
-                  {/* Technology */}
-                  <NewsSection 
-                    title="Technology" 
-                    articles={technologyArticles} 
-                    sectionName="technology"
-                  />
-
-                  {/* Entertainment */}
-                  <NewsSection 
-                    title="Entertainment" 
-                    articles={entertainmentArticles} 
-                    sectionName="entertainment"
+                    title="Events" 
+                    articles={eventsArticles} 
+                    sectionName="events"
                   />
 
                   {/* Opinion */}
@@ -497,35 +595,18 @@ export default function Home() {
 
                 {/* SIDEBAR */}
                 <aside className="lg:col-span-4 space-y-6">
-                  {/* SIDEBAR AD 1 - TOP */}
-                  <div className="sticky top-6">
-                    <AdPlaceholder size="MEDIUM RECTANGLE (300x250)" position="Sidebar Top - Sticky" />
+                  {/* AD SECTION 2 - SIDEBAR TOP (STATIC BOX) */}
+                  <div className="relative pt-8">
+                    <AdSlot 
+                      slot="homepage-sidebar-top" 
+                      number={2} 
+                      label="Sidebar Top (Above Trending)" 
+                      className="w-full"
+                      isAdmin={isAdmin}
+                    />
                   </div>
 
-                  {/* Trending */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
-                      Trending Now
-                    </h3>
-                    {trendingArticles.length === 0 ? (
-                      <p className="text-sm text-[color:var(--color-medium)] text-center py-4">
-                        No trending articles yet
-                      </p>
-                    ) : (
-                      <div>
-                        {trendingArticles.map((article) => (
-                          <ArticleCard key={article.id} article={article} size="compact" />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* SIDEBAR AD 2 */}
-                  <div>
-                    <AdPlaceholder size="MEDIUM RECTANGLE (300x250)" position="Sidebar Middle" />
-                  </div>
-
-                  {/* Most Read */}
+                  {/* Most Read - Numbered List */}
                   <div className="bg-white rounded-lg p-4 shadow-sm">
                     <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
                       Most Read
@@ -552,6 +633,9 @@ export default function Home() {
                                 <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2">
                                   {article.title}
                                 </h4>
+                                <p className="text-xs text-[color:var(--color-medium)] mt-1">
+                                  {article.view_count.toLocaleString()} views
+                                </p>
                               </div>
                             </Link>
                           ))}
@@ -559,16 +643,89 @@ export default function Home() {
                     )}
                   </div>
 
-                  {/* SIDEBAR AD 3 - BOTTOM */}
-                  <div>
-                    <AdPlaceholder size="SKYSCRAPER (160x600)" position="Sidebar Bottom - Sticky Tall" />
+                  {/* AD SECTION 3 - SIDEBAR MIDDLE */}
+                  <div className="relative pt-8">
+                    <AdSlot 
+                      slot="homepage-sidebar-middle" 
+                      number={3} 
+                      label="Sidebar Middle" 
+                      className="w-full"
+                      isAdmin={isAdmin}
+                    />
+                  </div>
+
+                  {/* Editor's Picks - Curated Content */}
+                  <div className="bg-gradient-to-br from-blue-50 to-white rounded-lg p-4 shadow-sm border border-blue-100">
+                    <div className="flex items-center gap-2 mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
+                      <svg className="w-5 h-5 text-[color:var(--color-riviera-blue)]" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                      <h3 className="text-lg font-black text-[color:var(--color-dark)]">
+                      Editor's Picks
+                    </h3>
+                  </div>
+                    {editorsPicks.length === 0 ? (
+                      <p className="text-sm text-[color:var(--color-medium)] text-center py-4">
+                        No editor's picks yet
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {editorsPicks.map((article) => (
+                          <Link
+                            key={article.id}
+                            href={`/article/${article.slug}`}
+                            className="block group"
+                          >
+                            <div className="flex gap-3">
+                              {article.image_url && (
+                                <div className="flex-shrink-0 w-20 h-20 overflow-hidden rounded">
+                                  <img
+                                    src={article.image_url}
+                                    alt={article.title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2 mb-1">
+                                  {article.title}
+                                </h4>
+                                <p className="text-xs text-[color:var(--color-medium)]">
+                                  {new Date(article.published_at || "").toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric"
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AD SECTION 4 - SIDEBAR BOTTOM */}
+                  <div className="relative pt-8">
+                    <AdSlot 
+                      slot="homepage-sidebar-bottom" 
+                      number={4} 
+                      label="Sidebar Bottom" 
+                      className="w-full"
+                      isAdmin={isAdmin}
+                    />
                   </div>
                 </aside>
               </div>
 
-              {/* BOTTOM AD SPACE */}
-              <section className="mt-8">
-                <AdPlaceholder size="LEADERBOARD (728x90)" position="Bottom Banner - Exit Intent" />
+              {/* AD SECTION 8 - BOTTOM BANNER */}
+              <section className="mt-8 relative pt-8">
+                <AdSlot 
+                  slot="homepage-banner-bottom" 
+                  number={8} 
+                  label="Banner Bottom" 
+                  className="w-full"
+                  isAdmin={isAdmin}
+                />
               </section>
             </>
           )}

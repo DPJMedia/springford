@@ -9,14 +9,15 @@ interface SectionSelectorProps {
 
 const AVAILABLE_SECTIONS = [
   { value: "hero", label: "Hero (Top of Page)", description: "Article becomes the main hero story at the top of the homepage" },
-  { value: "politics", label: "Politics", description: "Appears in Politics section" },
-  { value: "business", label: "Business", description: "Appears in Business section" },
-  { value: "local", label: "Local", description: "Appears in Local news section" },
-  { value: "sports", label: "Sports", description: "Appears in Sports section" },
-  { value: "world", label: "World", description: "Appears in World news section" },
-  { value: "technology", label: "Technology", description: "Appears in Technology section" },
-  { value: "entertainment", label: "Entertainment", description: "Appears in Entertainment section" },
-  { value: "opinion", label: "Opinion", description: "Appears in Opinion section" },
+  { value: "spring-city", label: "Spring City", description: "News from Spring City area" },
+  { value: "royersford", label: "Royersford", description: "News from Royersford area" },
+  { value: "limerick", label: "Limerick", description: "News from Limerick area" },
+  { value: "upper-providence", label: "Upper Providence", description: "News from Upper Providence area" },
+  { value: "school-district", label: "School District", description: "School district news and updates" },
+  { value: "politics", label: "Politics", description: "Local politics and government" },
+  { value: "business", label: "Business", description: "Local business news" },
+  { value: "events", label: "Events", description: "Community events and activities" },
+  { value: "opinion", label: "Opinion", description: "Opinion pieces and editorials" },
 ];
 
 export function SectionSelector({ selectedSections, onChange }: SectionSelectorProps) {

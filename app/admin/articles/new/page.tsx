@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BlockEditor, ContentBlock } from "@/components/BlockEditor";
 import { SectionSelector } from "@/components/SectionSelector";
+import { CategorySelector } from "@/components/CategorySelector";
 import { Tooltip } from "@/components/Tooltip";
 import { DateTimePicker } from "@/components/DateTimePicker";
+import { AuthorSelector } from "@/components/AuthorSelector";
+import { TagSelector } from "@/components/TagSelector";
 
 export default function NewArticlePage() {
   const [title, setTitle] = useState("");
@@ -18,7 +21,7 @@ export default function NewArticlePage() {
   ]);
   const [sections, setSections] = useState<string[]>([]);
   const [category, setCategory] = useState("");
-  const [tags, setTags] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   
   // Featured Image
   const [useFeaturedImage, setUseFeaturedImage] = useState(false);
@@ -145,7 +148,7 @@ export default function NewArticlePage() {
       }
 
       const slug = generateSlug(title);
-      const tagsArray = tags ? tags.split(",").map((t) => t.trim()) : null;
+      const tagsArray = tags && tags.length > 0 ? tags : null;
 
       let status: "draft" | "published" | "scheduled" = "draft";
       let publishedAt = null;
@@ -250,6 +253,9 @@ export default function NewArticlePage() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">Basic Information</h2>
             
             <div className="space-y-4">
+              {/* Author Selection */}
+              <AuthorSelector value={authorName} onChange={setAuthorName} />
+
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center">
                   Title *
@@ -420,32 +426,14 @@ export default function NewArticlePage() {
           <div className="bg-white rounded-lg p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Category & Tags</h2>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center">
-                  Category
-                  <Tooltip text="An optional category to further classify your article (e.g., Breaking News, Opinion, Analysis, Feature Story). This helps with organization and filtering." />
-                </label>
-                <input
-                  type="text"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-4 py-2"
-                  placeholder="e.g., Breaking News, Analysis"
-                />
-              </div>
+              <CategorySelector value={category} onChange={setCategory} />
 
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center">
-                  Tags (comma-separated)
-                  <Tooltip text="Keywords related to your article, separated by commas. Tags help readers find related content and improve SEO. Example: education, budget, school board" />
+                  Tags
+                  <Tooltip text="Keywords related to your article. Tags help readers find related content and improve SEO. You can use existing tags or create new ones." />
                 </label>
-                <input
-                  type="text"
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-4 py-2"
-                  placeholder="e.g., education, budget, election"
-                />
+                <TagSelector selectedTags={tags} onChange={setTags} />
               </div>
             </div>
           </div>
@@ -502,18 +490,6 @@ export default function NewArticlePage() {
                 )}
               </div>
 
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={allowComments}
-                  onChange={(e) => setAllowComments(e.target.checked)}
-                  className="w-5 h-5"
-                />
-                <span className="text-sm font-medium flex items-center">
-                  Allow Comments
-                  <Tooltip text="Check this to enable reader comments on this article. Uncheck to disable comments (useful for sensitive topics or when you want to prevent discussion). Comments are enabled by default." />
-                </span>
-              </label>
             </div>
           </div>
 

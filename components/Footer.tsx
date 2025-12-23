@@ -26,7 +26,7 @@ export function Footer() {
             </a>
           </div>
         </div>
-        <p className="text-xs">Independent, neighborhood-first reporting. No banner ads.</p>
+        <p className="text-xs">Independent, neighborhood-first reporting.</p>
       </div>
     </footer>
   );

@@ -145,3 +145,46 @@ a {
 .text-glow {
   animation: glow 2s ease-in-out infinite;
 }
+
+/* Markdown Content Styling */
+.markdown-content {
+  line-height: 1.8;
+}
+
+.markdown-content p {
+  margin-bottom: 1rem;
+  white-space: pre-wrap;
+  font-weight: 400;
+}
+
+.markdown-content strong,
+.markdown-content b {
+  font-weight: 700 !important;
+  color: inherit;
+}
+
+.markdown-content em,
+.markdown-content i {
+  font-style: italic !important;
+}
+
+.markdown-content a {
+  color: #2563eb;
+  text-decoration: underline;
+  transition: color 0.2s;
+  font-weight: 400;
+}
+
+.markdown-content a:hover {
+  color: #1d4ed8;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.5rem;
+}

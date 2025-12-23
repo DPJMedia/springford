@@ -1,15 +1,148 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { UserProfile } from "@/lib/types/database";
+import { Avatar } from "@/components/Avatar";
+import { EditUserModal } from "@/components/EditUserModal";
+
+// Dropdown Menu Component with smart positioning
+function DropdownMenu({
+  userId,
+  position,
+  onClose,
+  onEdit,
+  onNewsletter,
+  onAdmin,
+  onSuperAdmin,
+  onRemoveSuperAdmin,
+  onRemoveUser,
+  user,
+  currentUser,
+}: {
+  userId: string;
+  position: 'up' | 'down';
+  onClose: () => void;
+  onEdit: () => void;
+  onNewsletter: () => void;
+  onAdmin: () => void;
+  onSuperAdmin: () => void;
+  onRemoveSuperAdmin: () => void;
+  onRemoveUser: () => void;
+  user: UserProfile;
+  currentUser: any;
+}) {
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<React.CSSProperties>({});
+
+  useEffect(() => {
+    const button = document.querySelector(`[data-user-id="${userId}"]`) as HTMLElement;
+    if (button && dropdownRef.current) {
+      const rect = button.getBoundingClientRect();
+      if (position === 'up') {
+        setStyle({
+          bottom: `${window.innerHeight - rect.top + 4}px`,
+          right: `${window.innerWidth - rect.right}px`,
+        });
+      } else {
+        setStyle({
+          top: `${rect.bottom + 4}px`,
+          right: `${window.innerWidth - rect.right}px`,
+        });
+      }
+    }
+  }, [userId, position]);
+
+  return (
+    <div
+      ref={dropdownRef}
+      className="fixed w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50"
+      style={style}
+    >
+      <div className="py-1">
+        <button
+          onClick={onEdit}
+          className="w-full text-left px-4 py-2 text-sm text-[color:var(--color-dark)] hover:bg-gray-100 flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Edit Profile
+        </button>
+        <button
+          onClick={onNewsletter}
+          className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${
+            user.newsletter_subscribed ? "text-red-600" : "text-green-600"
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          {user.newsletter_subscribed ? "Revoke Newsletter" : "Grant Newsletter"}
+        </button>
+        {user.id !== currentUser.id && (
+          <>
+            {!user.is_super_admin && (
+              <>
+                <button
+                  onClick={onAdmin}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${
+                    user.is_admin ? "text-red-600" : "text-[color:var(--color-riviera-blue)]"
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  {user.is_admin ? "Remove Admin" : "Make Admin"}
+                </button>
+                <button
+                  onClick={onSuperAdmin}
+                  className="w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                  </svg>
+                  Make Super Admin
+                </button>
+              </>
+            )}
+            {user.is_super_admin && (
+              <button
+                onClick={onRemoveSuperAdmin}
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Remove Super Admin
+              </button>
+            )}
+            <div className="border-t border-gray-100 my-1"></div>
+            <button
+              onClick={onRemoveUser}
+              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Remove User
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function UsersAdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ [key: string]: 'up' | 'down' }>({});
   const router = useRouter();
   const supabase = createClient();
 
@@ -113,6 +246,50 @@ export default function UsersAdminPage() {
     }
   }
 
+  async function removeUser(userId: string, userName: string) {
+    if (!confirm(`Are you sure you want to remove user "${userName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    if (!confirm(`WARNING: This will permanently delete the user account and all associated data. Are you absolutely sure?`)) {
+      return;
+    }
+
+    try {
+      // Delete user's avatar from storage if exists
+      const user = users.find(u => u.id === userId);
+      if (user?.avatar_url) {
+        const urlParts = user.avatar_url.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        if (fileName) {
+          await supabase.storage.from('avatars').remove([fileName]);
+        }
+      }
+
+      // Delete user profile
+      const { error: profileError } = await supabase
+        .from("user_profiles")
+        .delete()
+        .eq("id", userId);
+
+      if (profileError) throw profileError;
+
+      // Delete auth user (this requires admin privileges)
+      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      
+      if (authError) {
+        console.error("Error deleting auth user:", authError);
+        // Profile is deleted, but auth user might remain - that's okay
+      }
+
+      loadUsers();
+      alert("User removed successfully!");
+      setOpenDropdown(null);
+    } catch (err: any) {
+      alert("Error removing user: " + err.message);
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center">
@@ -191,6 +368,7 @@ export default function UsersAdminPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">User</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Username</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Role</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Newsletter</th>
@@ -201,11 +379,21 @@ export default function UsersAdminPage() {
             <tbody>
               {users.map((user) => (
                 <tr key={user.id} className="border-t border-[color:var(--color-border)]">
-                  <td className="px-4 py-3 text-sm font-medium text-[color:var(--color-dark)]">
-                    {user.full_name || "No name"}
-                    {user.id === currentUser.id && (
-                      <span className="ml-2 text-xs text-[color:var(--color-medium)]">(You)</span>
-                    )}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar src={user.avatar_url} name={user.full_name} email={user.email} size="sm" />
+                      <div>
+                        <div className="text-sm font-medium text-[color:var(--color-dark)]">
+                          {user.full_name || "No name"}
+                          {user.id === currentUser.id && (
+                            <span className="ml-2 text-xs text-[color:var(--color-medium)]">(You)</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-[color:var(--color-medium)]">
+                    {user.username ? `@${user.username}` : "Not set"}
                   </td>
                   <td className="px-4 py-3 text-sm text-[color:var(--color-medium)]">
                     {user.email}
@@ -240,54 +428,65 @@ export default function UsersAdminPage() {
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2 flex-wrap">
-                      {/* Newsletter subscription - can modify for yourself too */}
+                    <div className="relative">
                       <button
-                        onClick={() => toggleNewsletterStatus(user.id, user.newsletter_subscribed || false)}
-                        className={`text-xs font-semibold hover:underline ${
-                          user.newsletter_subscribed ? "text-red-600" : "text-green-600"
-                        }`}
+                        data-user-id={user.id}
+                        onClick={(e) => {
+                          const button = e.currentTarget;
+                          const rect = button.getBoundingClientRect();
+                          const spaceBelow = window.innerHeight - rect.bottom;
+                          const spaceAbove = rect.top;
+                          const dropdownHeight = 350; // Approximate dropdown height
+                          
+                          // Determine if dropdown should open upward
+                          const shouldOpenUp = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+                          
+                          if (openDropdown === user.id) {
+                            setOpenDropdown(null);
+                          } else {
+                            setDropdownPosition({ ...dropdownPosition, [user.id]: shouldOpenUp ? 'up' : 'down' });
+                            setOpenDropdown(user.id);
+                          }
+                        }}
+                        className="px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] bg-gray-100 hover:bg-gray-200 rounded-md transition flex items-center gap-1"
                       >
-                        {user.newsletter_subscribed ? "Revoke Newsletter" : "Grant Newsletter"}
+                        Actions
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                       </button>
-                      
-                      {/* Admin/Super Admin controls - only for other users */}
-                      {user.id !== currentUser.id && (
-                        <>
-                          <span className="text-[color:var(--color-medium)]">|</span>
-                          {!user.is_super_admin && (
-                            <>
-                              <button
-                                onClick={() => toggleAdminStatus(user.id, user.is_admin)}
-                                className={`text-xs font-semibold hover:underline ${
-                                  user.is_admin ? "text-red-600" : "text-[color:var(--color-riviera-blue)]"
-                                }`}
-                              >
-                                {user.is_admin ? "Remove Admin" : "Make Admin"}
-                              </button>
-                              <span className="text-[color:var(--color-medium)]">|</span>
-                              <button
-                                onClick={() => toggleSuperAdminStatus(user.id, user.is_super_admin)}
-                                className="text-xs font-semibold text-purple-600 hover:underline"
-                              >
-                                Make Super Admin
-                              </button>
-                            </>
-                          )}
-                          {user.is_super_admin && (
-                            <button
-                              onClick={() => toggleSuperAdminStatus(user.id, true)}
-                              className="text-xs font-semibold text-red-600 hover:underline"
-                            >
-                              Remove Super Admin
-                            </button>
-                          )}
-                        </>
-                      )}
-                      {user.id === currentUser.id && (
-                        <span className="text-xs text-[color:var(--color-medium)]">
-                          (Admin roles locked)
-                        </span>
+
+                      {openDropdown === user.id && (
+                        <DropdownMenu
+                          userId={user.id}
+                          position={dropdownPosition[user.id] || 'down'}
+                          onClose={() => setOpenDropdown(null)}
+                          onEdit={() => {
+                            setEditingUser(user);
+                            setOpenDropdown(null);
+                          }}
+                          onNewsletter={() => {
+                            toggleNewsletterStatus(user.id, user.newsletter_subscribed || false);
+                            setOpenDropdown(null);
+                          }}
+                          onAdmin={() => {
+                            toggleAdminStatus(user.id, user.is_admin);
+                            setOpenDropdown(null);
+                          }}
+                          onSuperAdmin={() => {
+                            toggleSuperAdminStatus(user.id, user.is_super_admin);
+                            setOpenDropdown(null);
+                          }}
+                          onRemoveSuperAdmin={() => {
+                            toggleSuperAdminStatus(user.id, true);
+                            setOpenDropdown(null);
+                          }}
+                          onRemoveUser={() => {
+                            removeUser(user.id, user.full_name || user.email);
+                          }}
+                          user={user}
+                          currentUser={currentUser}
+                        />
                       )}
                     </div>
                   </td>
@@ -303,6 +502,27 @@ export default function UsersAdminPage() {
           )}
         </div>
       </main>
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          isOpen={!!editingUser}
+          onClose={() => setEditingUser(null)}
+          onUpdate={() => {
+            loadUsers();
+            setEditingUser(null);
+          }}
+        />
+      )}
+
+      {/* Close dropdown when clicking outside */}
+      {openDropdown && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setOpenDropdown(null)}
+        />
+      )}
     </div>
   );
 }

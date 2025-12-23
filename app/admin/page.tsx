@@ -204,26 +204,50 @@ export default function AdminPage() {
 
           {/* User Management (Super Admin Only) */}
           {profile?.is_super_admin && (
-            <Link
-              href="/admin/users"
-              className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-600 transition">
-                  <svg className="w-6 h-6 text-purple-600 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
+            <>
+              <Link
+                href="/admin/users"
+                className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-600 transition">
+                    <svg className="w-6 h-6 text-purple-600 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-[color:var(--color-dark)] group-hover:text-purple-600 transition">
+                      User Management
+                    </h3>
+                    <p className="text-sm text-[color:var(--color-medium)]">
+                      Manage users and permissions
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-[color:var(--color-dark)] group-hover:text-purple-600 transition">
-                    User Management
-                  </h3>
-                  <p className="text-sm text-[color:var(--color-medium)]">
-                    Manage users and permissions
-                  </p>
+              </Link>
+
+              {/* Ad Manager (Super Admin Only) */}
+              <Link
+                href="/admin/ads"
+                className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center group-hover:bg-orange-600 transition">
+                    <svg className="w-6 h-6 text-orange-600 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-[color:var(--color-dark)] group-hover:text-orange-600 transition">
+                      Ad Manager
+                    </h3>
+                    <p className="text-sm text-[color:var(--color-medium)]">
+                      Manage advertisements and ad slots
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            </>
           )}
 
           {/* Site Settings */}
