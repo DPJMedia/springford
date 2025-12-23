@@ -658,6 +658,7 @@ export default function AdsManagerPage() {
         runtime_seconds: ad.runtime_seconds,
         display_order: ad.display_order || 0,
         is_active: ad.is_active,
+        fill_section: true,
       });
       // Load per-slot fill settings
       const fillSettings: Record<string, boolean> = {};
@@ -683,6 +684,7 @@ export default function AdsManagerPage() {
         runtime_seconds: null,
         display_order: 0,
         is_active: true,
+        fill_section: true,
       });
       setSlotFillSettings({});
       setImagePreview(null);
