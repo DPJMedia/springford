@@ -810,15 +810,15 @@ export default function AdsManagerPage() {
             <tbody>
               {ads.map((ad: any) => (
                 <tr key={ad.id} className="border-t border-[color:var(--color-border)]">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 w-64">
                     <div className="flex items-center gap-3">
                       <img
                         src={ad.image_url}
                         alt={ad.title || "Ad"}
-                        className="w-16 h-16 object-cover rounded"
+                        className="w-16 h-16 object-cover rounded flex-shrink-0"
                       />
-                      <div>
-                        <div className="text-sm font-medium text-[color:var(--color-dark)]">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-[color:var(--color-dark)] truncate">
                           {ad.title || "Untitled Ad"}
                         </div>
                         {ad.runtime_seconds && (
@@ -830,11 +830,11 @@ export default function AdsManagerPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-[color:var(--color-medium)]">
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1 max-w-md">
                       {(ad.slots || [ad.ad_slot].filter(Boolean)).map((slot: string) => (
                         <span
                           key={slot}
-                          className="inline-flex rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-semibold"
+                          className="inline-flex rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-semibold whitespace-nowrap"
                         >
                           {getSlotLabel(slot)}
                         </span>
