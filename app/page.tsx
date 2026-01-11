@@ -249,11 +249,11 @@ export default function Home() {
       if (user) {
         const { data: profile } = await supabase
           .from("user_profiles")
-          .select("role")
+          .select("is_admin, is_super_admin")
           .eq("id", user.id)
           .single();
         
-        if (profile && (profile.role === "admin" || profile.role === "super_admin")) {
+        if (profile && (profile.is_admin || profile.is_super_admin)) {
           setIsAdmin(true);
         }
       }
