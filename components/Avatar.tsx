@@ -47,3 +47,5 @@ export function Avatar({ src, name, email, size = 'md', className = '' }: Avatar
   )
 }
 
+
+

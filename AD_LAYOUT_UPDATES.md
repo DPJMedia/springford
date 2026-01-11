@@ -132,3 +132,5 @@ This adds `article-inline-1` and `article-inline-2` to the `ad_settings` table.
 - Images always fill their ad space using `object-cover`
 - No more sizing inconsistencies between preview and live site!
 
+
+

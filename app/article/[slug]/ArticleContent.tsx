@@ -28,7 +28,19 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
 
   useEffect(() => {
     // Increment view count
-    supabase.rpc("increment_article_views", { article_id: article.id });
+    async function incrementViews() {
+      try {
+        const { error } = await supabase.rpc("increment_article_views", { 
+          article_id: article.id 
+        });
+        if (error) {
+          console.error("Error incrementing views:", error);
+        }
+      } catch (err) {
+        console.error("Failed to increment views:", err);
+      }
+    }
+    incrementViews();
 
     // Fetch author profile if author_name exists
     async function fetchAuthorProfile() {

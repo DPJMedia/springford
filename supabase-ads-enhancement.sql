@@ -96,3 +96,5 @@ BEGIN
   RAISE NOTICE 'Ads enhancement migration completed successfully!';
 END $$;
 
+
+

@@ -30,3 +30,5 @@ BEGIN
   RAISE NOTICE 'Newsletter subscription column added successfully!';
 END $$;
 
+
+

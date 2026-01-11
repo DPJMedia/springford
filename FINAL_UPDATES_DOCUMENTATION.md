@@ -385,3 +385,5 @@ All requested changes have been implemented:
 4. Test category filters on Town Council page
 5. Confirm mobile responsiveness on various devices
 
+
+

@@ -96,3 +96,5 @@ EXECUTE FUNCTION notify_super_admins_ad_change();
 -- The notification system is now updated and working
 -- Try editing an article - other admins should get notified!
 
+
+

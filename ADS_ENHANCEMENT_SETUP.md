@@ -135,3 +135,5 @@ Result: Ad 1 displays for 10s → Ad 2 for 15s → Ad 3 for 5s → repeat
 - Click ad slots in preview to see selection
 - Switch between Homepage/Article preview modes
 
+
+

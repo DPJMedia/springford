@@ -18,3 +18,5 @@ BEGIN
   RAISE NOTICE 'display_order column added to ads table successfully!';
 END $$;
 
+
+

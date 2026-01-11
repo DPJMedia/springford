@@ -28,3 +28,5 @@ BEGIN
   RAISE NOTICE 'New slots: article-inline-1, article-inline-2';
 END $$;
 
+
+

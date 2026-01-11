@@ -39,3 +39,5 @@ BEGIN
   RAISE NOTICE 'Profile avatar migration completed successfully!';
 END $$;
 
+
+

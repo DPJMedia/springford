@@ -190,3 +190,5 @@ ON CONFLICT (ad_slot) DO NOTHING;
 3. Monitor performance and user engagement
 4. Consider A/B testing different ad sizes if needed
 
+
+

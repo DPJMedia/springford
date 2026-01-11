@@ -148,3 +148,5 @@ You have two options:
 - The welcome email will be sent when they subscribe (once you set up email templates)
 - All subscription status is tracked in the `user_profiles.newsletter_subscribed` field
 
+
+

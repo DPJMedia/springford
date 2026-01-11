@@ -49,3 +49,5 @@ BEGIN
   RAISE NOTICE 'Make sure the ads bucket exists and is set to public in Supabase Dashboard → Storage';
 END $$;
 
+
+
