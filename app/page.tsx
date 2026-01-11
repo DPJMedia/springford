@@ -9,27 +9,16 @@ import { AdDisplay } from "@/components/AdDisplay";
 import type { Article } from "@/lib/types/database";
 import Link from "next/link";
 
-// Ad slot wrapper component with numbering for admins
+// Ad slot wrapper component
 function AdSlot({ 
   slot, 
-  number, 
-  label, 
-  className = "",
-  isAdmin
+  className = ""
 }: { 
   slot: string; 
-  number: number; 
-  label: string; 
   className?: string;
-  isAdmin: boolean;
 }) {
   return (
     <div className="relative">
-      {isAdmin && (
-        <div className="absolute -top-8 left-0 bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold z-10">
-          Section {number}: {label}
-        </div>
-      )}
       <AdDisplay adSlot={slot} className={className} />
     </div>
   );
@@ -239,27 +228,7 @@ export default function Home() {
   const [breakingNews, setBreakingNews] = useState<Article[]>([]);
   const [trendingArticles, setTrendingArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
-
-  // Check if user is admin (to show ad section numbers)
-  useEffect(() => {
-    async function checkAdmin() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("is_admin, is_super_admin")
-          .eq("id", user.id)
-          .single();
-        
-        if (profile && (profile.is_admin || profile.is_super_admin)) {
-          setIsAdmin(true);
-        }
-      }
-    }
-    checkAdmin();
-  }, []);
 
   useEffect(() => {
     fetchArticles();
@@ -448,13 +417,10 @@ export default function Home() {
           </section>
 
           {/* AD SECTION 1 */}
-          <section className="mb-8 relative pt-8">
+          <section className="mb-8">
             <AdSlot 
               slot="homepage-banner-top" 
-              number={1} 
-              label="Banner Below Hero" 
               className="w-full"
-              isAdmin={isAdmin}
             />
           </section>
 
@@ -493,10 +459,7 @@ export default function Home() {
                   <div className="relative pt-8">
                     <AdSlot 
                       slot="homepage-content-top" 
-                      number={5} 
-                      label="Main Content Top" 
                       className="w-full"
-                      isAdmin={isAdmin}
                     />
                   </div>
 
@@ -525,10 +488,7 @@ export default function Home() {
                   <div className="relative pt-8">
                     <AdSlot 
                       slot="homepage-content-middle-1" 
-                      number={6} 
-                      label="Main Content Middle 1" 
                       className="w-full"
-                      isAdmin={isAdmin}
                     />
                   </div>
 
@@ -557,10 +517,7 @@ export default function Home() {
                   <div className="relative pt-8">
                     <AdSlot 
                       slot="homepage-content-middle-2" 
-                      number={7} 
-                      label="Main Content Middle 2" 
                       className="w-full"
-                      isAdmin={isAdmin}
                     />
                   </div>
 
@@ -599,10 +556,7 @@ export default function Home() {
                   <div className="relative pt-8">
                     <AdSlot 
                       slot="homepage-sidebar-top" 
-                      number={2} 
-                      label="Sidebar Top (Above Trending)" 
                       className="w-full"
-                      isAdmin={isAdmin}
                     />
                   </div>
 
@@ -647,10 +601,7 @@ export default function Home() {
                   <div className="relative pt-8">
                     <AdSlot 
                       slot="homepage-sidebar-middle" 
-                      number={3} 
-                      label="Sidebar Middle" 
                       className="w-full"
-                      isAdmin={isAdmin}
                     />
                   </div>
 
@@ -708,10 +659,7 @@ export default function Home() {
                   <div className="relative pt-8">
                     <AdSlot 
                       slot="homepage-sidebar-bottom" 
-                      number={4} 
-                      label="Sidebar Bottom" 
                       className="w-full"
-                      isAdmin={isAdmin}
                     />
                   </div>
                 </aside>
@@ -721,10 +669,7 @@ export default function Home() {
               <section className="mt-8 relative pt-8">
                 <AdSlot 
                   slot="homepage-banner-bottom" 
-                  number={8} 
-                  label="Banner Bottom" 
                   className="w-full"
-                  isAdmin={isAdmin}
                 />
               </section>
             </>
