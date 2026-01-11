@@ -257,7 +257,7 @@ export default function Home() {
       // Hero article
       supabase
         .from("articles")
-        .select("id, title, slug, subtitle, excerpt, image_url, published_at, section, sections, category, author_name, view_count")
+        .select("*")
         .eq("status", "published")
         .contains("sections", ["hero"])
         .lte("published_at", now)
@@ -267,7 +267,7 @@ export default function Home() {
       // Breaking news
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, published_at, is_breaking, breaking_news_set_at, breaking_news_duration")
+        .select("*")
         .eq("status", "published")
         .eq("is_breaking", true)
         .lte("published_at", now)
@@ -277,7 +277,7 @@ export default function Home() {
       // Featured articles (Top Stories by views)
       supabase
         .from("articles")
-        .select("id, title, slug, subtitle, excerpt, image_url, published_at, section, category, author_name, view_count")
+        .select("*")
         .eq("status", "published")
         .lte("published_at", now)
         .order("view_count", { ascending: false })
@@ -286,7 +286,7 @@ export default function Home() {
       // Latest articles
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, image_url, published_at, section, category, author_name")
+        .select("*")
         .eq("status", "published")
         .lte("published_at", now)
         .order("published_at", { ascending: false })
@@ -295,7 +295,7 @@ export default function Home() {
       // Trending articles (Most Read)
       supabase
         .from("articles")
-        .select("id, title, slug, published_at, view_count")
+        .select("*")
         .eq("status", "published")
         .lte("published_at", now)
         .order("view_count", { ascending: false })
@@ -304,7 +304,7 @@ export default function Home() {
       // Section queries (all in parallel)
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .select("*")
         .eq("status", "published")
         .contains("sections", ["spring-city"])
         .lte("published_at", now)
@@ -313,7 +313,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .select("*")
         .eq("status", "published")
         .contains("sections", ["royersford"])
         .lte("published_at", now)
@@ -322,7 +322,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .select("*")
         .eq("status", "published")
         .contains("sections", ["limerick"])
         .lte("published_at", now)
@@ -331,7 +331,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .select("*")
         .eq("status", "published")
         .contains("sections", ["upper-providence"])
         .lte("published_at", now)
@@ -340,7 +340,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .select("*")
         .eq("status", "published")
         .contains("sections", ["school-district"])
         .lte("published_at", now)
@@ -349,7 +349,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .select("*")
         .eq("status", "published")
         .contains("sections", ["politics"])
         .lte("published_at", now)
@@ -358,7 +358,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .select("*")
         .eq("status", "published")
         .contains("sections", ["business"])
         .lte("published_at", now)
@@ -367,7 +367,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .select("*")
         .eq("status", "published")
         .contains("sections", ["events"])
         .lte("published_at", now)
@@ -376,7 +376,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .select("*")
         .eq("status", "published")
         .contains("sections", ["opinion"])
         .lte("published_at", now)
