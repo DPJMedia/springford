@@ -195,57 +195,65 @@ export default function ArticlesManagementPage() {
 
         {/* Filters */}
         <div className="mb-6 bg-white rounded-lg p-4 shadow-sm">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilter("all")}
-              className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
-                filter === "all"
-                  ? "bg-[color:var(--color-riviera-blue)] text-white"
-                  : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
-              }`}
+          <div className="flex gap-2 justify-between items-center">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFilter("all")}
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                  filter === "all"
+                    ? "bg-[color:var(--color-riviera-blue)] text-white"
+                    : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
+                }`}
+              >
+                All ({articles.length})
+              </button>
+              <button
+                onClick={() => setFilter("published")}
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                  filter === "published"
+                    ? "bg-[color:var(--color-riviera-blue)] text-white"
+                    : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
+                }`}
+              >
+                Published
+              </button>
+              <button
+                onClick={() => setFilter("draft")}
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                  filter === "draft"
+                    ? "bg-[color:var(--color-riviera-blue)] text-white"
+                    : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
+                }`}
+              >
+                Drafts
+              </button>
+              <button
+                onClick={() => setFilter("scheduled")}
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                  filter === "scheduled"
+                    ? "bg-[color:var(--color-riviera-blue)] text-white"
+                    : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
+                }`}
+              >
+                Scheduled
+              </button>
+              <button
+                onClick={() => setFilter("placements")}
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                  filter === "placements"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
+                }`}
+              >
+                Article Placements
+              </button>
+            </div>
+            <Link
+              href="/"
+              className="px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-100 rounded-md transition"
             >
-              All ({articles.length})
-            </button>
-            <button
-              onClick={() => setFilter("published")}
-              className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
-                filter === "published"
-                  ? "bg-[color:var(--color-riviera-blue)] text-white"
-                  : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
-              }`}
-            >
-              Published
-            </button>
-            <button
-              onClick={() => setFilter("draft")}
-              className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
-                filter === "draft"
-                  ? "bg-[color:var(--color-riviera-blue)] text-white"
-                  : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
-              }`}
-            >
-              Drafts
-            </button>
-            <button
-              onClick={() => setFilter("scheduled")}
-              className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
-                filter === "scheduled"
-                  ? "bg-[color:var(--color-riviera-blue)] text-white"
-                  : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
-              }`}
-            >
-              Scheduled
-            </button>
-            <button
-              onClick={() => setFilter("placements")}
-              className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
-                filter === "placements"
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
-              }`}
-            >
-              Article Placements
-            </button>
+              View Site →
+            </Link>
           </div>
         </div>
 

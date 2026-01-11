@@ -156,30 +156,8 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Article Management */}
-          <Link
-            href="/admin/articles"
-            className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-[color:var(--color-riviera-blue)] transition">
-                <svg className="w-6 h-6 text-blue-600 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition">
-                  Article Management
-                </h3>
-                <p className="text-sm text-[color:var(--color-medium)]">
-                  Create, edit, and manage news articles
-                </p>
-              </div>
-            </div>
-          </Link>
-
+        {/* Quick Actions - 2x2 Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
           {/* Create New Article */}
           <Link
             href="/admin/articles/new"
@@ -197,6 +175,28 @@ export default function AdminPage() {
                 </h3>
                 <p className="text-sm text-blue-100">
                   Write and publish news stories
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          {/* Article Management */}
+          <Link
+            href="/admin/articles"
+            className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-[color:var(--color-riviera-blue)] transition">
+                <svg className="w-6 h-6 text-blue-600 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition">
+                  Article Management
+                </h3>
+                <p className="text-sm text-[color:var(--color-medium)]">
+                  Create, edit, and manage news articles
                 </p>
               </div>
             </div>
@@ -249,29 +249,6 @@ export default function AdminPage() {
               </Link>
             </>
           )}
-
-          {/* Site Settings */}
-          <Link
-            href="/"
-            className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gray-600 transition">
-                <svg className="w-6 h-6 text-gray-600 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-[color:var(--color-dark)] group-hover:text-gray-600 transition">
-                  View Site
-                </h3>
-                <p className="text-sm text-[color:var(--color-medium)]">
-                  See the public-facing website
-                </p>
-              </div>
-            </div>
-          </Link>
         </div>
       </div>
     </div>

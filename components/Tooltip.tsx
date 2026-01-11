@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface TooltipProps {
   text: string;
@@ -8,14 +8,35 @@ interface TooltipProps {
 
 export function Tooltip({ text }: TooltipProps) {
   const [show, setShow] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // Handle click outside to close tooltip
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
+        setShow(false);
+      }
+    }
+
+    if (show) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [show]);
 
   return (
-    <div className="relative inline-block ml-1">
+    <div className="relative inline-block ml-1" ref={tooltipRef}>
       <button
         type="button"
         onMouseEnter={() => setShow(true)}
         onMouseLeave={() => setShow(false)}
-        onClick={() => setShow(!show)}
+        onClick={(e) => {
+          e.preventDefault();
+          setShow(!show);
+        }}
         className="inline-flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-blue-500 rounded-full hover:bg-blue-600 transition"
       >
         i

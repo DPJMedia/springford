@@ -130,28 +130,32 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
   }, [article.id, article.section, article.author_name, supabase]);
 
   const publishedDate = article.published_at
-    ? new Date(article.published_at).toLocaleString("en-US", {
+    ? new Date(article.published_at).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
       })
     : "";
 
   const updatedDate = article.updated_at
-    ? new Date(article.updated_at).toLocaleString("en-US", {
+    ? new Date(article.updated_at).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
         year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
       })
     : "";
 
   // Check if article was updated after publishing (meaningful update)
   const hasUpdate = article.updated_at && article.published_at && 
     new Date(article.updated_at).getTime() - new Date(article.published_at).getTime() > 60000; // More than 1 minute difference
+
+  // Check if breaking news is still active
+  const isBreakingNewsActive = article.is_breaking && article.breaking_news_set_at ? (() => {
+    const setAt = new Date(article.breaking_news_set_at);
+    const duration = article.breaking_news_duration || 24; // Default 24 hours
+    const expiresAt = new Date(setAt.getTime() + duration * 60 * 60 * 1000);
+    return new Date() < expiresAt;
+  })() : article.is_breaking;
 
   const articleUrl = `/article/${article.slug}`;
 
@@ -174,7 +178,7 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
 
               {/* Article Header */}
               <header className="mb-8">
-                {article.is_breaking && (
+                {isBreakingNewsActive && (
                   <span className="inline-block bg-red-600 text-white text-xs font-bold px-3 py-1 rounded mb-3">
                     BREAKING NEWS
                   </span>

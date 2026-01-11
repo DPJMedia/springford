@@ -235,60 +235,177 @@ export default function Home() {
   }, []);
 
   async function fetchArticles() {
-    // Fetch hero article (check if 'hero' is in sections array)
-    const { data: heroData } = await supabase
-      .from("articles")
-      .select("*")
-      .eq("status", "published")
-      .contains("sections", ["hero"])
-      .lte("published_at", new Date().toISOString())
-      .order("published_at", { ascending: false })
-      .limit(1);
-
-    if (heroData && heroData.length > 0) {
-      setHeroArticle(heroData[0]);
-    }
-
-    // Fetch breaking news (multiple articles)
-    const { data: breakingData } = await supabase
-      .from("articles")
-      .select("*")
-      .eq("status", "published")
-      .eq("is_breaking", true)
-      .lte("published_at", new Date().toISOString())
-      .order("published_at", { ascending: false })
-      .limit(10); // Get up to 10 breaking news articles
-
-    if (breakingData && breakingData.length > 0) {
-      // Filter only breaking news that's still active based on duration
-      const activeBreaking = breakingData.filter((article: any) => {
-        if (!article.breaking_news_set_at) return true; // Show if no timestamp set (backwards compatible)
-        
-        const setAt = new Date(article.breaking_news_set_at);
-        const duration = article.breaking_news_duration || 24; // Default 24 hours
-        const expiresAt = new Date(setAt.getTime() + duration * 60 * 60 * 1000);
-        
-        return new Date() < expiresAt; // Only show if not expired
-      });
+    const now = new Date().toISOString();
+    
+    // Fetch all main queries in parallel for faster loading
+    const [
+      heroResult,
+      breakingResult,
+      featuredResult,
+      latestResult,
+      trendingResult,
+      springCityResult,
+      royersfordResult,
+      limerickResult,
+      upperProvidenceResult,
+      schoolDistrictResult,
+      politicsResult,
+      businessResult,
+      eventsResult,
+      opinionResult
+    ] = await Promise.all([
+      // Hero article
+      supabase
+        .from("articles")
+        .select("id, title, slug, subtitle, excerpt, image_url, published_at, section, sections, category, author_name, view_count")
+        .eq("status", "published")
+        .contains("sections", ["hero"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(1),
       
-      setBreakingNews(activeBreaking);
+      // Breaking news
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, published_at, is_breaking, breaking_news_set_at, breaking_news_duration")
+        .eq("status", "published")
+        .eq("is_breaking", true)
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(10),
+      
+      // Featured articles (Top Stories by views)
+      supabase
+        .from("articles")
+        .select("id, title, slug, subtitle, excerpt, image_url, published_at, section, category, author_name, view_count")
+        .eq("status", "published")
+        .lte("published_at", now)
+        .order("view_count", { ascending: false })
+        .limit(4),
+      
+      // Latest articles
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, image_url, published_at, section, category, author_name")
+        .eq("status", "published")
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(3),
+      
+      // Trending articles (Most Read)
+      supabase
+        .from("articles")
+        .select("id, title, slug, published_at, view_count")
+        .eq("status", "published")
+        .lte("published_at", now)
+        .order("view_count", { ascending: false })
+        .limit(4),
+      
+      // Section queries (all in parallel)
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .eq("status", "published")
+        .contains("sections", ["spring-city"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(3),
+      
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .eq("status", "published")
+        .contains("sections", ["royersford"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(3),
+      
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .eq("status", "published")
+        .contains("sections", ["limerick"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(3),
+      
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .eq("status", "published")
+        .contains("sections", ["upper-providence"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(3),
+      
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .eq("status", "published")
+        .contains("sections", ["school-district"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(3),
+      
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .eq("status", "published")
+        .contains("sections", ["politics"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(3),
+      
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .eq("status", "published")
+        .contains("sections", ["business"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(3),
+      
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .eq("status", "published")
+        .contains("sections", ["events"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(3),
+      
+      supabase
+        .from("articles")
+        .select("id, title, slug, excerpt, image_url, published_at, author_name")
+        .eq("status", "published")
+        .contains("sections", ["opinion"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(3)
+    ]);
+
+    // Process results
+    if (heroResult.data && heroResult.data.length > 0) {
+      setHeroArticle(heroResult.data[0] as any);
     }
 
-    // Fetch featured articles (for Top Stories)
-    const { data: featuredData } = await supabase
-      .from("articles")
-      .select("*")
-      .eq("status", "published")
-      .eq("is_featured", true)
-      .lte("published_at", new Date().toISOString())
-      .order("published_at", { ascending: false })
-      .limit(4);
-
-    if (featuredData) {
-      setFeaturedArticles(featuredData);
+    if (breakingResult.data && breakingResult.data.length > 0) {
+      // Filter active breaking news
+      const activeBreaking = breakingResult.data.filter((article: any) => {
+        if (!article.breaking_news_set_at) return true;
+        const setAt = new Date(article.breaking_news_set_at);
+        const duration = article.breaking_news_duration || 24;
+        const expiresAt = new Date(setAt.getTime() + duration * 60 * 60 * 1000);
+        return new Date() < expiresAt;
+      });
+      setBreakingNews(activeBreaking as any);
     }
 
-    // Fetch Editor's Picks from localStorage
+    if (featuredResult.data) {
+      setFeaturedArticles(featuredResult.data as any);
+    }
+
+    // Handle Editor's Picks
     const savedPicks = localStorage.getItem("editorsPicks");
     if (savedPicks) {
       try {
@@ -296,69 +413,42 @@ export default function Home() {
         if (pickIds && pickIds.length > 0) {
           const { data: picksData } = await supabase
             .from("articles")
-            .select("*")
+            .select("id, title, slug, published_at")
             .in("id", pickIds)
             .eq("status", "published");
           
           if (picksData) {
-            // Sort by the order in savedPicks
             const sortedPicks = pickIds
               .map((id: string) => picksData.find((a) => a.id === id))
               .filter(Boolean);
-            setEditorsPicks(sortedPicks);
+            setEditorsPicks(sortedPicks as any);
           }
         }
       } catch (error) {
         console.error("Error loading editor's picks:", error);
       }
-    }
-    
-    // Fallback to featured articles if no editor's picks
-    if (!savedPicks && featuredData) {
-      setEditorsPicks(featuredData.slice(0, 3));
+    } else if (featuredResult.data) {
+      setEditorsPicks(featuredResult.data.slice(0, 3) as any);
     }
 
-    // Fetch latest articles
-    const { data: latestData } = await supabase
-      .from("articles")
-      .select("*")
-      .eq("status", "published")
-      .lte("published_at", new Date().toISOString())
-      .order("published_at", { ascending: false })
-      .limit(8);
-
-    if (latestData) {
-      setLatestArticles(latestData);
-      setTrendingArticles(latestData.slice(0, 5));
+    if (latestResult.data) {
+      setLatestArticles(latestResult.data as any);
     }
 
-    // Fetch articles by section
-    const sections = [
-      { name: 'spring-city', setter: setSpringCityArticles },
-      { name: 'royersford', setter: setRoyersfordArticles },
-      { name: 'limerick', setter: setLimerickArticles },
-      { name: 'upper-providence', setter: setUpperProvidenceArticles },
-      { name: 'school-district', setter: setSchoolDistrictArticles },
-      { name: 'politics', setter: setPoliticsArticles },
-      { name: 'business', setter: setBusinessArticles },
-      { name: 'events', setter: setEventsArticles },
-      { name: 'opinion', setter: setOpinionArticles },
-    ];
-
-    for (const section of sections) {
-      const { data } = await supabase
-        .from("articles")
-        .select("*")
-        .eq("status", "published")
-        .contains("sections", [section.name])
-        .lte("published_at", new Date().toISOString())
-        .order("published_at", { ascending: false })
-        .limit(3);
-
-      if (data) {
-        section.setter(data);
-      }
+    if (trendingResult.data) {
+      setTrendingArticles(trendingResult.data as any);
     }
+
+    // Set section articles
+    if (springCityResult.data) setSpringCityArticles(springCityResult.data as any);
+    if (royersfordResult.data) setRoyersfordArticles(royersfordResult.data as any);
+    if (limerickResult.data) setLimerickArticles(limerickResult.data as any);
+    if (upperProvidenceResult.data) setUpperProvidenceArticles(upperProvidenceResult.data as any);
+    if (schoolDistrictResult.data) setSchoolDistrictArticles(schoolDistrictResult.data as any);
+    if (politicsResult.data) setPoliticsArticles(politicsResult.data as any);
+    if (businessResult.data) setBusinessArticles(businessResult.data as any);
+    if (eventsResult.data) setEventsArticles(eventsResult.data as any);
+    if (opinionResult.data) setOpinionArticles(opinionResult.data as any);
 
     setLoading(false);
   }
@@ -396,19 +486,16 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 py-6">
           {/* Hero Section */}
           <section className="mb-6">
-            {heroArticle ? (
-              <ArticleCard article={heroArticle} size="hero" />
-            ) : (
-              <div className="h-[500px] bg-white rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+            {loading ? (
+              <div className="h-[500px] bg-white rounded-lg flex items-center justify-center">
                 <div className="text-center">
-                  <div className="text-6xl mb-4">📰</div>
-                  <p className="text-xl font-bold text-[color:var(--color-dark)] mb-2">Hero Article Space</p>
-                  <p className="text-[color:var(--color-medium)]">
-                    Create an article and set section to "Hero" to feature it here
-                  </p>
+                  <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[color:var(--color-riviera-blue)] border-r-transparent mb-4"></div>
+                  <p className="text-[color:var(--color-medium)]">Loading hero article...</p>
                 </div>
               </div>
-            )}
+            ) : heroArticle ? (
+              <ArticleCard article={heroArticle} size="hero" />
+            ) : null}
           </section>
 
           {/* Newsletter */}
@@ -627,27 +714,16 @@ export default function Home() {
                             href={`/article/${article.slug}`}
                             className="block group"
                           >
-                            <div className="flex gap-3">
-                              {article.image_url && (
-                                <div className="flex-shrink-0 w-20 h-20 overflow-hidden rounded">
-                                  <img
-                                    src={article.image_url}
-                                    alt={article.title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2 mb-1">
-                                  {article.title}
-                                </h4>
-                                <p className="text-xs text-[color:var(--color-medium)]">
-                                  {new Date(article.published_at || "").toLocaleDateString("en-US", {
-                                    month: "short",
-                                    day: "numeric"
-                                  })}
-                                </p>
-                              </div>
+                            <div className="py-2">
+                              <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2 mb-1">
+                                {article.title}
+                              </h4>
+                              <p className="text-xs text-[color:var(--color-medium)]">
+                                {new Date(article.published_at || "").toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric"
+                                })}
+                              </p>
                             </div>
                           </Link>
                         ))}
