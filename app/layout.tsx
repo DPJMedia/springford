@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Newsreader, Playfair_Display, Red_Hat_Display } from "next/font/google";
+import { Newsreader, Playfair_Display, Red_Hat_Display, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
 const redHatDisplay = Red_Hat_Display({
@@ -21,6 +21,13 @@ const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-masthead",
   weight: ["600", "700", "800", "900"],
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+  weight: ["300", "400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -54,7 +61,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${redHatDisplay.variable} ${newsreader.variable} ${playfair.variable} antialiased bg-[color:var(--color-surface)] text-[color:var(--color-text)]`}
+        className={`${redHatDisplay.variable} ${newsreader.variable} ${playfair.variable} ${spaceGrotesk.variable} antialiased bg-[color:var(--color-surface)] text-[color:var(--color-text)]`}
       >
         {children}
       </body>

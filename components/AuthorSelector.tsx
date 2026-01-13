@@ -121,6 +121,9 @@ export function AuthorSelector({ value, onChange }: AuthorSelectorProps) {
   const selectedAdmin = admins.find(admin => 
     admin.full_name === value || admin.email === value
   )
+  
+  // Check if value is "Powered by diffuse.ai"
+  const isDiffuseAI = value === "Powered by diffuse.ai"
 
   return (
     <div className="relative">
@@ -140,9 +143,14 @@ export function AuthorSelector({ value, onChange }: AuthorSelectorProps) {
           }}
           className="w-full border border-gray-300 rounded-md px-4 py-2 pl-10"
           placeholder="Type author name or @ to search admins"
+          style={isDiffuseAI ? { fontFamily: 'var(--font-space-grotesk)' } : undefined}
         />
         <div className="absolute left-3 top-1/2 -translate-y-1/2">
-          {selectedAdmin ? (
+          {isDiffuseAI ? (
+            <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[#ff9628] to-[#ff7300] flex items-center justify-center text-white text-xs font-bold">
+              AI
+            </div>
+          ) : selectedAdmin ? (
             <div className="w-6 h-6 rounded-full bg-[color:var(--color-riviera-blue)] flex items-center justify-center text-white text-xs font-semibold">
               {selectedAdmin.full_name?.[0]?.toUpperCase() || selectedAdmin.email?.[0]?.toUpperCase() || '?'}
             </div>

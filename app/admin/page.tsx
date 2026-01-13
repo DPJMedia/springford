@@ -10,7 +10,8 @@ interface Stats {
   publishedArticles: number;
   draftArticles: number;
   scheduledArticles: number;
-  totalViews: number;
+  currentViews: number;  // Views from currently published articles
+  allTimeViews: number;  // Views from all articles ever
 }
 
 export default function AdminPage() {
@@ -21,7 +22,8 @@ export default function AdminPage() {
     publishedArticles: 0,
     draftArticles: 0,
     scheduledArticles: 0,
-    totalViews: 0,
+    currentViews: 0,
+    allTimeViews: 0,
   });
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -67,14 +69,22 @@ export default function AdminPage() {
       const publishedArticles = articles.filter((a) => a.status === "published").length;
       const draftArticles = articles.filter((a) => a.status === "draft").length;
       const scheduledArticles = articles.filter((a) => a.status === "scheduled").length;
-      const totalViews = articles.reduce((sum, a) => sum + (a.view_count || 0), 0);
+      
+      // Current Views: Only from currently published articles
+      const currentViews = articles
+        .filter((a) => a.status === "published")
+        .reduce((sum, a) => sum + (a.view_count || 0), 0);
+      
+      // All Time Views: From all articles (published, draft, archived, etc.)
+      const allTimeViews = articles.reduce((sum, a) => sum + (a.view_count || 0), 0);
 
       setStats({
         totalArticles,
         publishedArticles,
         draftArticles,
         scheduledArticles,
-        totalViews,
+        currentViews,
+        allTimeViews,
       });
     }
 
@@ -96,7 +106,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-[color:var(--color-surface)]">
       <div className="mx-auto max-w-7xl px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-3xl font-bold text-[color:var(--color-dark)]">Admin Dashboard</h1>
             <Link
@@ -113,7 +123,7 @@ export default function AdminPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8 max-w-6xl mx-auto">
           <div className="bg-white rounded-lg p-6 shadow-sm">
             <div className="text-3xl font-black text-[color:var(--color-riviera-blue)] mb-2">
               {stats.totalArticles}
@@ -147,17 +157,25 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="bg-white rounded-lg p-6 shadow-sm">
-            <div className="text-3xl font-black text-purple-600 mb-2">
-              {stats.totalViews.toLocaleString()}
+            <div className="text-3xl font-black text-blue-600 mb-2">
+              {stats.currentViews.toLocaleString()}
             </div>
             <div className="text-sm font-semibold text-[color:var(--color-medium)]">
-              Total Views
+              Current Views
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-6 shadow-sm">
+            <div className="text-3xl font-black text-purple-600 mb-2">
+              {stats.allTimeViews.toLocaleString()}
+            </div>
+            <div className="text-sm font-semibold text-[color:var(--color-medium)]">
+              All Time Views
             </div>
           </div>
         </div>
 
         {/* Quick Actions - 2x2 Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {/* Create New Article */}
           <Link
             href="/admin/articles/new"
@@ -249,6 +267,35 @@ export default function AdminPage() {
               </Link>
             </>
           )}
+
+          {/* DiffuseAI Integration (All Admins) */}
+          <Link
+            href="/admin/diffuse"
+            className="relative overflow-hidden bg-[#000000] rounded-xl p-6 shadow-[0_10px_15px_-3px_rgba(255,150,40,0.3)] hover:shadow-[0_20px_25px_-5px_rgba(255,150,40,0.4)] transition-all duration-300 group col-span-1 md:col-span-2 border border-white/10"
+            style={{ fontFamily: 'var(--font-space-grotesk)' }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-[#ff9628]/10 via-transparent to-[#c086fa]/10 opacity-50"></div>
+            <div className="relative flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-white mb-1 tracking-tight">
+                  diffuse<span className="text-[#ff9628]">.ai</span> integration
+                </h3>
+                <p className="text-sm text-[#dbdbdb]">
+                  Import AI-generated articles from DiffuseAI
+                </p>
+              </div>
+              <div className="hidden md:block">
+                <div className="px-4 py-2 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-lg text-white text-sm font-semibold group-hover:scale-105 transition-transform">
+                  Open →
+                </div>
+              </div>
+            </div>
+          </Link>
         </div>
       </div>
     </div>

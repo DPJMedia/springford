@@ -43,6 +43,9 @@ export default function NewArticlePage() {
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authorName, setAuthorName] = useState("");
+  const [poweredByDiffuse, setPoweredByDiffuse] = useState(false);
+  const [coAuthorName, setCoAuthorName] = useState("");
+  const [showCoAuthor, setShowCoAuthor] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -187,7 +190,9 @@ export default function NewArticlePage() {
           image_credit: useFeaturedImage ? imageCredit || null : null,
           use_featured_image: useFeaturedImage,
           author_id: user.id,
-          author_name: authorName,
+          author_name: poweredByDiffuse 
+            ? (showCoAuthor && coAuthorName ? `Powered by diffuse.ai & ${coAuthorName}` : "Powered by diffuse.ai")
+            : (showCoAuthor && coAuthorName ? `${authorName} & ${coAuthorName}` : authorName),
           status,
           published_at: publishedAt,
           scheduled_for: scheduledTime,
@@ -255,6 +260,65 @@ export default function NewArticlePage() {
             <div className="space-y-4">
               {/* Author Selection */}
               <AuthorSelector value={authorName} onChange={setAuthorName} />
+
+              {/* Powered by diffuse.ai Checkbox */}
+              <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-[#ff9628]/5 to-[#c086fa]/5 border border-[#ff9628]/20 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="powered-by-diffuse"
+                  checked={poweredByDiffuse}
+                  onChange={(e) => {
+                    setPoweredByDiffuse(e.target.checked);
+                    if (e.target.checked) {
+                      setAuthorName("Powered by diffuse.ai");
+                    }
+                  }}
+                  className="w-5 h-5 text-[#ff9628] bg-white border-gray-300 rounded focus:ring-[#ff9628] focus:ring-2 cursor-pointer"
+                />
+                <label 
+                  htmlFor="powered-by-diffuse" 
+                  className="text-sm font-bold cursor-pointer select-none"
+                  style={{ fontFamily: 'var(--font-space-grotesk)' }}
+                >
+                  Use "<span className="text-gray-900">Powered by </span><span className="text-gray-900">diffuse</span><span className="text-[#ff9628]">.ai</span>" as author
+                </label>
+              </div>
+
+              {/* Co-Author Section */}
+              {!showCoAuthor ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCoAuthor(true)}
+                  className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add another author
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-semibold text-gray-900">
+                      Co-Author
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCoAuthor(false);
+                        setCoAuthorName("");
+                      }}
+                      className="text-sm font-semibold text-red-600 hover:text-red-700 transition"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <AuthorSelector value={coAuthorName} onChange={setCoAuthorName} />
+                  <p className="text-xs text-gray-500">
+                    Both authors will be displayed with their profile pictures and an "&" between their names.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center">

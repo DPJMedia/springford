@@ -132,6 +132,43 @@ export default function ArticlesManagementPage() {
     }
   }
 
+  async function archiveArticle(id: string) {
+    if (!confirm("Are you sure you want to archive this article? It will no longer appear on the site.")) return;
+
+    const { error } = await supabase
+      .from("articles")
+      .update({ status: "archived" })
+      .eq("id", id);
+
+    if (error) {
+      alert("Error archiving article: " + error.message);
+    } else {
+      // Update the local state
+      setArticles(articles.map((a) => (a.id === id ? { ...a, status: "archived" } : a)));
+      alert("Article archived successfully!");
+    }
+  }
+
+  async function republishArticle(id: string) {
+    if (!confirm("Are you sure you want to republish this article?")) return;
+
+    const { error } = await supabase
+      .from("articles")
+      .update({ 
+        status: "published",
+        published_at: new Date().toISOString()
+      })
+      .eq("id", id);
+
+    if (error) {
+      alert("Error republishing article: " + error.message);
+    } else {
+      // Update the local state
+      setArticles(articles.map((a) => (a.id === id ? { ...a, status: "published", published_at: new Date().toISOString() } : a)));
+      alert("Article republished successfully!");
+    }
+  }
+
   function getStatusDisplay(article: Article) {
     if (article.status === "scheduled" && article.scheduled_for) {
       const now = new Date();
@@ -147,7 +184,8 @@ export default function ArticlesManagementPage() {
     const statusColors: Record<string, string> = {
       published: "bg-green-100 text-green-800",
       scheduled: "bg-orange-100 text-orange-800",
-      draft: "bg-gray-100 text-gray-800"
+      draft: "bg-gray-100 text-gray-800",
+      archived: "bg-red-100 text-red-800"
     };
     
     return {
@@ -236,6 +274,16 @@ export default function ArticlesManagementPage() {
                 }`}
               >
                 Scheduled
+              </button>
+              <button
+                onClick={() => setFilter("archived")}
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                  filter === "archived"
+                    ? "bg-[color:var(--color-riviera-blue)] text-white"
+                    : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
+                }`}
+              >
+                Archived
               </button>
               <button
                 onClick={() => setFilter("placements")}
@@ -427,7 +475,13 @@ export default function ArticlesManagementPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {articles.map((article) => (
+                {articles
+                  .filter((article) => {
+                    if (filter === "all") return article.status !== "archived";
+                    if (filter === "archived") return article.status === "archived";
+                    return article.status === filter;
+                  })
+                  .map((article) => (
                   <tr key={article.id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4">
                       <div className="space-y-2">
@@ -471,19 +525,46 @@ export default function ArticlesManagementPage() {
                     <td className="px-6 py-4 text-sm text-[color:var(--color-medium)]">
                       {new Date(article.published_at || article.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium">
-                      <Link
-                        href={`/admin/articles/edit/${article.id}`}
-                        className="text-[color:var(--color-riviera-blue)] hover:underline mr-4"
-                      >
-                        Edit
-                      </Link>
-                      <button
-                        onClick={() => deleteArticle(article.id)}
-                        className="text-red-600 hover:underline"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-6 py-4 text-right text-sm font-medium space-x-4">
+                      {article.status !== "archived" && (
+                        <Link
+                          href={`/admin/articles/edit/${article.id}`}
+                          className="text-[color:var(--color-riviera-blue)] hover:underline"
+                        >
+                          Edit
+                        </Link>
+                      )}
+                      {article.status === "archived" ? (
+                        <>
+                          <button
+                            onClick={() => republishArticle(article.id)}
+                            className="text-green-600 hover:underline"
+                          >
+                            Republish
+                          </button>
+                          <button
+                            onClick={() => deleteArticle(article.id)}
+                            className="text-red-600 hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => archiveArticle(article.id)}
+                            className="text-orange-600 hover:underline"
+                          >
+                            Archive
+                          </button>
+                          <button
+                            onClick={() => deleteArticle(article.id)}
+                            className="text-red-600 hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}

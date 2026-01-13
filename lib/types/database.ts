@@ -95,6 +95,26 @@ export interface AdSetting {
   updated_by: string | null;
 }
 
+export interface DiffuseConnection {
+  id: string;
+  springford_user_id: string;
+  diffuse_user_id: string;
+  diffuse_email: string | null;
+  springford_email: string | null;
+  connected_at: string;
+  last_sync_at: string | null;
+  is_active: boolean;
+}
+
+export interface DiffuseImportedArticle {
+  id: string;
+  article_id: string;
+  diffuse_output_id: string;
+  diffuse_project_id: string;
+  imported_by: string;
+  imported_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {

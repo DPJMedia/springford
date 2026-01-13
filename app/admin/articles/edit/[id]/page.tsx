@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { Article } from "@/lib/types/database";
 import { BlockEditor, ContentBlock } from "@/components/BlockEditor";
@@ -46,7 +46,11 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authorName, setAuthorName] = useState("");
+  const [poweredByDiffuse, setPoweredByDiffuse] = useState(false);
+  const [coAuthorName, setCoAuthorName] = useState("");
+  const [showCoAuthor, setShowCoAuthor] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   useEffect(() => {
@@ -121,7 +125,28 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
       
       setMetaTitle(data.meta_title || "");
       setMetaDescription(data.meta_description || "");
-      setAuthorName(data.author_name || "");
+      const authorName = data.author_name || "";
+      setAuthorName(authorName);
+      
+      // Check if this article was imported from DiffuseAI
+      const fromDiffuse = searchParams.get('fromDiffuse') === 'true';
+      
+      // Auto-check if author is "Powered by diffuse.ai" OR if coming from DiffuseAI import
+      if (authorName === "Powered by diffuse.ai" || fromDiffuse) {
+        setPoweredByDiffuse(true);
+        if (fromDiffuse && authorName !== "Powered by diffuse.ai") {
+          setAuthorName("Powered by diffuse.ai");
+        }
+      }
+      
+      // Check for co-author in author_name (split by " & ")
+      if (authorName.includes(" & ")) {
+        const [mainAuthor, coAuthor] = authorName.split(" & ");
+        setAuthorName(mainAuthor);
+        setCoAuthorName(coAuthor);
+        setShowCoAuthor(true);
+      }
+      
       setIsFeatured(data.is_featured);
       setIsBreaking(data.is_breaking);
       setBreakingNewsDuration(data.breaking_news_duration || 24);
@@ -289,7 +314,9 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           allow_comments: allowComments,
           meta_title: metaTitle || null,
           meta_description: metaDescription || null,
-          author_name: authorName || null,
+          author_name: poweredByDiffuse 
+            ? (showCoAuthor && coAuthorName ? `Powered by diffuse.ai & ${coAuthorName}` : "Powered by diffuse.ai")
+            : (showCoAuthor && coAuthorName ? `${authorName} & ${coAuthorName}` : (authorName || null)),
           updated_by: user.id,
         })
         .eq("id", id);
@@ -356,6 +383,65 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
             <div className="space-y-4">
               {/* Author Selection */}
               <AuthorSelector value={authorName} onChange={setAuthorName} />
+
+              {/* Powered by diffuse.ai Checkbox */}
+              <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-[#ff9628]/5 to-[#c086fa]/5 border border-[#ff9628]/20 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="powered-by-diffuse"
+                  checked={poweredByDiffuse}
+                  onChange={(e) => {
+                    setPoweredByDiffuse(e.target.checked);
+                    if (e.target.checked) {
+                      setAuthorName("Powered by diffuse.ai");
+                    }
+                  }}
+                  className="w-5 h-5 text-[#ff9628] bg-white border-gray-300 rounded focus:ring-[#ff9628] focus:ring-2 cursor-pointer"
+                />
+                <label 
+                  htmlFor="powered-by-diffuse" 
+                  className="text-sm font-bold cursor-pointer select-none"
+                  style={{ fontFamily: 'var(--font-space-grotesk)' }}
+                >
+                  Use "<span className="text-gray-900">Powered by </span><span className="text-gray-900">diffuse</span><span className="text-[#ff9628]">.ai</span>" as author
+                </label>
+              </div>
+
+              {/* Co-Author Section */}
+              {!showCoAuthor ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCoAuthor(true)}
+                  className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add another author
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-semibold text-gray-900">
+                      Co-Author
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCoAuthor(false);
+                        setCoAuthorName("");
+                      }}
+                      className="text-sm font-semibold text-red-600 hover:text-red-700 transition"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <AuthorSelector value={coAuthorName} onChange={setCoAuthorName} />
+                  <p className="text-xs text-gray-500">
+                    Both authors will be displayed with their profile pictures and an "&" between their names.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
