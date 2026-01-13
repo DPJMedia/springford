@@ -45,22 +45,53 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
           setArticles(articlesData);
         }
       } else {
-        // Regular author profile lookup
-        const { data: authorData } = await supabase
+        // Regular author profile lookup - try username first
+        let { data: authorData } = await supabase
           .from("user_profiles")
           .select("*")
           .eq("username", username)
           .single();
 
+        // If no username match, try to find by email prefix (username might be email-based)
+        if (!authorData) {
+          const { data: profiles } = await supabase
+            .from("user_profiles")
+            .select("*")
+            .or(`email.ilike.${username}%,full_name.ilike.%${username}%`);
+          
+          if (profiles && profiles.length > 0) {
+            authorData = profiles[0];
+          }
+        }
+
+        // If still not found, try to match by generating username from profiles
+        if (!authorData) {
+          const { data: allProfiles } = await supabase
+            .from("user_profiles")
+            .select("*")
+            .in("is_admin", [true])
+            .or("is_super_admin.eq.true");
+          
+          if (allProfiles) {
+            // Try to find profile where generated username matches
+            authorData = allProfiles.find(profile => {
+              const generatedUsername = profile.email 
+                ? profile.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '')
+                : profile.full_name?.toLowerCase().replace(/[^a-z0-9]/g, '');
+              return generatedUsername === username;
+            }) || null;
+          }
+        }
+
         if (authorData) {
           setAuthor(authorData);
 
-          // Fetch articles by this author
+          // Fetch articles by this author - try both author_id and author_name
           const { data: articlesData } = await supabase
             .from("articles")
             .select("*")
             .eq("status", "published")
-            .eq("author_id", authorData.id)
+            .or(`author_id.eq.${authorData.id},author_name.ilike.%${authorData.full_name}%`)
             .lte("published_at", new Date().toISOString())
             .order("published_at", { ascending: false });
 

@@ -290,7 +290,6 @@ export default function Home() {
         .eq("status", "published")
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .order("created_at", { ascending: false })
         .limit(3),
       
       // Trending articles (Most Read)
@@ -554,23 +553,31 @@ export default function Home() {
                   {/* Latest News */}
                   <NewsSection 
                     title="Latest News" 
-                    articles={latestArticles} 
+                    articles={[...latestArticles].sort((a, b) => {
+                      const dateA = new Date(a.published_at || a.created_at).getTime();
+                      const dateB = new Date(b.published_at || b.created_at).getTime();
+                      return dateB - dateA; // Newest first (descending)
+                    })} 
                     sectionName="latest"
                   />
 
                   {/* Spring City */}
-                  <NewsSection 
-                    title="Spring City" 
-                    articles={springCityArticles} 
-                    sectionName="spring-city"
-                  />
+                  {springCityArticles.length > 0 && (
+                    <NewsSection 
+                      title="Spring City" 
+                      articles={springCityArticles} 
+                      sectionName="spring-city"
+                    />
+                  )}
 
                   {/* Royersford */}
-                  <NewsSection 
-                    title="Royersford" 
-                    articles={royersfordArticles} 
-                    sectionName="royersford"
-                  />
+                  {royersfordArticles.length > 0 && (
+                    <NewsSection 
+                      title="Royersford" 
+                      articles={royersfordArticles} 
+                      sectionName="royersford"
+                    />
+                  )}
 
                   {/* AD SECTION 6 - MAIN CONTENT MIDDLE 1 */}
                   <div className="relative pt-8">
@@ -581,25 +588,31 @@ export default function Home() {
                   </div>
 
                   {/* Limerick */}
-                  <NewsSection 
-                    title="Limerick" 
-                    articles={limerickArticles} 
-                    sectionName="limerick"
-                  />
+                  {limerickArticles.length > 0 && (
+                    <NewsSection 
+                      title="Limerick" 
+                      articles={limerickArticles} 
+                      sectionName="limerick"
+                    />
+                  )}
 
                   {/* Upper Providence */}
-                  <NewsSection 
-                    title="Upper Providence" 
-                    articles={upperProvidenceArticles} 
-                    sectionName="upper-providence"
-                  />
+                  {upperProvidenceArticles.length > 0 && (
+                    <NewsSection 
+                      title="Upper Providence" 
+                      articles={upperProvidenceArticles} 
+                      sectionName="upper-providence"
+                    />
+                  )}
 
                   {/* School District */}
-                  <NewsSection 
-                    title="School District" 
-                    articles={schoolDistrictArticles} 
-                    sectionName="school-district"
-                  />
+                  {schoolDistrictArticles.length > 0 && (
+                    <NewsSection 
+                      title="School District" 
+                      articles={schoolDistrictArticles} 
+                      sectionName="school-district"
+                    />
+                  )}
 
                   {/* AD SECTION 7 - MAIN CONTENT MIDDLE 2 */}
                   <div className="relative pt-8">
@@ -610,32 +623,40 @@ export default function Home() {
                   </div>
 
                   {/* Politics */}
-                  <NewsSection 
-                    title="Politics" 
-                    articles={politicsArticles} 
-                    sectionName="politics"
-                  />
+                  {politicsArticles.length > 0 && (
+                    <NewsSection 
+                      title="Politics" 
+                      articles={politicsArticles} 
+                      sectionName="politics"
+                    />
+                  )}
 
                   {/* Business */}
-                  <NewsSection 
-                    title="Business" 
-                    articles={businessArticles} 
-                    sectionName="business"
-                  />
+                  {businessArticles.length > 0 && (
+                    <NewsSection 
+                      title="Business" 
+                      articles={businessArticles} 
+                      sectionName="business"
+                    />
+                  )}
 
                   {/* Events */}
-                  <NewsSection 
-                    title="Events" 
-                    articles={eventsArticles} 
-                    sectionName="events"
-                  />
+                  {eventsArticles.length > 0 && (
+                    <NewsSection 
+                      title="Events" 
+                      articles={eventsArticles} 
+                      sectionName="events"
+                    />
+                  )}
 
                   {/* Opinion */}
-                  <NewsSection 
-                    title="Opinion" 
-                    articles={opinionArticles} 
-                    sectionName="opinion"
-                  />
+                  {opinionArticles.length > 0 && (
+                    <NewsSection 
+                      title="Opinion" 
+                      articles={opinionArticles} 
+                      sectionName="opinion"
+                    />
+                  )}
                 </div>
 
                 {/* SIDEBAR */}

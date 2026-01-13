@@ -116,6 +116,16 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
             }
           }
 
+          // Generate a fallback username if none exists
+          if (authorProfile && !authorProfile.username) {
+            // Generate username from email or full name
+            if (authorProfile.email) {
+              authorProfile.username = authorProfile.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+            } else if (authorProfile.full_name) {
+              authorProfile.username = authorProfile.full_name.toLowerCase().replace(/[^a-z0-9]/g, '');
+            }
+          }
+          
           return authorProfile || { full_name: cleanAuthorName, avatar_url: null, username: null };
         };
 
