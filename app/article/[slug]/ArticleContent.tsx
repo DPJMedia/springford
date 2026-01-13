@@ -24,6 +24,9 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
   const [authorAvatar, setAuthorAvatar] = useState<string | null>(null);
   const [authorName, setAuthorName] = useState<string | null>(null);
   const [authorUsername, setAuthorUsername] = useState<string | null>(null);
+  const [coAuthorAvatar, setCoAuthorAvatar] = useState<string | null>(null);
+  const [coAuthorName, setCoAuthorName] = useState<string | null>(null);
+  const [coAuthorUsername, setCoAuthorUsername] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -42,71 +45,92 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
     }
     incrementViews();
 
-    // Fetch author profile if author_name exists
+    // Fetch author profile(s) if author_name exists
     async function fetchAuthorProfile() {
       if (article.author_name) {
-        // Clean the author_name (remove any extra text like "(Admin)")
-        const cleanAuthorName = article.author_name.split('(')[0].trim();
-        
-        // Try multiple ways to find the author profile
-        // First, try exact match on full_name
-        let { data: authorProfile } = await supabase
-          .from("user_profiles")
-          .select("avatar_url, full_name, email, username")
-          .eq("full_name", cleanAuthorName)
-          .limit(1)
-          .maybeSingle();
+        // Check if there are two authors separated by " & "
+        const authorNames = article.author_name.includes(' & ') 
+          ? article.author_name.split(' & ').map(name => name.trim())
+          : [article.author_name.trim()];
 
-        // If not found, try case-insensitive match on full_name
-        if (!authorProfile) {
-          const { data: profiles } = await supabase
-            .from("user_profiles")
-            .select("avatar_url, full_name, email, username")
-            .limit(100); // Get all profiles to search client-side
-
-          if (profiles) {
-            authorProfile = profiles.find(
-              (p) => p.full_name?.toLowerCase().trim() === cleanAuthorName.toLowerCase()
-            ) || null;
+        // Function to fetch a single author's profile
+        const fetchSingleAuthor = async (authorName: string) => {
+          // Clean the author_name (remove any extra text like "(Admin)")
+          const cleanAuthorName = authorName.split('(')[0].trim();
+          
+          // Special case for DiffuseAI
+          if (cleanAuthorName.toLowerCase() === 'powered by diffuse.ai' || cleanAuthorName.toLowerCase() === 'diffuse.ai') {
+            return {
+              avatar_url: null,
+              full_name: 'Powered by diffuse.ai',
+              username: 'diffuse.ai'
+            };
           }
-        }
-
-        // If still not found, try matching by email (in case author_name is an email)
-        if (!authorProfile && cleanAuthorName.includes('@')) {
-          const { data: emailProfile } = await supabase
+          
+          // Try multiple ways to find the author profile
+          let { data: authorProfile } = await supabase
             .from("user_profiles")
             .select("avatar_url, full_name, email, username")
-            .eq("email", cleanAuthorName)
+            .eq("full_name", cleanAuthorName)
             .limit(1)
             .maybeSingle();
 
-          if (emailProfile) {
-            authorProfile = emailProfile;
+          if (!authorProfile) {
+            const { data: profiles } = await supabase
+              .from("user_profiles")
+              .select("avatar_url, full_name, email, username")
+              .limit(100);
+
+            if (profiles) {
+              authorProfile = profiles.find(
+                (p) => p.full_name?.toLowerCase().trim() === cleanAuthorName.toLowerCase()
+              ) || null;
+            }
           }
-        }
 
-        // If still not found, try partial match (author_name contains full_name or vice versa)
-        if (!authorProfile) {
-          const { data: profiles } = await supabase
-            .from("user_profiles")
-            .select("avatar_url, full_name, email, username")
-            .limit(100);
+          if (!authorProfile && cleanAuthorName.includes('@')) {
+            const { data: emailProfile } = await supabase
+              .from("user_profiles")
+              .select("avatar_url, full_name, email, username")
+              .eq("email", cleanAuthorName)
+              .limit(1)
+              .maybeSingle();
 
-          if (profiles) {
-            authorProfile = profiles.find(
-              (p) => 
-                (p.full_name && cleanAuthorName.toLowerCase().includes(p.full_name.toLowerCase())) ||
-                (p.full_name && p.full_name.toLowerCase().includes(cleanAuthorName.toLowerCase()))
-            ) || null;
+            if (emailProfile) {
+              authorProfile = emailProfile;
+            }
           }
-        }
 
-        if (authorProfile) {
-          setAuthorAvatar(authorProfile.avatar_url);
-          setAuthorName(authorProfile.full_name || cleanAuthorName);
-          setAuthorUsername(authorProfile.username);
-        } else {
-          setAuthorName(article.author_name);
+          if (!authorProfile) {
+            const { data: profiles } = await supabase
+              .from("user_profiles")
+              .select("avatar_url, full_name, email, username")
+              .limit(100);
+
+            if (profiles) {
+              authorProfile = profiles.find(
+                (p) => 
+                  (p.full_name && cleanAuthorName.toLowerCase().includes(p.full_name.toLowerCase())) ||
+                  (p.full_name && p.full_name.toLowerCase().includes(cleanAuthorName.toLowerCase()))
+              ) || null;
+            }
+          }
+
+          return authorProfile || { full_name: cleanAuthorName, avatar_url: null, username: null };
+        };
+
+        // Fetch first author
+        const firstAuthor = await fetchSingleAuthor(authorNames[0]);
+        setAuthorAvatar(firstAuthor.avatar_url);
+        setAuthorName(firstAuthor.full_name);
+        setAuthorUsername(firstAuthor.username);
+
+        // If there's a second author, fetch their profile too
+        if (authorNames.length > 1) {
+          const secondAuthor = await fetchSingleAuthor(authorNames[1]);
+          setCoAuthorAvatar(secondAuthor.avatar_url);
+          setCoAuthorName(secondAuthor.full_name);
+          setCoAuthorUsername(secondAuthor.username);
         }
       }
     }
@@ -198,6 +222,7 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                 <div className="flex flex-col gap-2 text-sm text-[color:var(--color-medium)] pt-4 border-t border-gray-200">
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
+                      {/* First Author */}
                       {authorUsername ? (
                         <Link href={`/author/${authorUsername}`} className="flex items-center gap-2 hover:opacity-80 transition">
                           <Avatar src={authorAvatar} name={authorName || article.author_name} size="sm" />
@@ -207,6 +232,24 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                         <>
                           <Avatar src={authorAvatar} name={authorName || article.author_name} size="sm" />
                           <span className="font-semibold text-[color:var(--color-dark)]">{authorName || article.author_name}</span>
+                        </>
+                      )}
+                      
+                      {/* Second Author (if exists) */}
+                      {coAuthorName && (
+                        <>
+                          <span className="text-[color:var(--color-medium)]">&</span>
+                          {coAuthorUsername ? (
+                            <Link href={`/author/${coAuthorUsername}`} className="flex items-center gap-2 hover:opacity-80 transition">
+                              <Avatar src={coAuthorAvatar} name={coAuthorName} size="sm" />
+                              <span className="font-semibold text-[color:var(--color-riviera-blue)] hover:underline">{coAuthorName}</span>
+                            </Link>
+                          ) : (
+                            <>
+                              <Avatar src={coAuthorAvatar} name={coAuthorName} size="sm" />
+                              <span className="font-semibold text-[color:var(--color-dark)]">{coAuthorName}</span>
+                            </>
+                          )}
                         </>
                       )}
                     </div>

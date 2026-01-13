@@ -17,27 +17,56 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
 
   useEffect(() => {
     async function fetchAuthorAndArticles() {
-      // Fetch author profile
-      const { data: authorData } = await supabase
-        .from("user_profiles")
-        .select("*")
-        .eq("username", username)
-        .single();
+      // Special case for DiffuseAI
+      if (username === 'diffuse.ai') {
+        // Create a virtual author profile for DiffuseAI
+        setAuthor({
+          id: 'diffuse-ai',
+          full_name: 'Powered by diffuse.ai',
+          username: 'diffuse.ai',
+          email: 'diffuse@ai.com',
+          avatar_url: null,
+          is_admin: false,
+          is_super_admin: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as UserProfile);
 
-      if (authorData) {
-        setAuthor(authorData);
-
-        // Fetch articles by this author
+        // Fetch articles that have "Powered by diffuse.ai" in author_name
         const { data: articlesData } = await supabase
           .from("articles")
           .select("*")
           .eq("status", "published")
-          .eq("author_id", authorData.id)
+          .or('author_name.ilike.%Powered by diffuse.ai%,author_name.ilike.%diffuse.ai%')
           .lte("published_at", new Date().toISOString())
           .order("published_at", { ascending: false });
 
         if (articlesData) {
           setArticles(articlesData);
+        }
+      } else {
+        // Regular author profile lookup
+        const { data: authorData } = await supabase
+          .from("user_profiles")
+          .select("*")
+          .eq("username", username)
+          .single();
+
+        if (authorData) {
+          setAuthor(authorData);
+
+          // Fetch articles by this author
+          const { data: articlesData } = await supabase
+            .from("articles")
+            .select("*")
+            .eq("status", "published")
+            .eq("author_id", authorData.id)
+            .lte("published_at", new Date().toISOString())
+            .order("published_at", { ascending: false });
+
+          if (articlesData) {
+            setArticles(articlesData);
+          }
         }
       }
 
