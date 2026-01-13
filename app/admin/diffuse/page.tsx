@@ -691,6 +691,18 @@ export default function DiffuseIntegrationPage() {
     try {
       const output = project.latest_output;
 
+      // Check if output exists
+      if (!output) {
+        setImportingProjectId(null);
+        setConfirmModalData({
+          title: "No Output Available",
+          message: "This project doesn't have any outputs yet. Please create an output in DiffuseAI first.",
+          onConfirm: () => setShowConfirmModal(false)
+        });
+        setShowConfirmModal(true);
+        return;
+      }
+
       // Check if already imported
       const { data: existing } = await supabase
         .from("diffuse_imported_articles")
