@@ -292,14 +292,15 @@ export default function Home() {
         .order("published_at", { ascending: false })
         .limit(3),
       
-      // Trending articles (Most Read)
+      // Trending articles (Most Read - past 30 days)
       supabase
         .from("articles")
         .select("*")
         .eq("status", "published")
         .lte("published_at", now)
+        .gte("published_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
         .order("view_count", { ascending: false })
-        .limit(4),
+        .limit(5),
       
       // Section queries (all in parallel)
       supabase
@@ -674,15 +675,13 @@ export default function Home() {
                     <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
                       Most Read
                     </h3>
-                    {latestArticles.length === 0 ? (
+                    {trendingArticles.length === 0 ? (
                       <p className="text-sm text-[color:var(--color-medium)] text-center py-4">
                         No articles yet
                       </p>
                     ) : (
                       <div>
-                        {latestArticles
-                          .sort((a, b) => b.view_count - a.view_count)
-                          .slice(0, 5)
+                        {trendingArticles
                           .map((article, index) => (
                             <Link
                               key={article.id}
