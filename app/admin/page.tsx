@@ -26,6 +26,7 @@ export default function AdminPage() {
     allTimeViews: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [hasDiffuseConnection, setHasDiffuseConnection] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -56,6 +57,18 @@ export default function AdminPage() {
     setUser(user);
     setProfile(profileData);
     loadStats();
+    checkDiffuseConnection(user.id);
+  }
+
+  async function checkDiffuseConnection(userId: string) {
+    // Check if user has a DiffuseAI connection
+    const { data: connection } = await supabase
+      .from("diffuse_connections")
+      .select("id")
+      .eq("springford_user_id", userId)
+      .maybeSingle();
+
+    setHasDiffuseConnection(!!connection);
   }
 
   async function loadStats() {
@@ -291,7 +304,7 @@ export default function AdminPage() {
               </div>
               <div className="hidden md:block">
                 <div className="px-4 py-2 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-lg text-white text-sm font-semibold group-hover:scale-105 transition-transform">
-                  Open →
+                  {hasDiffuseConnection ? 'Open' : 'Connect Diffuse Account'}
                 </div>
               </div>
             </div>

@@ -283,13 +283,14 @@ export default function Home() {
         .order("view_count", { ascending: false })
         .limit(4),
       
-      // Latest articles
+      // Latest articles (newest first)
       supabase
         .from("articles")
         .select("*")
         .eq("status", "published")
         .lte("published_at", now)
         .order("published_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(3),
       
       // Trending articles (Most Read)

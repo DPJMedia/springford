@@ -10,13 +10,23 @@ type AvatarProps = {
 
 export function Avatar({ src, name, email, size = 'md', className = '' }: AvatarProps) {
   const sizeClasses = {
-    sm: 'w-6 h-6 text-xs',
-    md: 'w-8 h-8 text-sm',
-    lg: 'w-12 h-12 text-base',
-    xl: 'w-24 h-24 text-2xl',
+    sm: 'w-8 h-8 text-sm',
+    md: 'w-10 h-10 text-base',
+    lg: 'w-16 h-16 text-2xl',
+    xl: 'w-32 h-32 text-4xl',
   }
 
+  // Check if this is DiffuseAI
+  const isDiffuseAI = name?.toLowerCase().includes('diffuse.ai') || 
+                      name?.toLowerCase().includes('powered by diffuse') ||
+                      email?.toLowerCase().includes('diffuse');
+
   function getInitials(name: string | null | undefined, email: string | null | undefined): string {
+    // Special case for DiffuseAI
+    if (isDiffuseAI) {
+      return 'AI'
+    }
+    
     if (name) {
       const parts = name.split(' ')
       if (parts.length >= 2) {
@@ -40,8 +50,11 @@ export function Avatar({ src, name, email, size = 'md', className = '' }: Avatar
     )
   }
 
+  // Use orange background for DiffuseAI, default blue for others
+  const bgColor = isDiffuseAI ? 'bg-gradient-to-br from-[#ff9628] to-[#ff7300]' : 'bg-[color:var(--color-riviera-blue)]';
+
   return (
-    <div className={`${sizeClasses[size]} rounded-full bg-[color:var(--color-riviera-blue)] flex items-center justify-center text-white font-bold ${className}`}>
+    <div className={`${sizeClasses[size]} rounded-full ${bgColor} flex items-center justify-center text-white font-black ${className}`}>
       {getInitials(name, email)}
     </div>
   )

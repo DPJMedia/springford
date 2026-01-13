@@ -85,10 +85,13 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
     });
   };
 
+  // Check if this is DiffuseAI author page
+  const isDiffuseAI = username === 'diffuse.ai';
+
   return (
     <>
       <Header />
-      <main className="bg-[color:var(--color-surface)] min-h-screen">
+      <main className={isDiffuseAI ? "bg-[#000000] min-h-screen" : "bg-[color:var(--color-surface)] min-h-screen"} style={isDiffuseAI ? { fontFamily: 'var(--font-space-grotesk)' } : {}}>
         <div className="mx-auto max-w-7xl px-4 py-8">
           {loading ? (
             <div className="text-center py-12">
@@ -110,38 +113,80 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
           ) : (
             <>
               {/* Author Profile Header */}
-              <div className="bg-white rounded-lg p-8 shadow-sm mb-8">
-                <div className="flex items-center gap-6">
-                  <Avatar 
-                    src={author.avatar_url} 
-                    name={author.full_name} 
-                    size="lg" 
-                    className="w-32 h-32"
-                  />
-                  <div className="flex-1">
-                    <h1 className="text-4xl font-black text-[color:var(--color-dark)] mb-2">
-                      {author.full_name}
-                    </h1>
-                    <p className="text-lg text-[color:var(--color-medium)] mb-1">
-                      @{author.username}
-                    </p>
-                    <p className="text-[color:var(--color-medium)]">
-                      {articles.length} article{articles.length !== 1 ? 's' : ''} published
-                    </p>
+              {isDiffuseAI ? (
+                <div className="relative overflow-hidden bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-[0_20px_25px_-5px_rgba(255,150,40,0.3)] mb-8">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#ff9628]/10 via-transparent to-[#c086fa]/10 opacity-50"></div>
+                  <div className="relative flex items-center justify-between gap-6 flex-wrap">
+                    <div className="flex items-center gap-6">
+                      <Avatar 
+                        src={author.avatar_url} 
+                        name={author.full_name} 
+                        size="xl"
+                      />
+                      <div className="flex-1">
+                        <h1 className="text-5xl font-black text-white mb-2 tracking-tight">
+                          diffuse<span className="text-[#ff9628]">.ai</span>
+                        </h1>
+                        <p className="text-xl text-[#dbdbdb] mb-2">
+                          AI-Powered Content Generation
+                        </p>
+                        <p className="text-[#dbdbdb]">
+                          {articles.length} article{articles.length !== 1 ? 's' : ''} published
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href="https://diffuse-ai-blush.vercel.app/dashboard"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-6 py-3 bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white font-bold rounded-xl hover:shadow-[0_10px_15px_-3px_rgba(255,150,40,0.5)] hover:scale-105 transition-all duration-200 flex items-center gap-2"
+                    >
+                      Visit diffuse.ai
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </Link>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-white rounded-lg p-8 shadow-sm mb-8">
+                  <div className="flex items-center gap-6">
+                    <Avatar 
+                      src={author.avatar_url} 
+                      name={author.full_name} 
+                      size="xl"
+                    />
+                    <div className="flex-1">
+                      <h1 className="text-4xl font-black text-[color:var(--color-dark)] mb-2">
+                        {author.full_name}
+                      </h1>
+                      <p className="text-lg text-[color:var(--color-medium)] mb-1">
+                        @{author.username}
+                      </p>
+                      <p className="text-[color:var(--color-medium)]">
+                        {articles.length} article{articles.length !== 1 ? 's' : ''} published
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Articles by this author */}
               <div className="mb-6">
-                <h2 className="text-2xl font-black text-[color:var(--color-dark)] mb-6 pb-2 border-b-4 border-[color:var(--color-riviera-blue)]">
-                  Articles by {author.full_name}
-                </h2>
+                {isDiffuseAI ? (
+                  <h2 className="text-3xl font-bold text-white mb-6 pb-3 border-b-2 border-[#ff9628]" style={{ letterSpacing: '-0.01em' }}>
+                    AI-Generated Articles
+                  </h2>
+                ) : (
+                  <h2 className="text-2xl font-black text-[color:var(--color-dark)] mb-6 pb-2 border-b-4 border-[color:var(--color-riviera-blue)]">
+                    Articles by {author.full_name}
+                  </h2>
+                )}
               </div>
 
               {articles.length === 0 ? (
-                <div className="bg-white rounded-lg p-12 text-center">
-                  <p className="text-[color:var(--color-medium)] text-lg">
+                <div className={isDiffuseAI ? "bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-12 text-center" : "bg-white rounded-lg p-12 text-center"}>
+                  <p className={isDiffuseAI ? "text-[#dbdbdb] text-lg" : "text-[color:var(--color-medium)] text-lg"}>
                     This author hasn't published any articles yet.
                   </p>
                 </div>
@@ -153,36 +198,71 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
                       href={`/article/${article.slug}`}
                       className="block group"
                     >
-                      <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition h-full flex flex-col">
-                        {article.image_url ? (
-                          <div className="relative h-48 overflow-hidden flex-shrink-0">
-                            <img
-                              src={article.image_url}
-                              alt={article.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          </div>
-                        ) : (
-                          <div className="relative h-48 overflow-hidden flex-shrink-0 bg-gradient-to-br from-blue-100 via-blue-50 to-gray-100 flex items-center justify-center">
-                            <svg className="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                            </svg>
-                          </div>
-                        )}
-                        <div className="p-5 flex-1 flex flex-col">
-                          <h3 className="font-bold text-lg text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition line-clamp-2">
-                            {article.title}
-                          </h3>
-                          {article.excerpt && (
-                            <p className="text-[color:var(--color-medium)] text-sm mb-3 flex-1 line-clamp-3">
-                              {article.excerpt}
-                            </p>
+                      {isDiffuseAI ? (
+                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden hover:border-[#ff9628]/50 hover:shadow-[0_10px_15px_-3px_rgba(255,150,40,0.3)] transition-all duration-300 h-full flex flex-col">
+                          {article.image_url ? (
+                            <div className="relative h-48 overflow-hidden flex-shrink-0">
+                              <img
+                                src={article.image_url}
+                                alt={article.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                            </div>
+                          ) : (
+                            <div className="relative h-48 overflow-hidden flex-shrink-0 bg-gradient-to-br from-[#ff9628]/20 via-[#141414] to-[#c086fa]/20 flex items-center justify-center">
+                              <svg className="w-20 h-20 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                              </svg>
+                            </div>
                           )}
-                          <div className="text-xs text-[color:var(--color-medium)] mt-auto">
-                            {formattedDate(article.published_at)} • {article.view_count} views
+                          <div className="p-5 flex-1 flex flex-col">
+                            <h3 className="font-bold text-xl text-white mb-2 group-hover:text-[#ff9628] transition line-clamp-2" style={{ letterSpacing: '-0.01em', lineHeight: '1.3' }}>
+                              {article.title}
+                            </h3>
+                            {article.excerpt && (
+                              <p className="text-[#dbdbdb] text-sm mb-3 flex-1 line-clamp-3" style={{ lineHeight: '1.6' }}>
+                                {article.excerpt}
+                              </p>
+                            )}
+                            <div className="text-xs text-[#545454] mt-auto flex items-center gap-2">
+                              <span>{formattedDate(article.published_at)}</span>
+                              <span className="text-[#ff9628]">•</span>
+                              <span>{article.view_count} views</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition h-full flex flex-col">
+                          {article.image_url ? (
+                            <div className="relative h-48 overflow-hidden flex-shrink-0">
+                              <img
+                                src={article.image_url}
+                                alt={article.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                            </div>
+                          ) : (
+                            <div className="relative h-48 overflow-hidden flex-shrink-0 bg-gradient-to-br from-blue-100 via-blue-50 to-gray-100 flex items-center justify-center">
+                              <svg className="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                              </svg>
+                            </div>
+                          )}
+                          <div className="p-5 flex-1 flex flex-col">
+                            <h3 className="font-bold text-lg text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition line-clamp-2">
+                              {article.title}
+                            </h3>
+                            {article.excerpt && (
+                              <p className="text-[color:var(--color-medium)] text-sm mb-3 flex-1 line-clamp-3">
+                                {article.excerpt}
+                              </p>
+                            )}
+                            <div className="text-xs text-[color:var(--color-medium)] mt-auto">
+                              {formattedDate(article.published_at)} • {article.view_count} views
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </Link>
                   ))}
                 </div>
