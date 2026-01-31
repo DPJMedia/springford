@@ -4,36 +4,39 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Line, Bar, Doughnut } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from "chart.js";
-import zoomPlugin from "chartjs-plugin-zoom";
+import dynamic from "next/dynamic";
 
-// Register Chart.js components and zoom plugin
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-  zoomPlugin
-);
+// Dynamically import Chart components with no SSR
+const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
+  ssr: false,
+});
+const Doughnut = dynamic(() => import("react-chartjs-2").then((mod) => mod.Doughnut), {
+  ssr: false,
+});
+
+// Register Chart.js components on client side only
+if (typeof window !== 'undefined') {
+  import("chart.js").then((ChartJS) => {
+    ChartJS.Chart.register(
+      ChartJS.CategoryScale,
+      ChartJS.LinearScale,
+      ChartJS.PointElement,
+      ChartJS.LineElement,
+      ChartJS.BarElement,
+      ChartJS.ArcElement,
+      ChartJS.Title,
+      ChartJS.Tooltip,
+      ChartJS.Legend,
+      ChartJS.Filler
+    );
+  });
+  
+  import("chartjs-plugin-zoom").then((zoomPlugin) => {
+    import("chart.js").then((ChartJS) => {
+      ChartJS.Chart.register(zoomPlugin.default);
+    });
+  });
+}
 
 export default function AnalyticsPage() {
   const [user, setUser] = useState<any>(null);
