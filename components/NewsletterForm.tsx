@@ -106,7 +106,7 @@ export function NewsletterForm() {
         <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-6">
           <div className="max-w-xl">
             <p className="eyebrow text-xs !text-white">Join Our Community</p>
-            <h3 className="headline mt-0.5 text-lg font-semibold text-white text-shimmer">
+            <h3 className="headline mt-0.5 text-lg font-semibold text-white">
               Sign up today for exclusive access
             </h3>
             <p className="mt-0.5 text-xs text-white/90 leading-relaxed">
