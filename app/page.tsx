@@ -8,6 +8,7 @@ import { NewsletterForm } from "@/components/NewsletterForm";
 import { AdDisplay } from "@/components/AdDisplay";
 import type { Article } from "@/lib/types/database";
 import Link from "next/link";
+import { usePageTracking } from "@/lib/analytics/usePageTracking";
 
 // Ad slot wrapper component
 function AdSlot({ 
@@ -222,6 +223,12 @@ export default function Home() {
   const [upperProvidenceArticles, setUpperProvidenceArticles] = useState<Article[]>([]);
   const [schoolDistrictArticles, setSchoolDistrictArticles] = useState<Article[]>([]);
   const [politicsArticles, setPoliticsArticles] = useState<Article[]>([]);
+
+  // Track homepage view
+  usePageTracking({
+    viewType: 'homepage',
+    trackScroll: true,
+  });
   const [businessArticles, setBusinessArticles] = useState<Article[]>([]);
   const [eventsArticles, setEventsArticles] = useState<Article[]>([]);
   const [opinionArticles, setOpinionArticles] = useState<Article[]>([]);

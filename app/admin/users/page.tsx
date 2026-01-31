@@ -256,36 +256,32 @@ export default function UsersAdminPage() {
     }
 
     try {
-      // Delete user's avatar from storage if exists
-      const user = users.find(u => u.id === userId);
-      if (user?.avatar_url) {
-        const urlParts = user.avatar_url.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        if (fileName) {
-          await supabase.storage.from('avatars').remove([fileName]);
-        }
-      }
+      // Call the secure API route to delete the user
+      const response = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      });
 
-      // Delete user profile
-      const { error: profileError } = await supabase
-        .from("user_profiles")
-        .delete()
-        .eq("id", userId);
+      const data = await response.json();
 
-      if (profileError) throw profileError;
-
-      // Delete auth user (this requires admin privileges)
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      
-      if (authError) {
-        console.error("Error deleting auth user:", authError);
-        // Profile is deleted, but auth user might remain - that's okay
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete user');
       }
 
       loadUsers();
-      alert("User removed successfully!");
+      
+      if (data.warning) {
+        alert(`User removed with warning: ${data.warning}`);
+      } else {
+        alert("User removed successfully!");
+      }
+      
       setOpenDropdown(null);
     } catch (err: any) {
+      console.error("Error removing user:", err);
       alert("Error removing user: " + err.message);
     }
   }

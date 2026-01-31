@@ -6,6 +6,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import type { Article } from "@/lib/types/database";
 import Link from "next/link";
+import { usePageTracking } from "@/lib/analytics/usePageTracking";
 
 // Define category filters for Town Council section
 const TOWN_COUNCIL_FILTERS = [
@@ -33,6 +34,12 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState("all");
   const supabase = createClient();
+
+  // Track section page view
+  usePageTracking({
+    viewType: 'section',
+    trackScroll: true,
+  });
 
   const sectionTitle = SECTION_TITLES[section] || section.charAt(0).toUpperCase() + section.slice(1);
   const showFilters = section === "town-council";

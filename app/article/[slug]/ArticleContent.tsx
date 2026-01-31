@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -12,6 +12,13 @@ import type { Article } from "@/lib/types/database";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import {
+  trackArticleScrollData,
+  trackAuthorClick,
+  getSessionId,
+  calculateScrollDepth,
+} from "@/lib/analytics/tracker";
+import { usePageTracking } from "@/lib/analytics/usePageTracking";
 
 type ArticleContentProps = {
   initialArticle: Article;
@@ -28,6 +35,60 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
   const [coAuthorName, setCoAuthorName] = useState<string | null>(null);
   const [coAuthorUsername, setCoAuthorUsername] = useState<string | null>(null);
   const supabase = createClient();
+
+  // Analytics tracking
+  const { sessionId, getCurrentScrollDepth, getTimeSpent } = usePageTracking({
+    viewType: 'article',
+    articleId: article.id,
+    trackScroll: true,
+  });
+
+  // Scroll checkpoint tracking
+  const scrollCheckpointsRef = useRef<Record<number, number>>({});
+  const articleRef = useRef<HTMLElement>(null);
+  const entryTimeRef = useRef<number>(Date.now());
+
+  // Track scroll checkpoints
+  useEffect(() => {
+    const checkpoints = [10, 25, 50, 75, 90, 100];
+    let scrollTimeout: NodeJS.Timeout;
+
+    const handleScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const scrollPercent = calculateScrollDepth();
+        
+        // Record checkpoint timestamps
+        checkpoints.forEach((checkpoint) => {
+          if (scrollPercent >= checkpoint && !scrollCheckpointsRef.current[checkpoint]) {
+            scrollCheckpointsRef.current[checkpoint] = Date.now();
+          }
+        });
+      }, 100);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
+
+      // Send scroll data on unmount
+      const articleLength = articleRef.current?.scrollHeight || document.documentElement.scrollHeight;
+      const maxScroll = getCurrentScrollDepth();
+      const timeSpent = getTimeSpent();
+
+      trackArticleScrollData({
+        articleId: article.id,
+        sessionId: sessionId,
+        scrollCheckpoints: scrollCheckpointsRef.current,
+        maxScrollPercent: maxScroll,
+        articleLengthPixels: articleLength,
+        timeSpentSeconds: timeSpent,
+        abandonedAtPercent: maxScroll,
+      });
+    };
+  }, [article.id, sessionId, getCurrentScrollDepth, getTimeSpent]);
 
   useEffect(() => {
     // Increment view count
@@ -200,7 +261,7 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
         <div className="mx-auto max-w-7xl px-4 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Main Article Content - 8 columns */}
-            <article className="lg:col-span-8">
+            <article ref={articleRef} className="lg:col-span-8">
               {/* Breadcrumb */}
               <div className="mb-4 text-sm text-[color:var(--color-medium)]">
                 <Link href="/" className="hover:text-[color:var(--color-riviera-blue)]">
@@ -234,7 +295,15 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                     <div className="flex items-center gap-2">
                       {/* First Author */}
                       {authorUsername ? (
-                        <Link href={`/author/${authorUsername}`} className="flex items-center gap-2 hover:opacity-80 transition">
+                        <Link 
+                          href={`/author/${authorUsername}`} 
+                          className="flex items-center gap-2 hover:opacity-80 transition"
+                          onClick={() => trackAuthorClick({
+                            authorName: authorName || article.author_name || 'Unknown',
+                            clickedFromPage: 'article',
+                            articleId: article.id,
+                          })}
+                        >
                           <Avatar src={authorAvatar} name={authorName || article.author_name} size="sm" />
                           <span className="font-semibold text-[color:var(--color-riviera-blue)] hover:underline">{authorName || article.author_name}</span>
                         </Link>
@@ -250,7 +319,15 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                         <>
                           <span className="text-[color:var(--color-medium)]">&</span>
                           {coAuthorUsername ? (
-                            <Link href={`/author/${coAuthorUsername}`} className="flex items-center gap-2 hover:opacity-80 transition">
+                            <Link 
+                              href={`/author/${coAuthorUsername}`} 
+                              className="flex items-center gap-2 hover:opacity-80 transition"
+                              onClick={() => trackAuthorClick({
+                                authorName: coAuthorName || 'Unknown',
+                                clickedFromPage: 'article',
+                                articleId: article.id,
+                              })}
+                            >
                               <Avatar src={coAuthorAvatar} name={coAuthorName} size="sm" />
                               <span className="font-semibold text-[color:var(--color-riviera-blue)] hover:underline">{coAuthorName}</span>
                             </Link>

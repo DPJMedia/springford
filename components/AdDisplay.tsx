@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Ad, AdSetting } from "@/lib/types/database";
+import {
+  trackAdImpression,
+  trackAdClick,
+  calculateViewportPosition,
+  calculateScrollDepth,
+} from "@/lib/analytics/tracker";
 
 type AdDisplayProps = {
   adSlot: string;
@@ -19,6 +25,12 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
   const [activeAdsList, setActiveAdsList] = useState<AdWithFillSetting[]>([]);
   const supabase = createClient();
+  
+  // Tracking refs
+  const adRef = useRef<HTMLAnchorElement>(null);
+  const hasTrackedImpression = useRef<boolean>(false);
+  const viewStartTime = useRef<number | null>(null);
+  const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
 
   // Rotation effect
   useEffect(() => {
@@ -120,6 +132,82 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
     fetchAds();
   }, [adSlot, supabase]);
 
+  // Ad visibility tracking effect
+  useEffect(() => {
+    if (!ad || !adRef.current) return;
+
+    // Reset tracking for new ad
+    hasTrackedImpression.current = false;
+    viewStartTime.current = null;
+
+    const adElement = adRef.current;
+
+    // Create intersection observer
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            // Ad is 50%+ visible
+            if (!viewStartTime.current) {
+              viewStartTime.current = Date.now();
+            }
+
+            // Track impression after 1 second of visibility
+            if (!hasTrackedImpression.current) {
+              setTimeout(() => {
+                if (viewStartTime.current && !hasTrackedImpression.current) {
+                  const scrollDepth = calculateScrollDepth();
+                  const viewportPosition = calculateViewportPosition(adElement);
+
+                  trackAdImpression({
+                    adId: ad.id,
+                    adSlot: adSlot,
+                    wasViewed: true,
+                    viewportPosition: viewportPosition,
+                    scrollDepthWhenViewed: scrollDepth,
+                  });
+
+                  hasTrackedImpression.current = true;
+                }
+              }, 1000);
+            }
+          } else {
+            // Ad left viewport
+            if (viewStartTime.current && hasTrackedImpression.current) {
+              const viewDuration = Math.round((Date.now() - viewStartTime.current) / 1000);
+              
+              // Could update the impression with view duration here if needed
+              // For now, we track it on the initial impression
+              
+              viewStartTime.current = null;
+            }
+          }
+        });
+      },
+      { threshold: [0, 0.5, 1.0] }
+    );
+
+    observer.observe(adElement);
+    intersectionObserverRef.current = observer;
+
+    return () => {
+      if (intersectionObserverRef.current) {
+        intersectionObserverRef.current.disconnect();
+      }
+    };
+  }, [ad, adSlot]);
+
+  // Track ad click handler
+  const handleAdClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (ad) {
+      trackAdClick({
+        adId: ad.id,
+        adSlot: adSlot,
+        destinationUrl: ad.link_url,
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className={`bg-gray-100 rounded-lg animate-pulse ${className}`}>
@@ -159,10 +247,12 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
     
     return (
       <a
+        ref={adRef}
         href={ad.link_url}
         target="_blank"
         rel="noopener noreferrer"
         className={`block hover:opacity-90 transition-opacity ${className}`}
+        onClick={handleAdClick}
       >
         <img
           src={ad.image_url}

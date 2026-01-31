@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { Avatar } from "@/components/Avatar";
 import type { Article, UserProfile } from "@/lib/types/database";
 import Link from "next/link";
+import { usePageTracking } from "@/lib/analytics/usePageTracking";
 
 export default function AuthorPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
@@ -14,6 +15,12 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+
+  // Track author page view
+  usePageTracking({
+    viewType: 'author',
+    trackScroll: true,
+  });
 
   useEffect(() => {
     async function fetchAuthorAndArticles() {
