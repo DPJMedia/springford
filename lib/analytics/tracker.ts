@@ -1,5 +1,13 @@
 import { createClient } from "@/lib/supabase/client";
 
+// Cache location data in memory to avoid repeated API calls
+let cachedLocation: {
+  city: string;
+  state: string;
+  country: string;
+  postal_code: string;
+} | null = null;
+
 // Session ID management
 export function getSessionId(): string {
   if (typeof window === 'undefined') return '';
@@ -10,6 +18,35 @@ export function getSessionId(): string {
     localStorage.setItem('analytics_session_id', sessionId);
   }
   return sessionId;
+}
+
+// Fetch user location from server-side API
+export async function getLocation(): Promise<{
+  city: string;
+  state: string;
+  country: string;
+  postal_code: string;
+}> {
+  if (typeof window === 'undefined') {
+    return { city: 'Unknown', state: 'Unknown', country: 'Unknown', postal_code: '' };
+  }
+
+  // Return cached location if available
+  if (cachedLocation) {
+    return cachedLocation;
+  }
+
+  try {
+    const response = await fetch('/api/geolocation');
+    if (!response.ok) throw new Error('Geolocation failed');
+    
+    const location = await response.json();
+    cachedLocation = location;
+    return location;
+  } catch (error) {
+    console.error('Failed to get location:', error);
+    return { city: 'Unknown', state: 'Unknown', country: 'Unknown', postal_code: '' };
+  }
 }
 
 // Device detection
@@ -82,6 +119,7 @@ export async function trackPageView(data: {
   const deviceType = getDeviceType();
   const { source: trafficSource, referrer } = getTrafficSource();
   const utmParams = getUTMParams();
+  const location = await getLocation();
   
   try {
     await supabase.from('page_views').insert({
@@ -96,6 +134,10 @@ export async function trackPageView(data: {
       utm_campaign: utmParams.campaign || null,
       device_type: deviceType,
       user_agent: navigator.userAgent,
+      city: location.city,
+      state: location.state,
+      country: location.country,
+      postal_code: location.postal_code,
       viewed_at: new Date().toISOString(),
     });
   } catch (error) {
@@ -181,6 +223,7 @@ export async function trackAdImpression(data: {
   const supabase = createClient();
   const sessionId = getSessionId();
   const deviceType = getDeviceType();
+  const location = await getLocation();
   
   try {
     await supabase.from('ad_impressions').insert({
@@ -190,6 +233,10 @@ export async function trackAdImpression(data: {
       session_id: sessionId,
       page_url: window.location.href,
       device_type: deviceType,
+      city: location.city,
+      state: location.state,
+      country: location.country,
+      postal_code: location.postal_code,
       was_viewed: data.wasViewed,
       view_duration_seconds: data.viewDurationSeconds || 0,
       viewport_position: data.viewportPosition || null,

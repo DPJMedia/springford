@@ -4,6 +4,36 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Line, Bar, Doughnut } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from "chart.js";
+import zoomPlugin from "chartjs-plugin-zoom";
+
+// Register Chart.js components and zoom plugin
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+  zoomPlugin
+);
 
 export default function AnalyticsPage() {
   const [user, setUser] = useState<any>(null);
@@ -34,6 +64,25 @@ export default function AnalyticsPage() {
   const [trafficSources, setTrafficSources] = useState<any[]>([]);
   const [deviceBreakdown, setDeviceBreakdown] = useState<any[]>([]);
   
+  // Location metrics
+  const [topCities, setTopCities] = useState<any[]>([]);
+  const [topStates, setTopStates] = useState<any[]>([]);
+  
+  // Chart data
+  const [pageViewsOverTime, setPageViewsOverTime] = useState<any>(null);
+  const [homepageViewsOverTime, setHomepageViewsOverTime] = useState<any>(null);
+  const [articleViewsOverTime, setArticleViewsOverTime] = useState<any>(null);
+  const [trafficChartData, setTrafficChartData] = useState<any>(null);
+  const [deviceChartData, setDeviceChartData] = useState<any>(null);
+  
+  // Chart controls
+  const [chartTimeRange, setChartTimeRange] = useState<'24h' | '7d' | '30d' | '90d'>('7d');
+  const [yAxisMax, setYAxisMax] = useState(1000);
+  const [showHomepageViews, setShowHomepageViews] = useState(true);
+  const [showArticleViews, setShowArticleViews] = useState(true);
+  const [showTrafficChart, setShowTrafficChart] = useState(false);
+  const [showDeviceChart, setShowDeviceChart] = useState(false);
+  
   const router = useRouter();
   const supabase = createClient();
 
@@ -44,6 +93,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (user) {
       loadAllAnalytics();
+      loadChartData(chartTimeRange);
     }
   }, [user, timeRange]);
 
@@ -341,12 +391,234 @@ export default function AnalyticsPage() {
         .sort((a, b) => b.count - a.count);
       setDeviceBreakdown(devicesArray);
 
+      // === LOCATION DATA ===
+      
+      // Top cities
+      const { data: cityData } = await supabase
+        .from('page_views')
+        .select('city')
+        .gte('viewed_at', startDate.toISOString())
+        .not('city', 'is', null);
+
+      const cityMap: Record<string, number> = {};
+      cityData?.forEach(c => {
+        if (c.city && c.city !== 'Unknown') {
+          cityMap[c.city] = (cityMap[c.city] || 0) + 1;
+        }
+      });
+
+      const citiesArray = Object.entries(cityMap)
+        .map(([city, count]) => ({ city, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+      setTopCities(citiesArray);
+
+      // Top states
+      const { data: stateData } = await supabase
+        .from('page_views')
+        .select('state')
+        .gte('viewed_at', startDate.toISOString())
+        .not('state', 'is', null);
+
+      const stateMap: Record<string, number> = {};
+      stateData?.forEach(s => {
+        if (s.state && s.state !== 'Unknown') {
+          stateMap[s.state] = (stateMap[s.state] || 0) + 1;
+        }
+      });
+
+      const statesArray = Object.entries(stateMap)
+        .map(([state, count]) => ({ state, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+      setTopStates(statesArray);
+
+      // === CHART DATA ===
+      // This will be loaded separately based on chartTimeRange
+      loadChartData(chartTimeRange);
+
+      // Traffic sources doughnut chart
+      if (sourcesArray.length > 0) {
+        setTrafficChartData({
+          labels: sourcesArray.map(s => s.source.charAt(0).toUpperCase() + s.source.slice(1)),
+          datasets: [{
+            data: sourcesArray.map(s => s.count),
+            backgroundColor: [
+              'rgba(59, 130, 246, 0.8)',
+              'rgba(16, 185, 129, 0.8)',
+              'rgba(245, 158, 11, 0.8)',
+              'rgba(239, 68, 68, 0.8)',
+              'rgba(139, 92, 246, 0.8)',
+            ],
+          }],
+        });
+      }
+
+      // Device breakdown pie chart
+      if (devicesArray.length > 0) {
+        setDeviceChartData({
+          labels: devicesArray.map(d => d.device.charAt(0).toUpperCase() + d.device.slice(1)),
+          datasets: [{
+            data: devicesArray.map(d => d.count),
+            backgroundColor: [
+              'rgba(16, 185, 129, 0.8)',
+              'rgba(59, 130, 246, 0.8)',
+              'rgba(245, 158, 11, 0.8)',
+            ],
+          }],
+        });
+      }
+
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
       setLoading(false);
     }
   }
+
+  async function loadChartData(period: '24h' | '7d' | '30d' | '90d') {
+    try {
+      const now = new Date();
+      let chartStartDate = new Date();
+      let daysToShow = 7;
+      let timeFormat: 'hour' | 'day' = 'day';
+      
+      switch (period) {
+        case '24h':
+          chartStartDate.setHours(now.getHours() - 24);
+          daysToShow = 24;
+          timeFormat = 'hour';
+          break;
+        case '7d':
+          chartStartDate.setDate(now.getDate() - 7);
+          daysToShow = 7;
+          break;
+        case '30d':
+          chartStartDate.setDate(now.getDate() - 30);
+          daysToShow = 30;
+          break;
+        case '90d':
+          chartStartDate.setDate(now.getDate() - 90);
+          daysToShow = 90;
+          break;
+      }
+
+      // Fetch all page views for the period
+      const { data: allViews } = await supabase
+        .from('page_views')
+        .select('viewed_at, view_type')
+        .gte('viewed_at', chartStartDate.toISOString());
+
+      // Initialize data structures
+      const homepageByTime: Record<string, number> = {};
+      const articlesByTime: Record<string, number> = {};
+      
+      if (timeFormat === 'hour') {
+        // For 24h view, group by hour
+        for (let i = 23; i >= 0; i--) {
+          const date = new Date();
+          date.setHours(date.getHours() - i);
+          const hourStr = date.toISOString().slice(0, 13); // YYYY-MM-DDTHH
+          homepageByTime[hourStr] = 0;
+          articlesByTime[hourStr] = 0;
+        }
+      } else {
+        // For day views, group by day
+        for (let i = daysToShow - 1; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dateStr = date.toISOString().split('T')[0];
+          homepageByTime[dateStr] = 0;
+          articlesByTime[dateStr] = 0;
+        }
+      }
+
+      // Populate data
+      allViews?.forEach(v => {
+        const key = timeFormat === 'hour' 
+          ? v.viewed_at.slice(0, 13) 
+          : v.viewed_at.split('T')[0];
+        
+        if (v.view_type === 'homepage') {
+          if (homepageByTime[key] !== undefined) {
+            homepageByTime[key]++;
+          }
+        } else if (v.view_type === 'article') {
+          if (articlesByTime[key] !== undefined) {
+            articlesByTime[key]++;
+          }
+        }
+      });
+
+      // Format labels
+      const labels = Object.keys(homepageByTime).map(k => {
+        if (timeFormat === 'hour') {
+          const date = new Date(k + ':00:00Z');
+          return date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+        } else {
+          return new Date(k).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+      });
+
+      setHomepageViewsOverTime(Object.values(homepageByTime));
+      setArticleViewsOverTime(Object.values(articlesByTime));
+      
+      // Build chart data
+      const datasets = [];
+      if (showHomepageViews) {
+        datasets.push({
+          label: 'Homepage Views',
+          data: Object.values(homepageByTime),
+          borderColor: 'rgb(59, 130, 246)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 2,
+        });
+      }
+      if (showArticleViews) {
+        datasets.push({
+          label: 'Article Views',
+          data: Object.values(articlesByTime),
+          borderColor: 'rgb(16, 185, 129)',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          fill: true,
+          tension: 0.4,
+          borderWidth: 2,
+        });
+      }
+
+      setPageViewsOverTime({
+        labels,
+        datasets,
+      });
+
+    } catch (error) {
+      console.error('Error loading chart data:', error);
+    }
+  }
+
+  // Zoom functions
+  function zoomIn() {
+    if (yAxisMax > 10) {
+      const newMax = yAxisMax === 1000 ? 500 : yAxisMax === 500 ? 250 : yAxisMax === 250 ? 100 : yAxisMax === 100 ? 50 : yAxisMax === 50 ? 25 : 10;
+      setYAxisMax(newMax);
+    }
+  }
+
+  function zoomOut() {
+    if (yAxisMax < 1000) {
+      const newMax = yAxisMax === 10 ? 25 : yAxisMax === 25 ? 50 : yAxisMax === 50 ? 100 : yAxisMax === 100 ? 250 : yAxisMax === 250 ? 500 : 1000;
+      setYAxisMax(newMax);
+    }
+  }
+
+  // Reload chart when controls change
+  useEffect(() => {
+    if (user) {
+      loadChartData(chartTimeRange);
+    }
+  }, [chartTimeRange, showHomepageViews, showArticleViews, user]);
 
   if (loading) {
     return (
@@ -633,6 +905,226 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {/* === PAGE VIEWS CHART === */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Page Views Chart</h2>
+            </div>
+          </div>
+
+          {/* Chart Controls */}
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div className="flex flex-wrap items-center gap-4 mb-6">
+              {/* Time Period Selector */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Time Period:</label>
+                <select
+                  value={chartTimeRange}
+                  onChange={(e) => setChartTimeRange(e.target.value as any)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="24h">Last 24 Hours</option>
+                  <option value="7d">Last 7 Days</option>
+                  <option value="30d">Last 30 Days</option>
+                  <option value="90d">Last 90 Days</option>
+                </select>
+              </div>
+
+              {/* Zoom Controls */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Y-Axis:</label>
+                <button
+                  onClick={zoomOut}
+                  disabled={yAxisMax >= 1000}
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-sm font-medium rounded-md transition"
+                >
+                  Zoom Out
+                </button>
+                <span className="text-sm font-semibold text-gray-700 min-w-[80px] text-center">0 - {yAxisMax}</span>
+                <button
+                  onClick={zoomIn}
+                  disabled={yAxisMax <= 10}
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-sm font-medium rounded-md transition"
+                >
+                  Zoom In
+                </button>
+              </div>
+
+              {/* View Type Checkboxes */}
+              <div className="flex items-center gap-4 ml-auto">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showHomepageViews}
+                    onChange={(e) => setShowHomepageViews(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                    Homepage Views
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showArticleViews}
+                    onChange={(e) => setShowArticleViews(e.target.checked)}
+                    className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                  />
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                    Article Views
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Chart */}
+            {pageViewsOverTime && (showHomepageViews || showArticleViews) ? (
+              <div className="h-96">
+                <Line 
+                  data={pageViewsOverTime}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                      mode: 'point',
+                      intersect: true,
+                    },
+                    plugins: {
+                      legend: { 
+                        display: false,
+                      },
+                      tooltip: {
+                        enabled: true,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleFont: { size: 14, weight: 'bold' },
+                        bodyFont: { size: 13 },
+                        padding: 12,
+                        displayColors: true,
+                        callbacks: {
+                          label: function(context: any) {
+                            return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} views`;
+                          }
+                        }
+                      },
+                    },
+                    scales: {
+                      y: { 
+                        beginAtZero: true,
+                        max: yAxisMax,
+                        ticks: {
+                          font: { size: 12 },
+                          callback: function(value: any) {
+                            return value.toLocaleString();
+                          },
+                          stepSize: yAxisMax / 10,
+                        },
+                        grid: {
+                          color: 'rgba(0, 0, 0, 0.05)',
+                        },
+                      },
+                      x: {
+                        ticks: {
+                          font: { size: 12 },
+                          maxRotation: 45,
+                          minRotation: 0,
+                        },
+                        grid: {
+                          color: 'rgba(0, 0, 0, 0.05)',
+                        },
+                      },
+                    },
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="h-96 flex items-center justify-center text-gray-500">
+                <p>Please select at least one view type to display the chart</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* === LOCATION INSIGHTS === */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <svg className="w-5 h-5 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Geographic Insights</h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Cities */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">Top Cities</h3>
+              {topCities.length === 0 ? (
+                <p className="text-sm text-gray-500">No city data available yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {topCities.map((city, index) => {
+                    const total = topCities.reduce((sum, c) => sum + c.count, 0);
+                    const percentage = ((city.count / total) * 100).toFixed(1);
+                    return (
+                      <div key={city.city}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium text-gray-700">
+                            #{index + 1} {city.city}
+                          </span>
+                          <span className="text-gray-900 font-semibold">{city.count} ({percentage}%)</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-500 h-2 rounded-full transition-all"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Top States */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">Top States/Regions</h3>
+              {topStates.length === 0 ? (
+                <p className="text-sm text-gray-500">No state data available yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {topStates.map((state, index) => {
+                    const total = topStates.reduce((sum, s) => sum + s.count, 0);
+                    const percentage = ((state.count / total) * 100).toFixed(1);
+                    return (
+                      <div key={state.state}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium text-gray-700">
+                            #{index + 1} {state.state}
+                          </span>
+                          <span className="text-gray-900 font-semibold">{state.count} ({percentage}%)</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-green-500 h-2 rounded-full transition-all"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* === TRAFFIC QUALITY === */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
@@ -645,7 +1137,52 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Traffic Sources */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">Traffic Sources</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[color:var(--color-dark)]">Traffic Sources</h3>
+                <button
+                  onClick={() => setShowTrafficChart(!showTrafficChart)}
+                  className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition"
+                >
+                  {showTrafficChart ? 'Hide Chart' : 'View Chart'}
+                </button>
+              </div>
+              
+              {showTrafficChart && trafficChartData ? (
+                <div className="h-80 flex items-center justify-center mb-4">
+                  <Doughnut 
+                    data={trafficChartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { 
+                          position: 'bottom',
+                          labels: {
+                            font: { size: 12 },
+                            padding: 15,
+                            usePointStyle: true,
+                          },
+                        },
+                        tooltip: {
+                          enabled: true,
+                          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                          titleFont: { size: 13 },
+                          bodyFont: { size: 12 },
+                          padding: 10,
+                          callbacks: {
+                            label: function(context: any) {
+                              const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                              const percentage = ((context.parsed / total) * 100).toFixed(1);
+                              return `${context.label}: ${context.parsed.toLocaleString()} (${percentage}%)`;
+                            }
+                          }
+                        },
+                      },
+                    }}
+                  />
+                </div>
+              ) : null}
+              
               {trafficSources.length === 0 ? (
                 <p className="text-sm text-gray-500">No traffic data yet</p>
               ) : (
@@ -674,7 +1211,52 @@ export default function AnalyticsPage() {
 
             {/* Device Breakdown */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">Device Distribution</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[color:var(--color-dark)]">Device Distribution</h3>
+                <button
+                  onClick={() => setShowDeviceChart(!showDeviceChart)}
+                  className="px-3 py-1.5 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md transition"
+                >
+                  {showDeviceChart ? 'Hide Chart' : 'View Chart'}
+                </button>
+              </div>
+              
+              {showDeviceChart && deviceChartData ? (
+                <div className="h-80 flex items-center justify-center mb-4">
+                  <Doughnut 
+                    data={deviceChartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { 
+                          position: 'bottom',
+                          labels: {
+                            font: { size: 12 },
+                            padding: 15,
+                            usePointStyle: true,
+                          },
+                        },
+                        tooltip: {
+                          enabled: true,
+                          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                          titleFont: { size: 13 },
+                          bodyFont: { size: 12 },
+                          padding: 10,
+                          callbacks: {
+                            label: function(context: any) {
+                              const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                              const percentage = ((context.parsed / total) * 100).toFixed(1);
+                              return `${context.label}: ${context.parsed.toLocaleString()} (${percentage}%)`;
+                            }
+                          }
+                        },
+                      },
+                    }}
+                  />
+                </div>
+              ) : null}
+              
               {deviceBreakdown.length === 0 ? (
                 <p className="text-sm text-gray-500">No device data yet</p>
               ) : (
