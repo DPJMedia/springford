@@ -92,11 +92,11 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
             </div>
           )}
           <div className="p-5 flex-1 flex flex-col">
-            <h3 className={`font-bold text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition ${article.image_url ? 'text-xl line-clamp-3' : 'text-2xl line-clamp-4'}`}>
+            <h3 className="font-bold text-xl text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition line-clamp-3">
               {article.title}
             </h3>
             {article.excerpt && (
-              <p className={`text-[color:var(--color-medium)] mb-3 flex-1 ${article.image_url ? 'text-sm line-clamp-2' : 'text-base line-clamp-3'}`}>
+              <p className="text-sm text-[color:var(--color-medium)] mb-3 flex-1 line-clamp-2">
                 {article.excerpt}
               </p>
             )}
@@ -154,11 +154,11 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
           </div>
         )}
         <div className="p-4 flex-1 flex flex-col">
-          <h3 className={`font-bold text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition ${article.image_url ? 'text-base line-clamp-2' : 'text-lg line-clamp-3'}`}>
+          <h3 className="font-bold text-base text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition line-clamp-2">
             {article.title}
           </h3>
           {article.excerpt && (
-            <p className={`text-[color:var(--color-medium)] mb-2 flex-1 ${article.image_url ? 'text-sm line-clamp-2' : 'text-base line-clamp-4'}`}>
+            <p className="text-sm text-[color:var(--color-medium)] mb-2 flex-1 line-clamp-2">
               {article.excerpt}
             </p>
           )}
