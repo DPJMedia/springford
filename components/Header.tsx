@@ -103,14 +103,9 @@ export function Header() {
       <div className="mx-auto flex w-full max-w-none items-center justify-between gap-2 px-3 py-1.5 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-          <div className="flex flex-col leading-tight">
-            <span className="masthead text-base sm:text-lg font-black text-[color:var(--color-dark)] whitespace-nowrap">
-              Spring-Ford Press
-            </span>
-            <span className="text-[8px] sm:text-[9px] text-[color:var(--color-medium)] uppercase tracking-wider whitespace-nowrap">
-              Neighborhood-first
-            </span>
-          </div>
+          <span className="masthead text-lg sm:text-xl font-semibold text-[color:var(--color-dark)] whitespace-nowrap" style={{ letterSpacing: '-0.02em' }}>
+            Spring-Ford Press
+          </span>
         </Link>
 
         {/* Desktop Navigation - Hidden on mobile/tablet */}

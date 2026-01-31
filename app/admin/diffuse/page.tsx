@@ -864,6 +864,8 @@ export default function DiffuseIntegrationPage() {
       let sections: string[] = [];
       let metaTitle = null;
       let metaDescription = null;
+      let photoCaption = null;
+      let photoCredit = null;
 
       // First, try to parse structured_data if it exists
       let parsedData = output.structured_data;
@@ -968,6 +970,18 @@ export default function DiffuseIntegrationPage() {
           metaDescription = parsedData.meta_description;
           console.log("✅ Found meta_description:", metaDescription);
         }
+        
+        // Photo Caption
+        if (parsedData.photo_caption) {
+          photoCaption = parsedData.photo_caption;
+          console.log("✅ Found photo_caption:", photoCaption);
+        }
+        
+        // Photo Credit
+        if (parsedData.photo_credit) {
+          photoCredit = parsedData.photo_credit;
+          console.log("✅ Found photo_credit:", photoCredit);
+        }
       } else {
         console.warn("⚠️ No parsed data available, using defaults");
       }
@@ -997,6 +1011,8 @@ export default function DiffuseIntegrationPage() {
       console.log("Sections:", sections);
       console.log("Meta Title:", metaTitle);
       console.log("Meta Description:", metaDescription);
+      console.log("Photo Caption:", photoCaption || "NONE");
+      console.log("Photo Credit:", photoCredit || "NONE");
       console.log("========================================\n");
 
       // Handle cover image download and upload
@@ -1200,6 +1216,8 @@ export default function DiffuseIntegrationPage() {
       console.log("Article data being inserted:");
       console.log("  - image_url:", imageUrl);
       console.log("  - use_featured_image:", useFeaturedImage);
+      console.log("  - image_caption:", photoCaption);
+      console.log("  - image_credit:", photoCredit);
       console.log("  - title:", title);
       
       const articleData = {
@@ -1231,8 +1249,8 @@ export default function DiffuseIntegrationPage() {
         share_count: 0,
         image_url: imageUrl,
         use_featured_image: useFeaturedImage,
-        image_caption: null,
-        image_credit: null,
+        image_caption: photoCaption,
+        image_credit: photoCredit,
       };
       
       const { data: article, error: articleError } = await supabase
@@ -1251,6 +1269,8 @@ export default function DiffuseIntegrationPage() {
       console.log("  - id:", article.id);
       console.log("  - image_url:", article.image_url);
       console.log("  - use_featured_image:", article.use_featured_image);
+      console.log("  - image_caption:", article.image_caption);
+      console.log("  - image_credit:", article.image_credit);
       console.log("============================================\n");
 
       // Track the import
