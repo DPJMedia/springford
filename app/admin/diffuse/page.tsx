@@ -1287,48 +1287,46 @@ export default function DiffuseIntegrationPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#000000] flex items-center justify-center" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+      <div className="min-h-screen bg-black flex items-center justify-center antialiased" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
         <div className="text-center">
           <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#ff9628] border-r-transparent"></div>
-          <p className="mt-4 text-[#dbdbdb] text-lg">Loading DiffuseAI...</p>
+          <p className="mt-4 text-[#dbdbdb] text-lg leading-[1.6]">Loading diffuse.ai...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#000000]" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-      <div className="mx-auto max-w-7xl px-4 py-8">
+    <div className="min-h-screen bg-black antialiased" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+      <div className="mx-auto max-w-7xl px-6 md:px-12 lg:px-16 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <div>
-              {/* DiffuseAI Logo */}
+              {/* diffuse.ai Logo */}
               <div className="flex items-center gap-4 mb-4">
-                <h1 className="text-5xl font-bold text-white" style={{ letterSpacing: '-0.01em', lineHeight: '1.2' }}>
+                <h1 className="text-[48px] font-bold text-white leading-[1.2] tracking-[-0.01em]">
                   diffuse<span className="text-[#ff9628]">.ai</span>
                 </h1>
                 <a
                   href="https://diffuse-ai-blush.vercel.app/dashboard"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2 text-xs font-bold text-white bg-[#545454] hover:bg-[#141414] border border-white/40 rounded-lg transition-all duration-300 flex items-center gap-2 shadow-lg"
-                  style={{ color: '#FFFFFF' }}
+                  className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all duration-300 flex items-center gap-2 backdrop-blur-[20px]"
                 >
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
-                  <span style={{ color: '#FFFFFF' }}>Visit diffuse<span className="text-[#ff9628]">.ai</span></span>
+                  <span>Visit diffuse<span className="text-[#ff9628]">.ai</span></span>
                 </a>
               </div>
-              <p className="text-[#dbdbdb] text-lg" style={{ lineHeight: '1.6' }}>
-                Connect your DiffuseAI account to import generated articles
+              <p className="text-[#dbdbdb] text-[18px] leading-[1.6]">
+                Connect your diffuse.ai account to import generated articles
               </p>
             </div>
             <Link
               href="/admin"
-              className="px-6 py-3 text-sm font-bold text-white bg-[#545454] hover:bg-[#141414] rounded-xl transition border border-white/40 shadow-lg"
-              style={{ color: '#FFFFFF' }}
+              className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-[#dbdbdb] hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all duration-300 backdrop-blur-[20px]"
             >
               ← Back to Dashboard
             </Link>
@@ -1337,62 +1335,60 @@ export default function DiffuseIntegrationPage() {
 
         {/* Connection Status */}
         {!connection ? (
-          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-8 shadow-[0_10px_15px_-3px_rgba(255,150,40,0.3)] max-w-2xl mx-auto">
+          <div className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-6 md:p-8 shadow-lg shadow-[#ff9628]/30 max-w-2xl mx-auto">
             <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <div className="w-20 h-20 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-[#ff9628]/30">
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h2 className="text-4xl font-bold text-white mb-3" style={{ letterSpacing: '-0.01em', lineHeight: '1.2' }}>
-                Connect Your DiffuseAI Account
+              <h2 className="text-[36px] font-bold text-white mb-3 leading-[1.2] tracking-[-0.01em]">
+                Connect Your diffuse.ai Account
               </h2>
-              <p className="text-[#dbdbdb] text-lg" style={{ lineHeight: '1.6' }}>
-                Sign in with your DiffuseAI credentials to import your generated articles
+              <p className="text-[#dbdbdb] text-[18px] leading-[1.6]">
+                Sign in with your diffuse.ai credentials to import your generated articles
               </p>
             </div>
 
             {error && (
-              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl backdrop-blur-xl">
-                <p className="text-sm text-red-300 font-medium">{error}</p>
+              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl backdrop-blur-[20px]">
+                <p className="text-[14px] leading-[1.6] text-red-400 font-medium">{error}</p>
               </div>
             )}
 
-            <div className="space-y-5">
+            <div className="space-y-6">
               <div>
-                <label className="block text-base font-semibold text-white mb-3" style={{ lineHeight: '1.4' }}>
-                  DiffuseAI Email
+                <label className="block text-[16px] leading-[1.6] font-medium text-[#dbdbdb] mb-2">
+                  diffuse.ai Email
                 </label>
                 <input
                   type="email"
                   value={diffuseEmail}
                   onChange={(e) => setDiffuseEmail(e.target.value)}
-                  className="w-full border border-white/10 bg-white/5 backdrop-blur-xl rounded-xl px-5 py-4 text-white placeholder-[#545454] focus:border-[#ff9628] focus:outline-none focus:ring-2 focus:ring-[#ff9628]/30 transition"
+                  className="w-full border border-white/10 bg-white/5 backdrop-blur-[20px] rounded-xl px-4 py-3 text-[#dbdbdb] text-[16px] leading-[1.6] placeholder-[#545454] focus:border-[#ff9628] focus:outline-none transition-all duration-300"
                   placeholder="your@email.com"
                   disabled={connectLoading}
-                  style={{ fontSize: '16px', lineHeight: '1.6' }}
                 />
               </div>
 
               <div>
-                <label className="block text-base font-semibold text-white mb-3" style={{ lineHeight: '1.4' }}>
-                  DiffuseAI Password
+                <label className="block text-[16px] leading-[1.6] font-medium text-[#dbdbdb] mb-2">
+                  diffuse.ai Password
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     value={diffusePassword}
                     onChange={(e) => setDiffusePassword(e.target.value)}
-                    className="w-full border border-white/10 bg-white/5 backdrop-blur-xl rounded-xl px-5 py-4 pr-12 text-white placeholder-[#545454] focus:border-[#ff9628] focus:outline-none focus:ring-2 focus:ring-[#ff9628]/30 transition"
+                    className="w-full border border-white/10 bg-white/5 backdrop-blur-[20px] rounded-xl px-4 py-3 pr-12 text-[#dbdbdb] text-[16px] leading-[1.6] placeholder-[#545454] focus:border-[#ff9628] focus:outline-none transition-all duration-300"
                     placeholder="••••••••"
                     disabled={connectLoading}
                     onKeyDown={(e) => e.key === "Enter" && handleConnect()}
-                    style={{ fontSize: '16px', lineHeight: '1.6' }}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#545454] hover:text-[#ff9628] transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#545454] hover:text-[#ff9628] transition-colors duration-300"
                     disabled={connectLoading}
                   >
                     {showPassword ? (
@@ -1412,7 +1408,7 @@ export default function DiffuseIntegrationPage() {
               <button
                 onClick={handleConnect}
                 disabled={connectLoading || !diffuseEmail || !diffusePassword}
-                className="w-full bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white px-8 py-4 rounded-xl font-bold text-lg hover:shadow-[0_10px_15px_-3px_rgba(255,150,40,0.4)] hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="w-full bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white px-8 py-4 rounded-xl font-medium text-[16px] leading-[1.6] hover:shadow-lg hover:shadow-[#ff9628]/30 hover:scale-105 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {connectLoading ? "Connecting..." : "Connect Account"}
               </button>
@@ -1421,11 +1417,11 @@ export default function DiffuseIntegrationPage() {
         ) : (
           <div>
             {/* Connected Status */}
-            <div className="bg-gradient-to-br from-[#c086fa]/10 via-white/5 to-[#ff9628]/10 backdrop-blur-xl rounded-xl p-6 shadow-[0_10px_15px_-3px_rgba(255,150,40,0.2)] mb-8 border border-[#ff9628]/20">
+            <div className="bg-gradient-to-br from-[#c086fa]/10 via-white/5 to-[#ff9628]/10 backdrop-blur-[20px] rounded-xl p-6 shadow-lg shadow-[#ff9628]/20 mb-8 border border-[#ff9628]/20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-5">
                   {/* User Profile Picture */}
-                  <div className="relative w-14 h-14 rounded-2xl overflow-hidden shadow-lg ring-2 ring-[#ff9628]/50">
+                  <div className="relative w-14 h-14 rounded-xl overflow-hidden shadow-lg ring-2 ring-[#ff9628]/50">
                     {profile?.avatar_url ? (
                       <img 
                         src={profile.avatar_url} 
@@ -1434,24 +1430,24 @@ export default function DiffuseIntegrationPage() {
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-[#ff9628] to-[#c086fa] flex items-center justify-center">
-                        <span className="text-white font-bold text-xl">
+                        <span className="text-white font-bold text-[20px] leading-[1.4]">
                           {profile?.full_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "?"}
                         </span>
                       </div>
                     )}
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-white mb-1" style={{ letterSpacing: '-0.01em' }}>
+                    <h3 className="text-[20px] leading-[1.4] font-bold text-white mb-1">
                       Connected to <span className="text-white">diffuse<span className="text-[#ff9628]">.ai</span></span>
                     </h3>
-                    <p className="text-base text-[#dbdbdb]" style={{ lineHeight: '1.6' }}>
+                    <p className="text-[16px] leading-[1.6] text-[#dbdbdb]">
                       {connection.diffuse_email || "Account connected"}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={handleDisconnect}
-                  className="px-6 py-3 text-sm font-semibold text-red-300 hover:text-white bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition-all duration-300"
+                  className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-red-400 hover:text-white bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition-all duration-300"
                 >
                   Disconnect
                 </button>
@@ -1459,23 +1455,23 @@ export default function DiffuseIntegrationPage() {
             </div>
 
             {/* Organizations & Projects */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl shadow-[0_10px_15px_-3px_rgba(255,150,40,0.2)]">
-              <div className="p-8 border-b border-white/10">
+            <div className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl shadow-lg shadow-[#ff9628]/20">
+              <div className="p-6 md:p-8 border-b border-white/10">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-3xl font-bold text-white mb-2" style={{ letterSpacing: '-0.01em', lineHeight: '1.3' }}>
-                      Your DiffuseAI Organizations ({workspaces.length})
+                    <h2 className="text-[32px] leading-[1.3] tracking-[-0.01em] font-bold text-white mb-2">
+                      Your diffuse.ai Organizations ({workspaces.length})
                     </h2>
-                    <p className="text-base text-[#dbdbdb]" style={{ lineHeight: '1.6' }}>
-                      View projects and import their outputs as drafts
+                    <p className="text-[16px] leading-[1.6] text-[#dbdbdb]">
+                      View Projects and Import Their Outputs as Drafts
                     </p>
                   </div>
                   <button
                     onClick={fetchWorkspacesAndProjects}
-                    className="px-5 py-3 text-sm font-semibold text-[#ff9628] hover:text-white bg-[#ff9628]/10 hover:bg-[#ff9628]/20 border border-[#ff9628]/30 rounded-xl transition-all duration-300 flex items-center gap-2"
+                    className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-[#ff9628] hover:text-white bg-[#ff9628]/10 hover:bg-[#ff9628]/20 border border-[#ff9628]/30 hover:border-[#ff9628]/50 rounded-xl transition-all duration-300 flex items-center gap-2"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     Refresh
                   </button>
@@ -1485,11 +1481,11 @@ export default function DiffuseIntegrationPage() {
               {workspaces.length === 0 ? (
                 <div className="p-16 text-center">
                   <div className="text-7xl mb-6 opacity-50">🏢</div>
-                  <h3 className="text-2xl font-bold text-white mb-3" style={{ letterSpacing: '-0.01em' }}>
+                  <h3 className="text-[24px] leading-[1.4] font-bold text-white mb-3">
                     No Organizations Yet
                   </h3>
-                  <p className="text-lg text-[#dbdbdb]" style={{ lineHeight: '1.6' }}>
-                    Create an organization in DiffuseAI and it will appear here
+                  <p className="text-[18px] leading-[1.6] text-[#dbdbdb]">
+                    Create an organization in diffuse.ai and it will appear here
                   </p>
                 </div>
               ) : (
@@ -1502,7 +1498,7 @@ export default function DiffuseIntegrationPage() {
                         <div className="mb-6">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                              <div className="w-14 h-14 bg-white/10 border border-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center shadow-lg">
+                              <div className="w-14 h-14 bg-white/10 border border-white/20 backdrop-blur-[20px] rounded-xl flex items-center justify-center shadow-lg">
                                 <svg className="w-8 h-8 text-[#dbdbdb]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                 </svg>
@@ -1521,7 +1517,7 @@ export default function DiffuseIntegrationPage() {
                             {/* Collapse Toggle Button */}
                             <button
                               onClick={() => toggleWorkspaceCollapse(workspace.id)}
-                              className="px-4 py-2 text-sm font-bold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-all duration-300 flex items-center gap-2"
+                              className="px-4 py-2 text-sm font-bold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-300 flex items-center gap-2"
                             >
                               <svg 
                                 className={`w-4 h-4 transition-transform duration-300 ${collapsedWorkspaces.has(workspace.id) ? 'rotate-180' : ''}`}
@@ -1529,7 +1525,7 @@ export default function DiffuseIntegrationPage() {
                                 stroke="currentColor" 
                                 viewBox="0 0 24 24"
                               >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
                               </svg>
                               {collapsedWorkspaces.has(workspace.id) ? 'Show' : 'Hide'}
                             </button>
@@ -1539,14 +1535,14 @@ export default function DiffuseIntegrationPage() {
                         {/* Projects Grid */}
                         {!collapsedWorkspaces.has(workspace.id) && (
                           loadingProjects ? (
-                            <div className="ml-16 p-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl flex items-center justify-center">
+                            <div className="ml-16 p-8 bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl flex items-center justify-center">
                               <div className="flex flex-col items-center gap-3">
                                 <div className="w-8 h-8 border-4 border-[#ff9628] border-t-transparent rounded-full animate-spin"></div>
                                 <p className="text-sm text-[#dbdbdb]">Loading projects...</p>
                               </div>
                             </div>
                           ) : projects.length === 0 ? (
-                            <div className="ml-16 p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl text-center">
+                            <div className="ml-16 p-6 bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl text-center">
                               <p className="text-base text-[#dbdbdb]" style={{ lineHeight: '1.6' }}>
                                 No projects in this organization yet
                               </p>
@@ -1556,7 +1552,7 @@ export default function DiffuseIntegrationPage() {
                               {projects.map((project) => (
                                 <div
                                   key={project.id}
-                                  className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-5 flex flex-col h-full"
+                                  className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-5 flex flex-col h-full"
                                 >
                                   {/* Project Info - Grows to fill space */}
                                   <div className="flex-1 mb-4">
@@ -1586,7 +1582,7 @@ export default function DiffuseIntegrationPage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                       </svg>
                                       <span className="text-xs text-[#dbdbdb] font-medium">
                                         {project.creator_name || "Unknown"}
@@ -1594,7 +1590,7 @@ export default function DiffuseIntegrationPage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                       </svg>
                                       <span className="text-xs text-[#dbdbdb] font-medium">
                                         {project.cover_image_path ? "1 image" : "0 images"}
@@ -1602,7 +1598,7 @@ export default function DiffuseIntegrationPage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                       </svg>
                                       <span className="text-xs text-[#dbdbdb] font-medium">
                                         {project.all_outputs?.length || 0} output{project.all_outputs?.length !== 1 ? 's' : ''}
@@ -1624,14 +1620,14 @@ export default function DiffuseIntegrationPage() {
                                     ) : !project.all_outputs || project.all_outputs.length === 0 ? (
                                       <>
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                         </svg>
                                         No Output
                                       </>
                                     ) : (
                                       <>
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                         </svg>
                                         Turn into Article
                                       </>
@@ -1653,7 +1649,7 @@ export default function DiffuseIntegrationPage() {
                       <div className="mb-6">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-gradient-to-br from-[#ff9628]/20 to-[#c086fa]/20 border border-[#ff9628]/40 backdrop-blur-xl rounded-2xl flex items-center justify-center shadow-lg">
+                            <div className="w-14 h-14 bg-gradient-to-br from-[#ff9628]/20 to-[#c086fa]/20 border border-[#ff9628]/40 backdrop-blur-[20px] rounded-xl flex items-center justify-center shadow-lg">
                               <svg className="w-8 h-8 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                               </svg>
@@ -1670,7 +1666,7 @@ export default function DiffuseIntegrationPage() {
                           {/* Collapse Toggle Button */}
                           <button
                             onClick={() => toggleWorkspaceCollapse("private")}
-                            className="px-4 py-2 text-sm font-bold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-all duration-300 flex items-center gap-2"
+                            className="px-4 py-2 text-sm font-bold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-300 flex items-center gap-2"
                           >
                             <svg 
                               className={`w-4 h-4 transition-transform duration-300 ${collapsedWorkspaces.has("private") ? 'rotate-180' : ''}`}
@@ -1678,7 +1674,7 @@ export default function DiffuseIntegrationPage() {
                               stroke="currentColor" 
                               viewBox="0 0 24 24"
                             >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
                             </svg>
                             {collapsedWorkspaces.has("private") ? 'Show' : 'Hide'}
                           </button>
@@ -1691,7 +1687,7 @@ export default function DiffuseIntegrationPage() {
                           {projectsByWorkspace["private"].map((project) => (
                             <div
                               key={project.id}
-                              className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-5 flex flex-col h-full"
+                              className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-5 flex flex-col h-full"
                             >
                               {/* Project Info - Grows to fill space */}
                               <div className="flex-1 mb-4">
@@ -1721,7 +1717,7 @@ export default function DiffuseIntegrationPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                   </svg>
                                   <span className="text-xs text-[#dbdbdb] font-medium">
                                     {project.creator_name || "Unknown"}
@@ -1729,7 +1725,7 @@ export default function DiffuseIntegrationPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                   </svg>
                                   <span className="text-xs text-[#dbdbdb] font-medium">
                                     {project.cover_image_path ? "1 image" : "0 images"}
@@ -1737,7 +1733,7 @@ export default function DiffuseIntegrationPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                   </svg>
                                   <span className="text-xs text-[#dbdbdb] font-medium">
                                     {project.all_outputs?.length || 0} output{project.all_outputs?.length !== 1 ? 's' : ''}
@@ -1759,14 +1755,14 @@ export default function DiffuseIntegrationPage() {
                                 ) : !project.all_outputs || project.all_outputs.length === 0 ? (
                                   <>
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                     </svg>
                                     No Output
                                   </>
                                 ) : (
                                   <>
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
                                     Turn into Article
                                   </>
@@ -1788,7 +1784,7 @@ export default function DiffuseIntegrationPage() {
         {showOutputSelector && outputSelectorData && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowOutputSelector(false)}>
             <div 
-              className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 max-w-2xl w-full shadow-[0_20px_25px_-5px_rgba(255,150,40,0.4)] max-h-[80vh] overflow-y-auto"
+              className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-8 max-w-2xl w-full shadow-[0_20px_25px_-5px_rgba(255,150,40,0.4)] max-h-[80vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
               style={{ fontFamily: 'var(--font-space-grotesk)' }}
             >
@@ -1797,7 +1793,7 @@ export default function DiffuseIntegrationPage() {
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center shadow-lg">
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
                   <div>
@@ -1884,7 +1880,7 @@ export default function DiffuseIntegrationPage() {
                             {output.cover_photo_path && (
                               <span className="inline-flex items-center gap-1 text-xs text-[#ff9628] font-medium flex-shrink-0">
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
                                 Has image
                               </span>
@@ -1908,7 +1904,7 @@ export default function DiffuseIntegrationPage() {
                           )}
                         </div>
                         <svg className="w-5 h-5 text-[#ff9628] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
                     </button>
@@ -1931,7 +1927,7 @@ export default function DiffuseIntegrationPage() {
         {showConfirmModal && confirmModalData && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowConfirmModal(false)}>
             <div 
-              className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-[0_20px_25px_-5px_rgba(255,150,40,0.4)]"
+              className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-8 max-w-md w-full shadow-[0_20px_25px_-5px_rgba(255,150,40,0.4)]"
               onClick={(e) => e.stopPropagation()}
               style={{ fontFamily: 'var(--font-space-grotesk)' }}
             >
@@ -1940,7 +1936,7 @@ export default function DiffuseIntegrationPage() {
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center shadow-lg">
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <h2 className="text-2xl font-bold text-white" style={{ letterSpacing: '-0.01em', lineHeight: '1.3' }}>
