@@ -63,37 +63,30 @@ export function getDeviceType(): 'desktop' | 'mobile' | 'tablet' {
   return 'desktop';
 }
 
-// Traffic source detection
+// Traffic source detection - Simplified to Search vs External
 export function getTrafficSource(): { source: string; referrer: string } {
-  if (typeof window === 'undefined') return { source: 'direct', referrer: '' };
+  if (typeof window === 'undefined') return { source: 'external', referrer: '' };
   
   const referrer = document.referrer;
-  if (!referrer) return { source: 'direct', referrer: '' };
-  
-  const referrerUrl = new URL(referrer);
   const currentHost = window.location.hostname;
   
+  // If no referrer or internal navigation, count as external (direct visit)
+  if (!referrer) return { source: 'external', referrer: '' };
+  
+  const referrerUrl = new URL(referrer);
+  
+  // Skip internal navigation (don't count as traffic source)
   if (referrerUrl.hostname === currentHost) {
-    return { source: 'internal', referrer };
+    return { source: 'internal', referrer }; // Will be filtered out in analytics
   }
   
-  // Search engines
-  if (/google|bing|yahoo|duckduckgo|baidu/.test(referrerUrl.hostname)) {
+  // Search engines = "search"
+  if (/google|bing|yahoo|duckduckgo|baidu|yandex/.test(referrerUrl.hostname)) {
     return { source: 'search', referrer };
   }
   
-  // Social media
-  if (/facebook|twitter|linkedin|instagram|pinterest|reddit|tiktok/.test(referrerUrl.hostname)) {
-    return { source: 'social', referrer };
-  }
-  
-  // Shared links (if they have specific parameters)
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('share') || urlParams.get('ref')) {
-    return { source: 'shared_link', referrer };
-  }
-  
-  return { source: 'referral', referrer };
+  // Everything else = "external" (social media, other websites, shared links, etc.)
+  return { source: 'external', referrer };
 }
 
 // Get UTM parameters

@@ -364,20 +364,33 @@ export default function AnalyticsPage() {
 
       // === TRAFFIC QUALITY ===
       
-      // Traffic sources
+      // Traffic sources - Consolidate into Search vs External
       const { data: trafficData } = await supabase
         .from('page_views')
         .select('traffic_source')
         .gte('viewed_at', startDate.toISOString());
 
-      const sourceMap: Record<string, number> = {};
+      const sourceMap: Record<string, number> = {
+        'search': 0,
+        'external': 0
+      };
+      
       trafficData?.forEach(t => {
-        const source = t.traffic_source || 'unknown';
-        sourceMap[source] = (sourceMap[source] || 0) + 1;
+        const source = t.traffic_source;
+        
+        // Map all sources to either 'search' or 'external'
+        if (source === 'search') {
+          sourceMap['search']++;
+        } else if (source !== 'internal') {
+          // Consolidate: direct, social, referral, shared_link, unknown -> external
+          sourceMap['external']++;
+        }
+        // Skip 'internal' - don't count as traffic source
       });
 
       const sourcesArray = Object.entries(sourceMap)
         .map(([source, count]) => ({ source, count }))
+        .filter(item => item.count > 0) // Only show sources with data
         .sort((a, b) => b.count - a.count);
       setTrafficSources(sourcesArray);
 
@@ -458,18 +471,20 @@ export default function AnalyticsPage() {
       // This will be loaded separately based on chartTimeRange
       loadChartData(chartTimeRange);
 
-      // Traffic sources doughnut chart
+      // Traffic sources doughnut chart - Simplified
       if (sourcesArray.length > 0) {
+        const displayNames: Record<string, string> = {
+          'search': 'Search Engines',
+          'external': 'External Sources'
+        };
+        
         setTrafficChartData({
-          labels: sourcesArray.map(s => s.source.charAt(0).toUpperCase() + s.source.slice(1)),
+          labels: sourcesArray.map(s => displayNames[s.source] || s.source),
           datasets: [{
             data: sourcesArray.map(s => s.count),
             backgroundColor: [
-              'rgba(59, 130, 246, 0.8)',
-              'rgba(16, 185, 129, 0.8)',
-              'rgba(245, 158, 11, 0.8)',
-              'rgba(239, 68, 68, 0.8)',
-              'rgba(139, 92, 246, 0.8)',
+              'rgba(59, 130, 246, 0.8)',  // Blue for Search
+              'rgba(16, 185, 129, 0.8)',  // Green for External
             ],
           }],
         });
@@ -1217,7 +1232,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-[color:var(--color-dark)] flex items-center">
                   Traffic Sources
-                  <InfoTooltip text="How visitors found your site. Detected from the browser's referrer URL and UTM parameters." />
+                  <InfoTooltip text="Where visitors came from before landing on your site: Search Engines (Google, Bing, etc.) or External Sources (social media, other websites, direct visits, etc.)." />
                 </h3>
                 <button
                   onClick={() => setShowTrafficChart(!showTrafficChart)}
@@ -1271,21 +1286,23 @@ export default function AnalyticsPage() {
                     const total = trafficSources.reduce((sum, s) => sum + s.count, 0);
                     const percentage = ((source.count / total) * 100).toFixed(1);
                     
-                    // Get tooltip text for each source type
+                    // Simplified tooltip text
                     const sourceTooltips: Record<string, string> = {
-                      'direct': 'Visitors who typed your URL directly, used a bookmark, or clicked a link without referrer data (e.g., from email apps).',
-                      'search': 'Visitors from search engines like Google, Bing, Yahoo, DuckDuckGo. They found you through organic search results.',
-                      'social': 'Visitors from social media platforms like Facebook, Twitter, LinkedIn, Instagram, Reddit, TikTok.',
-                      'referral': 'Visitors who clicked a link on another website that led to your site. External sites linking to your content.',
-                      'internal': 'Navigation within your own site. When users click links between your pages (homepage → article, etc.).',
-                      'shared_link': 'Visitors from shared links with tracking parameters (share buttons, URL parameters like ?share=1 or ?ref=).'
+                      'search': 'Visitors who found your site through search engines (Google, Bing, Yahoo, DuckDuckGo, etc.). These are people actively searching for news or topics.',
+                      'external': 'Visitors from all other sources: social media (Facebook, Twitter), other websites linking to you, shared links, direct visits (typing URL or bookmarks), email links, etc.'
+                    };
+                    
+                    // Display names
+                    const displayNames: Record<string, string> = {
+                      'search': 'Search Engines',
+                      'external': 'External Sources'
                     };
                     
                     return (
                       <div key={source.source}>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-gray-700 capitalize flex items-center">
-                            {source.source}
+                          <span className="font-medium text-gray-700 flex items-center">
+                            {displayNames[source.source] || source.source}
                             <InfoTooltip text={sourceTooltips[source.source] || 'Traffic from this source.'} />
                           </span>
                           <span className="text-gray-900 font-semibold">{source.count} ({percentage}%)</span>
