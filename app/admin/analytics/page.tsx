@@ -398,51 +398,56 @@ export default function AnalyticsPage() {
       
       // List of locations to exclude (development/test data)
       const excludedCities = ['Unknown', 'Development', 'Santa Clara', 'San Jose', 'Mountain View', 'Palo Alto'];
-      const excludedStates = ['Unknown', 'Local', 'California']; // Exclude CA if it's just Santa Clara area
       
-      // Top cities
+      // Top cities - count UNIQUE SESSIONS, not total page views
       const { data: cityData } = await supabase
         .from('page_views')
-        .select('city, state')
+        .select('city, state, session_id')
         .gte('viewed_at', startDate.toISOString())
         .not('city', 'is', null);
 
-      const cityMap: Record<string, number> = {};
+      const citySessionsMap: Record<string, Set<string>> = {};
       cityData?.forEach(c => {
         // Exclude development/test cities AND exclude CA cities that are likely proxy locations
         const isExcluded = excludedCities.includes(c.city) || 
                           (c.state === 'California' && ['Santa Clara', 'San Jose', 'Mountain View', 'Palo Alto', 'Sunnyvale'].includes(c.city));
         
         if (c.city && !isExcluded) {
-          cityMap[c.city] = (cityMap[c.city] || 0) + 1;
+          if (!citySessionsMap[c.city]) {
+            citySessionsMap[c.city] = new Set();
+          }
+          citySessionsMap[c.city].add(c.session_id);
         }
       });
 
-      const citiesArray = Object.entries(cityMap)
-        .map(([city, count]) => ({ city, count }))
+      const citiesArray = Object.entries(citySessionsMap)
+        .map(([city, sessions]) => ({ city, count: sessions.size }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
       setTopCities(citiesArray);
 
-      // Top states
+      // Top states - count UNIQUE SESSIONS, not total page views
       const { data: stateData } = await supabase
         .from('page_views')
-        .select('state, city')
+        .select('state, city, session_id')
         .gte('viewed_at', startDate.toISOString())
         .not('state', 'is', null);
 
-      const stateMap: Record<string, number> = {};
+      const stateSessionsMap: Record<string, Set<string>> = {};
       stateData?.forEach(s => {
-        // Only exclude if it's ONLY California traffic from proxy cities
-        const isDevState = excludedStates.includes(s.state);
+        // Exclude development states
+        const isExcluded = ['Unknown', 'Local'].includes(s.state);
         
-        if (s.state && !isDevState) {
-          stateMap[s.state] = (stateMap[s.state] || 0) + 1;
+        if (s.state && !isExcluded) {
+          if (!stateSessionsMap[s.state]) {
+            stateSessionsMap[s.state] = new Set();
+          }
+          stateSessionsMap[s.state].add(s.session_id);
         }
       });
 
-      const statesArray = Object.entries(stateMap)
-        .map(([state, count]) => ({ state, count }))
+      const statesArray = Object.entries(stateSessionsMap)
+        .map(([state, sessions]) => ({ state, count: sessions.size }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
       setTopStates(statesArray);
@@ -1077,7 +1082,10 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Top Cities */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">Top Cities</h3>
+              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">
+                Top Cities
+                <span className="text-xs font-normal text-gray-500 ml-2">(Unique Visitors)</span>
+              </h3>
               {topCities.length === 0 ? (
                 <p className="text-sm text-gray-500">No city data available yet</p>
               ) : (
@@ -1085,13 +1093,14 @@ export default function AnalyticsPage() {
                   {topCities.map((city, index) => {
                     const total = topCities.reduce((sum, c) => sum + c.count, 0);
                     const percentage = ((city.count / total) * 100).toFixed(1);
+                    const visitorLabel = city.count === 1 ? 'visitor' : 'visitors';
                     return (
                       <div key={city.city}>
                         <div className="flex justify-between text-sm mb-1">
                           <span className="font-medium text-gray-700">
                             #{index + 1} {city.city}
                           </span>
-                          <span className="text-gray-900 font-semibold">{city.count} ({percentage}%)</span>
+                          <span className="text-gray-900 font-semibold">{city.count} {visitorLabel} ({percentage}%)</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div 
@@ -1108,7 +1117,10 @@ export default function AnalyticsPage() {
 
             {/* Top States */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">Top States/Regions</h3>
+              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">
+                Top States/Regions
+                <span className="text-xs font-normal text-gray-500 ml-2">(Unique Visitors)</span>
+              </h3>
               {topStates.length === 0 ? (
                 <p className="text-sm text-gray-500">No state data available yet</p>
               ) : (
@@ -1116,13 +1128,14 @@ export default function AnalyticsPage() {
                   {topStates.map((state, index) => {
                     const total = topStates.reduce((sum, s) => sum + s.count, 0);
                     const percentage = ((state.count / total) * 100).toFixed(1);
+                    const visitorLabel = state.count === 1 ? 'visitor' : 'visitors';
                     return (
                       <div key={state.state}>
                         <div className="flex justify-between text-sm mb-1">
                           <span className="font-medium text-gray-700">
                             #{index + 1} {state.state}
                           </span>
-                          <span className="text-gray-900 font-semibold">{state.count} ({percentage}%)</span>
+                          <span className="text-gray-900 font-semibold">{state.count} {visitorLabel} ({percentage}%)</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div 
