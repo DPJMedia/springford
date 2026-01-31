@@ -1401,9 +1401,9 @@ export default function AnalyticsPage() {
 // Info Tooltip Component
 function InfoTooltip({ text }: { text: string }) {
   return (
-    <div className="group relative inline-block ml-1.5">
+    <div className="group relative inline-block ml-2">
       <svg 
-        className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help inline-block" 
+        className="w-5 h-5 text-blue-500 hover:text-blue-700 cursor-help inline-block transition-colors" 
         fill="currentColor" 
         viewBox="0 0 20 20"
       >
@@ -1413,9 +1413,9 @@ function InfoTooltip({ text }: { text: string }) {
           clipRule="evenodd" 
         />
       </svg>
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50">
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block w-72 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl z-[9999] pointer-events-none">
         {text}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-2 border-[6px] border-transparent border-t-gray-900"></div>
       </div>
     </div>
   );
