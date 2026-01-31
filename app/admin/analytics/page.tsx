@@ -86,6 +86,10 @@ export default function AnalyticsPage() {
   const [showTrafficChart, setShowTrafficChart] = useState(false);
   const [showDeviceChart, setShowDeviceChart] = useState(false);
   
+  // View more controls
+  const [showAllCities, setShowAllCities] = useState(false);
+  const [showAllStates, setShowAllStates] = useState(false);
+  
   const router = useRouter();
   const supabase = createClient();
 
@@ -422,8 +426,7 @@ export default function AnalyticsPage() {
 
       const citiesArray = Object.entries(citySessionsMap)
         .map(([city, sessions]) => ({ city, count: sessions.size }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
+        .sort((a, b) => b.count - a.count);
       setTopCities(citiesArray);
 
       // Top states - count UNIQUE SESSIONS, not total page views
@@ -448,8 +451,7 @@ export default function AnalyticsPage() {
 
       const statesArray = Object.entries(stateSessionsMap)
         .map(([state, sessions]) => ({ state, count: sessions.size }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
+        .sort((a, b) => b.count - a.count);
       setTopStates(statesArray);
 
       // === CHART DATA ===
@@ -692,6 +694,7 @@ export default function AnalyticsPage() {
             <MetricCard
               title="Total Page Views"
               value={totalPageViews.toLocaleString()}
+              tooltip="Total number of pages viewed across your site. Each page load counts as one view, including multiple views from the same visitor."
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -704,6 +707,7 @@ export default function AnalyticsPage() {
               title="Avg Session Duration"
               value={`${Math.floor(avgSessionDuration / 60)}:${String(avgSessionDuration % 60).padStart(2, '0')}`}
               subtitle="minutes"
+              tooltip="Average time visitors spend on your site per session. Calculated by tracking time spent on pages with scroll activity."
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -715,6 +719,7 @@ export default function AnalyticsPage() {
               title="Revenue Potential"
               value={`$${revenueEst.toFixed(2)}`}
               subtitle={`${totalAdImpressions.toLocaleString()} impressions`}
+              tooltip="Estimated ad revenue based on $5 CPM (cost per 1,000 impressions). Actual revenue depends on your ad network and rates."
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -726,6 +731,7 @@ export default function AnalyticsPage() {
               title="Engagement Rate"
               value={`${engagementRate.toFixed(2)}%`}
               subtitle="clicks/views"
+              tooltip="Percentage of page views that result in ad clicks. Higher rates indicate more engaged readers and better ad placement."
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -751,19 +757,28 @@ export default function AnalyticsPage() {
               <div className="text-2xl font-black text-blue-600 mb-1">
                 {avgReadingTime > 0 ? `${Math.floor(avgReadingTime / 60)}:${String(avgReadingTime % 60).padStart(2, '0')}` : '0:00'}
               </div>
-              <div className="text-sm font-semibold text-gray-600">Avg Reading Time</div>
+              <div className="text-sm font-semibold text-gray-600 flex items-center">
+                Avg Reading Time
+                <InfoTooltip text="Average time readers spend on articles, tracked from when they start reading until they navigate away. Calculated from article_scroll_data." />
+              </div>
             </div>
             <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-green-500">
               <div className="text-2xl font-black text-green-600 mb-1">
                 {completionRate.toFixed(1)}%
               </div>
-              <div className="text-sm font-semibold text-gray-600">Article Completion Rate</div>
+              <div className="text-sm font-semibold text-gray-600 flex items-center">
+                Article Completion Rate
+                <InfoTooltip text="Percentage of readers who scroll to at least 90% of an article. Higher rates indicate engaging content that readers finish." />
+              </div>
             </div>
             <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-purple-500">
               <div className="text-2xl font-black text-purple-600 mb-1">
                 {topArticles.length}
               </div>
-              <div className="text-sm font-semibold text-gray-600">Published Articles</div>
+              <div className="text-sm font-semibold text-gray-600 flex items-center">
+                Published Articles
+                <InfoTooltip text="Total number of articles currently published and visible on your site." />
+              </div>
             </div>
           </div>
 
@@ -865,21 +880,30 @@ export default function AnalyticsPage() {
               <div className="text-2xl font-black text-orange-600 mb-1">
                 {adViewability.toFixed(1)}%
               </div>
-              <div className="text-sm font-semibold text-gray-600">Ad Viewability Rate</div>
+              <div className="text-sm font-semibold text-gray-600 flex items-center">
+                Ad Viewability Rate
+                <InfoTooltip text="Percentage of ad impressions that were actually visible on screen for at least 1 second at 50%+ visibility. Industry standard for viewability." />
+              </div>
               <div className="text-xs text-gray-500 mt-1">Ads actually seen by users</div>
             </div>
             <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-pink-500">
               <div className="text-2xl font-black text-pink-600 mb-1">
                 {avgTimeInViewport}s
               </div>
-              <div className="text-sm font-semibold text-gray-600">Avg Time in Viewport</div>
+              <div className="text-sm font-semibold text-gray-600 flex items-center">
+                Avg Time in Viewport
+                <InfoTooltip text="Average duration ads remain visible on screen. Tracked using Intersection Observer API when ads are 50%+ visible." />
+              </div>
               <div className="text-xs text-gray-500 mt-1">How long ads are visible</div>
             </div>
             <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-green-500">
               <div className="text-2xl font-black text-green-600 mb-1">
                 ${revenueEst.toFixed(2)}
               </div>
-              <div className="text-sm font-semibold text-gray-600">Est. Revenue (CPM $5)</div>
+              <div className="text-sm font-semibold text-gray-600 flex items-center">
+                Est. Revenue (CPM $5)
+                <InfoTooltip text="Estimated advertising revenue calculated at $5 per 1,000 impressions (CPM). Actual rates vary by ad network and demand." />
+              </div>
               <div className="text-xs text-gray-500 mt-1">Based on impressions</div>
             </div>
           </div>
@@ -1082,71 +1106,97 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Top Cities */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">
-                Top Cities
-                <span className="text-xs font-normal text-gray-500 ml-2">(Unique Visitors)</span>
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[color:var(--color-dark)] flex items-center">
+                  Top Cities
+                  <span className="text-xs font-normal text-gray-500 ml-2">(Unique Visitors)</span>
+                  <InfoTooltip text="Cities where your visitors are located, based on IP geolocation. Each unique session ID is counted once per city." />
+                </h3>
+              </div>
               {topCities.length === 0 ? (
                 <p className="text-sm text-gray-500">No city data available yet</p>
               ) : (
-                <div className="space-y-3">
-                  {topCities.map((city, index) => {
-                    const total = topCities.reduce((sum, c) => sum + c.count, 0);
-                    const percentage = ((city.count / total) * 100).toFixed(1);
-                    const visitorLabel = city.count === 1 ? 'visitor' : 'visitors';
-                    return (
-                      <div key={city.city}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-gray-700">
-                            #{index + 1} {city.city}
-                          </span>
-                          <span className="text-gray-900 font-semibold">{city.count} {visitorLabel} ({percentage}%)</span>
+                <>
+                  <div className="space-y-3">
+                    {(showAllCities ? topCities : topCities.slice(0, 10)).map((city, index) => {
+                      const total = topCities.reduce((sum, c) => sum + c.count, 0);
+                      const percentage = ((city.count / total) * 100).toFixed(1);
+                      const visitorLabel = city.count === 1 ? 'visitor' : 'visitors';
+                      return (
+                        <div key={city.city}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium text-gray-700">
+                              #{index + 1} {city.city}
+                            </span>
+                            <span className="text-gray-900 font-semibold">{city.count} {visitorLabel} ({percentage}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full transition-all"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-500 h-2 rounded-full transition-all"
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                  {topCities.length > 10 && (
+                    <button
+                      onClick={() => setShowAllCities(!showAllCities)}
+                      className="mt-4 w-full px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition border border-blue-200"
+                    >
+                      {showAllCities ? `Show Less` : `View More (${topCities.length - 10} more cities)`}
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
             {/* Top States */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">
-                Top States/Regions
-                <span className="text-xs font-normal text-gray-500 ml-2">(Unique Visitors)</span>
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[color:var(--color-dark)] flex items-center">
+                  Top States/Regions
+                  <span className="text-xs font-normal text-gray-500 ml-2">(Unique Visitors)</span>
+                  <InfoTooltip text="States/regions where your visitors are located, based on IP geolocation. Each unique session ID is counted once per state." />
+                </h3>
+              </div>
               {topStates.length === 0 ? (
                 <p className="text-sm text-gray-500">No state data available yet</p>
               ) : (
-                <div className="space-y-3">
-                  {topStates.map((state, index) => {
-                    const total = topStates.reduce((sum, s) => sum + s.count, 0);
-                    const percentage = ((state.count / total) * 100).toFixed(1);
-                    const visitorLabel = state.count === 1 ? 'visitor' : 'visitors';
-                    return (
-                      <div key={state.state}>
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-gray-700">
-                            #{index + 1} {state.state}
-                          </span>
-                          <span className="text-gray-900 font-semibold">{state.count} {visitorLabel} ({percentage}%)</span>
+                <>
+                  <div className="space-y-3">
+                    {(showAllStates ? topStates : topStates.slice(0, 10)).map((state, index) => {
+                      const total = topStates.reduce((sum, s) => sum + s.count, 0);
+                      const percentage = ((state.count / total) * 100).toFixed(1);
+                      const visitorLabel = state.count === 1 ? 'visitor' : 'visitors';
+                      return (
+                        <div key={state.state}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium text-gray-700">
+                              #{index + 1} {state.state}
+                            </span>
+                            <span className="text-gray-900 font-semibold">{state.count} {visitorLabel} ({percentage}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-green-500 h-2 rounded-full transition-all"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-green-500 h-2 rounded-full transition-all"
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                  {topStates.length > 10 && (
+                    <button
+                      onClick={() => setShowAllStates(!showAllStates)}
+                      className="mt-4 w-full px-4 py-2 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md transition border border-green-200"
+                    >
+                      {showAllStates ? `Show Less` : `View More (${topStates.length - 10} more states)`}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -1317,19 +1367,44 @@ export default function AnalyticsPage() {
   );
 }
 
+// Info Tooltip Component
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <div className="group relative inline-block ml-1.5">
+      <svg 
+        className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help inline-block" 
+        fill="currentColor" 
+        viewBox="0 0 20 20"
+      >
+        <path 
+          fillRule="evenodd" 
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" 
+          clipRule="evenodd" 
+        />
+      </svg>
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg z-50">
+        {text}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+      </div>
+    </div>
+  );
+}
+
 // Metric Card Component
 function MetricCard({ 
   title, 
   value, 
   subtitle,
   icon,
-  color 
+  color,
+  tooltip
 }: { 
   title: string; 
   value: string; 
   subtitle?: string;
   icon: React.ReactNode;
   color: 'blue' | 'green' | 'purple' | 'orange';
+  tooltip?: string;
 }) {
   const colorClasses = {
     blue: 'from-blue-500 to-blue-600',
@@ -1353,8 +1428,9 @@ function MetricCard({
       <div className={`text-3xl font-black mb-1 ${textColors[color]}`}>
         {value}
       </div>
-      <div className="text-sm font-semibold text-gray-600 mb-1">
+      <div className="text-sm font-semibold text-gray-600 mb-1 flex items-center">
         {title}
+        {tooltip && <InfoTooltip text={tooltip} />}
       </div>
       {subtitle && (
         <div className="text-xs text-gray-500">
