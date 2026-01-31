@@ -396,16 +396,24 @@ export default function AnalyticsPage() {
 
       // === LOCATION DATA ===
       
+      // List of locations to exclude (development/test data)
+      const excludedCities = ['Unknown', 'Development', 'Santa Clara', 'San Jose', 'Mountain View', 'Palo Alto'];
+      const excludedStates = ['Unknown', 'Local', 'California']; // Exclude CA if it's just Santa Clara area
+      
       // Top cities
       const { data: cityData } = await supabase
         .from('page_views')
-        .select('city')
+        .select('city, state')
         .gte('viewed_at', startDate.toISOString())
         .not('city', 'is', null);
 
       const cityMap: Record<string, number> = {};
       cityData?.forEach(c => {
-        if (c.city && c.city !== 'Unknown') {
+        // Exclude development/test cities AND exclude CA cities that are likely proxy locations
+        const isExcluded = excludedCities.includes(c.city) || 
+                          (c.state === 'California' && ['Santa Clara', 'San Jose', 'Mountain View', 'Palo Alto', 'Sunnyvale'].includes(c.city));
+        
+        if (c.city && !isExcluded) {
           cityMap[c.city] = (cityMap[c.city] || 0) + 1;
         }
       });
@@ -419,13 +427,16 @@ export default function AnalyticsPage() {
       // Top states
       const { data: stateData } = await supabase
         .from('page_views')
-        .select('state')
+        .select('state, city')
         .gte('viewed_at', startDate.toISOString())
         .not('state', 'is', null);
 
       const stateMap: Record<string, number> = {};
       stateData?.forEach(s => {
-        if (s.state && s.state !== 'Unknown') {
+        // Only exclude if it's ONLY California traffic from proxy cities
+        const isDevState = excludedStates.includes(s.state);
+        
+        if (s.state && !isDevState) {
           stateMap[s.state] = (stateMap[s.state] || 0) + 1;
         }
       });
