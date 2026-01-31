@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { createDiffuseClient, type DiffuseOutput, type DiffuseProject } from "@/lib/diffuse/client";
+import { createDiffuseClient, type DiffuseOutput, type DiffuseProject, type DiffuseProjectInput } from "@/lib/diffuse/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -37,7 +37,10 @@ interface WorkspaceMember {
 interface ProjectWithWorkspace extends DiffuseProject {
   workspace?: Workspace;
   latest_output?: DiffuseOutput;
+  all_outputs?: DiffuseOutput[];
   creator_name?: string;
+  cover_image_path?: string | null;
+  cover_image_file_name?: string | null;
 }
 
 export default function DiffuseIntegrationPage() {
@@ -61,6 +64,11 @@ export default function DiffuseIntegrationPage() {
   } | null>(null);
   const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Set<string>>(new Set());
   const [loadingProjects, setLoadingProjects] = useState(true);
+  const [showOutputSelector, setShowOutputSelector] = useState(false);
+  const [outputSelectorData, setOutputSelectorData] = useState<{
+    project: ProjectWithWorkspace;
+    outputs: DiffuseOutput[];
+  } | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -509,34 +517,81 @@ export default function DiffuseIntegrationPage() {
           for (const project of workspaceProjects) {
             console.log(`  📝 Checking outputs for project: ${project.name}`);
             
+            // Fetch ALL outputs (not just latest) - EXCLUDE DELETED
             const { data: outputs } = await diffuseClient
               .from("diffuse_project_outputs")
               .select("*")
               .eq("project_id", project.id)
-              .order("created_at", { ascending: false })
-              .limit(1);
+              .is("deleted_at", null)
+              .order("created_at", { ascending: false });
+
+            // Fetch cover image from project inputs
+            console.log(`  🖼️ Checking cover image for project: ${project.name}`);
+            let coverImagePath: string | null = null;
+            let coverImageFileName: string | null = null;
+            
+            const { data: coverInput } = await diffuseClient
+              .from("diffuse_project_inputs")
+              .select("file_path, file_name")
+              .eq("project_id", project.id)
+              .eq("type", "cover_photo")
+              .is("deleted_at", null)
+              .maybeSingle();
+            
+            if (!coverInput) {
+              // Try without prefix
+              const fallbackCoverResult = await diffuseClient
+                .from("project_inputs")
+                .select("file_path, file_name")
+                .eq("project_id", project.id)
+                .eq("type", "cover_photo")
+                .is("deleted_at", null)
+                .maybeSingle();
+              
+              if (fallbackCoverResult.data) {
+                coverImagePath = fallbackCoverResult.data.file_path;
+                coverImageFileName = fallbackCoverResult.data.file_name;
+                console.log(`  ✅ Found cover image (fallback): ${coverImageFileName}`);
+              }
+            } else {
+              coverImagePath = coverInput.file_path;
+              coverImageFileName = coverInput.file_name;
+              console.log(`  ✅ Found cover image: ${coverImageFileName}`);
+            }
+            
+            // If no project-level cover, check output cover
+            if (!coverImagePath && outputs && outputs.length > 0 && outputs[0].cover_photo_path) {
+              coverImagePath = outputs[0].cover_photo_path;
+              console.log(`  ✅ Found output-level cover image: ${coverImagePath}`);
+            }
 
             if (!outputs) {
               const fallbackResult = await diffuseClient
                 .from("project_outputs")
                 .select("*")
                 .eq("project_id", project.id)
-                .order("created_at", { ascending: false })
-                .limit(1);
+                .is("deleted_at", null)
+                .order("created_at", { ascending: false });
               
               if (fallbackResult.data && fallbackResult.data.length > 0) {
                 projectsWithOutputs.push({
                   ...project,
                   workspace: workspace,
                   latest_output: fallbackResult.data[0],
+                  all_outputs: fallbackResult.data,
                   creator_name: creatorMap[project.created_by] || "Unknown",
+                  cover_image_path: coverImagePath,
+                  cover_image_file_name: coverImageFileName,
                 });
-                console.log(`  ✅ Project "${project.name}" has output (fallback)`);
+                console.log(`  ✅ Project "${project.name}" has ${fallbackResult.data.length} output(s) (fallback)`);
               } else {
                 projectsWithOutputs.push({
                   ...project,
                   workspace: workspace,
+                  all_outputs: [],
                   creator_name: creatorMap[project.created_by] || "Unknown",
+                  cover_image_path: coverImagePath,
+                  cover_image_file_name: coverImageFileName,
                 });
                 console.log(`  ⚠️ Project "${project.name}" has no outputs yet`);
               }
@@ -545,14 +600,20 @@ export default function DiffuseIntegrationPage() {
                 ...project,
                 workspace: workspace,
                 latest_output: outputs[0],
+                all_outputs: outputs,
                 creator_name: creatorMap[project.created_by] || "Unknown",
+                cover_image_path: coverImagePath,
+                cover_image_file_name: coverImageFileName,
               });
-              console.log(`  ✅ Project "${project.name}" has output`);
+              console.log(`  ✅ Project "${project.name}" has ${outputs.length} output(s)`);
             } else {
               projectsWithOutputs.push({
                 ...project,
                 workspace: workspace,
+                all_outputs: [],
                 creator_name: creatorMap[project.created_by] || "Unknown",
+                cover_image_path: coverImagePath,
+                cover_image_file_name: coverImageFileName,
               });
               console.log(`  ⚠️ Project "${project.name}" has no outputs yet`);
             }
@@ -583,32 +644,79 @@ export default function DiffuseIntegrationPage() {
         for (const project of privateProjects) {
           console.log(`  📝 Checking private project: ${project.name}`);
           
+          // Fetch ALL outputs (not just latest) - EXCLUDE DELETED
           const { data: outputs } = await diffuseClient
             .from("diffuse_project_outputs")
             .select("*")
             .eq("project_id", project.id)
-            .order("created_at", { ascending: false })
-            .limit(1);
+            .is("deleted_at", null)
+            .order("created_at", { ascending: false });
+
+          // Fetch cover image from project inputs
+          console.log(`  🖼️ Checking cover image for private project: ${project.name}`);
+          let coverImagePath: string | null = null;
+          let coverImageFileName: string | null = null;
+          
+          const { data: coverInput } = await diffuseClient
+            .from("diffuse_project_inputs")
+            .select("file_path, file_name")
+            .eq("project_id", project.id)
+            .eq("type", "cover_photo")
+            .is("deleted_at", null)
+            .maybeSingle();
+          
+          if (!coverInput) {
+            // Try without prefix
+            const fallbackCoverResult = await diffuseClient
+              .from("project_inputs")
+              .select("file_path, file_name")
+              .eq("project_id", project.id)
+              .eq("type", "cover_photo")
+              .is("deleted_at", null)
+              .maybeSingle();
+            
+            if (fallbackCoverResult.data) {
+              coverImagePath = fallbackCoverResult.data.file_path;
+              coverImageFileName = fallbackCoverResult.data.file_name;
+              console.log(`  ✅ Found cover image (fallback): ${coverImageFileName}`);
+            }
+          } else {
+            coverImagePath = coverInput.file_path;
+            coverImageFileName = coverInput.file_name;
+            console.log(`  ✅ Found cover image: ${coverImageFileName}`);
+          }
+          
+          // If no project-level cover, check output cover
+          if (!coverImagePath && outputs && outputs.length > 0 && outputs[0].cover_photo_path) {
+            coverImagePath = outputs[0].cover_photo_path;
+            console.log(`  ✅ Found output-level cover image: ${coverImagePath}`);
+          }
 
           if (!outputs) {
             const fallbackResult = await diffuseClient
               .from("project_outputs")
               .select("*")
               .eq("project_id", project.id)
-              .order("created_at", { ascending: false })
-              .limit(1);
+              .is("deleted_at", null)
+              .order("created_at", { ascending: false });
             
             if (fallbackResult.data && fallbackResult.data.length > 0) {
               privateProjectsWithOutputs.push({
                 ...project,
                 latest_output: fallbackResult.data[0],
+                all_outputs: fallbackResult.data,
                 creator_name: creatorMap[project.created_by] || "Unknown",
+                cover_image_path: coverImagePath,
+                cover_image_file_name: coverImageFileName,
               });
-              console.log(`  ✅ Private project "${project.name}" has output`);
+              console.log(`  ✅ Private project "${project.name}" has ${fallbackResult.data.length} output(s)`);
             } else {
               privateProjectsWithOutputs.push({
                 ...project,
+                all_outputs: [],
                 creator_name: creatorMap[project.created_by] || "Unknown",
+                cover_image_path: coverImagePath,
+                cover_image_file_name: coverImageFileName,
               });
               console.log(`  ⚠️ Private project "${project.name}" has no outputs yet`);
             }
@@ -616,13 +724,19 @@ export default function DiffuseIntegrationPage() {
             privateProjectsWithOutputs.push({
               ...project,
               latest_output: outputs[0],
+              all_outputs: outputs,
               creator_name: creatorMap[project.created_by] || "Unknown",
+              cover_image_path: coverImagePath,
+              cover_image_file_name: coverImageFileName,
             });
-            console.log(`  ✅ Private project "${project.name}" has output`);
+            console.log(`  ✅ Private project "${project.name}" has ${outputs.length} output(s)`);
           } else {
             privateProjectsWithOutputs.push({
               ...project,
+              all_outputs: [],
               creator_name: creatorMap[project.created_by] || "Unknown",
+              cover_image_path: coverImagePath,
+              cover_image_file_name: coverImageFileName,
             });
             console.log(`  ⚠️ Private project "${project.name}" has no outputs yet`);
           }
@@ -665,7 +779,9 @@ export default function DiffuseIntegrationPage() {
   }
 
   function handleImport(project: ProjectWithWorkspace) {
-    if (!project.latest_output) {
+    const outputs = project.all_outputs || [];
+    
+    if (outputs.length === 0) {
       setConfirmModalData({
         title: "No Output Available",
         message: "This project doesn't have any outputs yet.",
@@ -675,22 +791,30 @@ export default function DiffuseIntegrationPage() {
       return;
     }
 
+    // If multiple outputs, show selector
+    if (outputs.length > 1) {
+      setOutputSelectorData({ project, outputs });
+      setShowOutputSelector(true);
+      return;
+    }
+
+    // Single output - import directly
     setConfirmModalData({
       title: "Import Article",
       message: `Import "${project.name}" as a draft article?`,
       onConfirm: () => {
         setShowConfirmModal(false);
-        performImport(project);
+        performImport(project, outputs[0]);
       }
     });
     setShowConfirmModal(true);
   }
 
-  async function performImport(project: ProjectWithWorkspace) {
+  async function performImport(project: ProjectWithWorkspace, selectedOutput?: DiffuseOutput) {
     setImportingProjectId(project.id);
 
     try {
-      const output = project.latest_output;
+      const output = selectedOutput || project.latest_output;
 
       // Check if output exists
       if (!output) {
@@ -875,43 +999,259 @@ export default function DiffuseIntegrationPage() {
       console.log("Meta Description:", metaDescription);
       console.log("========================================\n");
 
+      // Handle cover image download and upload
+      let imageUrl: string | null = null;
+      let useFeaturedImage = false;
+      
+      // Priority: output-level cover first, then project-level cover
+      const coverImagePath = output.cover_photo_path || project.cover_image_path;
+      
+      if (coverImagePath) {
+        console.log("\n🖼️ ====== PROCESSING COVER IMAGE ======");
+        console.log("📍 Cover image path:", coverImagePath);
+        console.log("📍 Source:", output.cover_photo_path ? "Output-level" : "Project-level");
+        console.log("📍 Output has cover_photo_path:", !!output.cover_photo_path);
+        console.log("📍 Project has cover_image_path:", !!project.cover_image_path);
+        
+        try {
+          // Get URL from Diffuse storage
+          const diffuseClient = createDiffuseClient();
+          let downloadUrl: string;
+          
+          // First, let's try to list files in the bucket to see if our file exists
+          console.log("🔍 Checking if file exists in storage...");
+          try {
+            const pathParts = coverImagePath.split('/');
+            const folderPath = pathParts.slice(0, -1).join('/');
+            console.log("📁 Checking folder:", folderPath);
+            
+            const { data: filesList, error: listError } = await diffuseClient
+              .storage
+              .from("project-files")
+              .list(folderPath);
+            
+            if (listError) {
+              console.warn("⚠️ Could not list files in folder:", listError);
+            } else {
+              console.log("📊 Files in folder:", filesList?.map(f => f.name));
+              const fileName = pathParts[pathParts.length - 1];
+              const fileExists = filesList?.some(f => f.name === fileName);
+              console.log(`📍 File "${fileName}" exists in storage:`, fileExists);
+            }
+          } catch (listErr) {
+            console.warn("⚠️ Error listing files:", listErr);
+          }
+          
+          // Try Method 1: Public URL (if bucket is public)
+          console.log("🔄 Method 1: Trying public URL from bucket: project-files");
+          const { data: publicUrlData } = diffuseClient
+            .storage
+            .from("project-files")
+            .getPublicUrl(coverImagePath);
+          
+          console.log("📊 Public URL result:", publicUrlData);
+          
+          if (publicUrlData?.publicUrl) {
+            console.log("✅ Got public URL, testing if accessible...");
+            console.log("🔗 Public URL (first 100 chars):", publicUrlData.publicUrl.substring(0, 100) + "...");
+            
+            // Test if the URL is accessible
+            try {
+              const testResponse = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
+              console.log("📊 Public URL test:", {
+                status: testResponse.status,
+                ok: testResponse.ok
+              });
+              
+              if (testResponse.ok) {
+                downloadUrl = publicUrlData.publicUrl;
+                console.log("✅ Public URL is accessible! Using it.");
+              } else {
+                throw new Error("Public URL not accessible");
+              }
+            } catch (testErr) {
+              console.warn("⚠️ Public URL test failed:", testErr);
+              console.log("🔄 Method 2: Trying signed URL instead...");
+              
+              // Try Method 2: Signed URL
+              const { data: signedUrlData, error: signedUrlError } = await diffuseClient
+                .storage
+                .from("project-files")
+                .createSignedUrl(coverImagePath, 300); // 5 minutes expiry
+
+              console.log("📊 Signed URL result:", {
+                hasData: !!signedUrlData,
+                hasSignedUrl: !!signedUrlData?.signedUrl,
+                error: signedUrlError
+              });
+
+              if (signedUrlError || !signedUrlData?.signedUrl) {
+                console.error("❌ ERROR: Could not get signed URL");
+                console.error("Error details:", JSON.stringify(signedUrlError, null, 2));
+                throw new Error(`Failed to get signed URL: ${signedUrlError?.message || 'Unknown error'}`);
+              }
+              
+              downloadUrl = signedUrlData.signedUrl;
+              console.log("✅ Got signed URL from Diffuse storage");
+              console.log("🔗 Signed URL (first 100 chars):", downloadUrl.substring(0, 100) + "...");
+            }
+          } else {
+            throw new Error("Could not get public or signed URL");
+          }
+          
+          // Download the image from Diffuse
+          console.log("🔄 Downloading image from Diffuse...");
+          const imageResponse = await fetch(downloadUrl);
+          console.log("📊 Download response:", {
+            status: imageResponse.status,
+            statusText: imageResponse.statusText,
+            ok: imageResponse.ok,
+            contentType: imageResponse.headers.get('content-type'),
+            contentLength: imageResponse.headers.get('content-length')
+          });
+          
+          if (!imageResponse.ok) {
+            console.error("❌ ERROR: Could not download image");
+            console.error("Response status:", imageResponse.status, imageResponse.statusText);
+            throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
+          }
+          
+          const imageBlob = await imageResponse.blob();
+          console.log("✅ Downloaded image successfully");
+          console.log("📊 Image details:", {
+            size: imageBlob.size + " bytes",
+            type: imageBlob.type
+          });
+          
+          // Determine file extension from path or blob type
+          let fileExt = coverImagePath.split(".").pop()?.toLowerCase() || "";
+          if (!fileExt || fileExt.length > 5) {
+            // Fallback to blob type
+            const mimeType = imageBlob.type;
+            if (mimeType.includes("jpeg") || mimeType.includes("jpg")) fileExt = "jpg";
+            else if (mimeType.includes("png")) fileExt = "png";
+            else if (mimeType.includes("webp")) fileExt = "webp";
+            else if (mimeType.includes("gif")) fileExt = "gif";
+            else fileExt = "jpg"; // Ultimate fallback
+          }
+          
+          const fileName = `diffuse-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          console.log("📝 Generated filename:", fileName);
+          
+          // Upload to local storage
+          console.log("🔄 Uploading to local storage (article-images bucket)...");
+          const { error: uploadError, data: uploadData } = await supabase.storage
+            .from("article-images")
+            .upload(fileName, imageBlob, {
+              contentType: imageBlob.type,
+              cacheControl: '3600',
+              upsert: false
+            });
+
+          console.log("📊 Upload result:", {
+            success: !uploadError,
+            error: uploadError,
+            data: uploadData
+          });
+
+          if (uploadError) {
+            console.error("❌ ERROR: Could not upload image to local storage");
+            console.error("Upload error details:", JSON.stringify(uploadError, null, 2));
+            throw new Error(`Failed to upload image: ${uploadError.message}`);
+          }
+          
+          console.log("✅ Uploaded image to local storage successfully");
+          
+          // Get public URL
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("article-images").getPublicUrl(fileName);
+          
+          imageUrl = publicUrl;
+          useFeaturedImage = true;
+          
+          console.log("✅✅✅ SUCCESS! Featured image processing complete");
+          console.log("📸 Image URL:", imageUrl);
+          console.log("🎚️ use_featured_image will be set to:", useFeaturedImage);
+        } catch (err) {
+          console.error("❌❌❌ CRITICAL ERROR processing cover image:");
+          console.error("Error type:", err instanceof Error ? err.constructor.name : typeof err);
+          console.error("Error message:", err instanceof Error ? err.message : String(err));
+          console.error("Full error:", err);
+          
+          // Show error to user
+          setConfirmModalData({
+            title: "Image Processing Error",
+            message: `Could not process cover image: ${err instanceof Error ? err.message : String(err)}. The article will be created without the featured image. You can add it manually later.`,
+            onConfirm: () => setShowConfirmModal(false)
+          });
+          setShowConfirmModal(true);
+        }
+        console.log("=======================================\n");
+      } else {
+        console.log("\n⚠️ No cover image found for this output or project");
+        console.log("📍 output.cover_photo_path:", output.cover_photo_path || "NOT SET");
+        console.log("📍 project.cover_image_path:", project.cover_image_path || "NOT SET");
+        console.log("\n");
+      }
+
       // Create draft article
+      console.log("\n📝 ====== CREATING ARTICLE IN DATABASE ======");
+      console.log("Article data being inserted:");
+      console.log("  - image_url:", imageUrl);
+      console.log("  - use_featured_image:", useFeaturedImage);
+      console.log("  - title:", title);
+      
+      const articleData = {
+        title: title,
+        subtitle: subtitle,
+        slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now(),
+        excerpt: excerpt,
+        content: content,
+        content_blocks: [
+          {
+            id: crypto.randomUUID(),
+            type: "text",
+            content: content,
+            order: 0,
+          },
+        ],
+        status: "draft" as const,
+        author_name: author, // Use Diffuse.AI as author
+        section: sections[0] || "general",
+        sections: sections,
+        category: category,
+        tags: tags.length > 0 ? tags : null,
+        meta_title: metaTitle,
+        meta_description: metaDescription,
+        is_featured: false,
+        is_breaking: false,
+        allow_comments: true,
+        view_count: 0,
+        share_count: 0,
+        image_url: imageUrl,
+        use_featured_image: useFeaturedImage,
+        image_caption: null,
+        image_credit: null,
+      };
+      
       const { data: article, error: articleError } = await supabase
         .from("articles")
-        .insert({
-          title: title,
-          subtitle: subtitle,
-          slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now(),
-          excerpt: excerpt,
-          content: content,
-          content_blocks: [
-            {
-              id: crypto.randomUUID(),
-              type: "text",
-              content: content,
-              order: 0,
-            },
-          ],
-          status: "draft",
-          author_name: author, // Use Diffuse.AI as author
-          section: sections[0] || "general",
-          sections: sections,
-          category: category,
-          tags: tags.length > 0 ? tags : null,
-          meta_title: metaTitle,
-          meta_description: metaDescription,
-          is_featured: false,
-          is_breaking: false,
-          allow_comments: true,
-          view_count: 0,
-          share_count: 0,
-        })
+        .insert(articleData)
         .select()
         .single();
 
       if (articleError) {
+        console.error("❌ ERROR creating article:", articleError);
         throw articleError;
       }
+      
+      console.log("✅ Article created successfully!");
+      console.log("📊 Created article data:");
+      console.log("  - id:", article.id);
+      console.log("  - image_url:", article.image_url);
+      console.log("  - use_featured_image:", article.use_featured_image);
+      console.log("============================================\n");
 
       // Track the import
       await supabase
@@ -1252,12 +1592,28 @@ export default function DiffuseIntegrationPage() {
                                         {project.creator_name || "Unknown"}
                                       </span>
                                     </div>
+                                    <div className="flex items-center gap-2">
+                                      <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                      <span className="text-xs text-[#dbdbdb] font-medium">
+                                        {project.cover_image_path ? "1 image" : "0 images"}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                      </svg>
+                                      <span className="text-xs text-[#dbdbdb] font-medium">
+                                        {project.all_outputs?.length || 0} output{project.all_outputs?.length !== 1 ? 's' : ''}
+                                      </span>
+                                    </div>
                                   </div>
 
                                   {/* Turn into Article Button */}
                                   <button
                                     onClick={() => handleImport(project)}
-                                    disabled={!project.latest_output || importingProjectId === project.id}
+                                    disabled={!project.all_outputs || project.all_outputs.length === 0 || importingProjectId === project.id}
                                     className="w-full px-5 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white hover:shadow-[0_10px_15px_-3px_rgba(255,150,40,0.5)] hover:scale-[1.03] rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                   >
                                     {importingProjectId === project.id ? (
@@ -1265,7 +1621,7 @@ export default function DiffuseIntegrationPage() {
                                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                         Importing...
                                       </>
-                                    ) : !project.latest_output ? (
+                                    ) : !project.all_outputs || project.all_outputs.length === 0 ? (
                                       <>
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1371,12 +1727,28 @@ export default function DiffuseIntegrationPage() {
                                     {project.creator_name || "Unknown"}
                                   </span>
                                 </div>
+                                <div className="flex items-center gap-2">
+                                  <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  <span className="text-xs text-[#dbdbdb] font-medium">
+                                    {project.cover_image_path ? "1 image" : "0 images"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  <span className="text-xs text-[#dbdbdb] font-medium">
+                                    {project.all_outputs?.length || 0} output{project.all_outputs?.length !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
                               </div>
 
                               {/* Turn into Article Button */}
                               <button
                                 onClick={() => handleImport(project)}
-                                disabled={!project.latest_output || importingProjectId === project.id}
+                                disabled={!project.all_outputs || project.all_outputs.length === 0 || importingProjectId === project.id}
                                 className="w-full px-5 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white hover:shadow-[0_10px_15px_-3px_rgba(255,150,40,0.5)] hover:scale-[1.03] rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                               >
                                 {importingProjectId === project.id ? (
@@ -1384,7 +1756,7 @@ export default function DiffuseIntegrationPage() {
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                     Importing...
                                   </>
-                                ) : !project.latest_output ? (
+                                ) : !project.all_outputs || project.all_outputs.length === 0 ? (
                                   <>
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1408,6 +1780,149 @@ export default function DiffuseIntegrationPage() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Output Selector Modal */}
+        {showOutputSelector && outputSelectorData && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowOutputSelector(false)}>
+            <div 
+              className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 max-w-2xl w-full shadow-[0_20px_25px_-5px_rgba(255,150,40,0.4)] max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+              style={{ fontFamily: 'var(--font-space-grotesk)' }}
+            >
+              {/* Modal Header */}
+              <div className="mb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center shadow-lg">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white" style={{ letterSpacing: '-0.01em', lineHeight: '1.3' }}>
+                      Select Output
+                    </h2>
+                    <p className="text-sm text-[#dbdbdb]">
+                      {outputSelectorData.project.name}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-base text-[#dbdbdb]" style={{ lineHeight: '1.6' }}>
+                  This project has {outputSelectorData.outputs.length} outputs. Choose which one to import:
+                </p>
+              </div>
+
+              {/* Outputs List */}
+              <div className="space-y-3 mb-6">
+                {outputSelectorData.outputs.map((output, index) => {
+                  // Try to get title and preview from the output
+                  let title = "";
+                  let preview = "";
+                  
+                  try {
+                    // First try: structured_data
+                    let parsedData = output.structured_data;
+                    if (typeof output.structured_data === 'string') {
+                      parsedData = JSON.parse(output.structured_data);
+                    }
+                    
+                    if (parsedData && typeof parsedData === 'object') {
+                      title = parsedData.title || parsedData.name || "";
+                      preview = parsedData.excerpt || parsedData.description || parsedData.subtitle || "";
+                    }
+                    
+                    // Second try: parse content if it's JSON
+                    if (!title && output.content && typeof output.content === 'string') {
+                      if (output.content.trim().startsWith('{')) {
+                        try {
+                          const contentJson = JSON.parse(output.content);
+                          title = contentJson.title || contentJson.name || "";
+                          preview = contentJson.excerpt || contentJson.description || contentJson.subtitle || "";
+                        } catch {
+                          // Content is not JSON, use as preview
+                          preview = output.content.substring(0, 100);
+                        }
+                      } else {
+                        // Content is plain text, use first 100 chars as preview
+                        preview = output.content.substring(0, 100);
+                      }
+                    }
+                  } catch (err) {
+                    console.warn("Could not parse output data:", err);
+                  }
+                  
+                  // Fallback to generic label if no title found
+                  if (!title) {
+                    title = `Output #${index + 1}`;
+                  }
+
+                  return (
+                    <button
+                      key={output.id}
+                      onClick={() => {
+                        setShowOutputSelector(false);
+                        setConfirmModalData({
+                          title: "Import Article",
+                          message: `Import output ${index + 1} as a draft article?`,
+                          onConfirm: () => {
+                            setShowConfirmModal(false);
+                            performImport(outputSelectorData.project, output);
+                          }
+                        });
+                        setShowConfirmModal(true);
+                      }}
+                      className="w-full p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#ff9628]/50 rounded-xl transition-all duration-200 text-left group"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-base font-bold text-white line-clamp-1">
+                              {title}
+                            </h3>
+                            {output.cover_photo_path && (
+                              <span className="inline-flex items-center gap-1 text-xs text-[#ff9628] font-medium flex-shrink-0">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                Has image
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs text-[#545454] font-medium">
+                              {new Date(output.created_at).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          {preview && (
+                            <p className="text-sm text-[#dbdbdb] line-clamp-2">
+                              {preview}
+                            </p>
+                          )}
+                        </div>
+                        <svg className="w-5 h-5 text-[#ff9628] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Cancel Button */}
+              <button
+                onClick={() => setShowOutputSelector(false)}
+                className="w-full px-6 py-3 text-sm font-bold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-300"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         )}

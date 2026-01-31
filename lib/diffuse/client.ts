@@ -20,6 +20,7 @@ export interface DiffuseOutput {
   structured_data: any;
   workflow_status: string;
   workflow_metadata: any;
+  cover_photo_path?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -64,4 +65,13 @@ export interface DiffuseWorkspaceMember {
   role: string;
   invited_by: string | null;
   joined_at: string | null;
+}
+
+export interface DiffuseProjectInput {
+  id: string;
+  project_id: string;
+  type: string;
+  file_path: string | null;
+  file_name: string | null;
+  deleted_at: string | null;
 }
