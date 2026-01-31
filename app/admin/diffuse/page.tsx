@@ -1312,12 +1312,12 @@ export default function DiffuseIntegrationPage() {
                   href="https://diffuse-ai-blush.vercel.app/dashboard"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all duration-300 flex items-center gap-2 backdrop-blur-[20px]"
+                  className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#ff9628] rounded-xl transition-all duration-300 flex items-center gap-2 backdrop-blur-[20px]"
                 >
                   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
-                  <span>Visit diffuse<span className="text-[#ff9628]">.ai</span></span>
+                  <span className="text-white">Visit diffuse<span className="text-[#ff9628]">.ai</span></span>
                 </a>
               </div>
               <p className="text-[#dbdbdb] text-[18px] leading-[1.6]">
@@ -1326,7 +1326,7 @@ export default function DiffuseIntegrationPage() {
             </div>
             <Link
               href="/admin"
-              className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-[#dbdbdb] hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all duration-300 backdrop-blur-[20px]"
+              className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all duration-300 backdrop-blur-[20px]"
             >
               ← Back to Dashboard
             </Link>
@@ -1335,9 +1335,9 @@ export default function DiffuseIntegrationPage() {
 
         {/* Connection Status */}
         {!connection ? (
-          <div className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-6 md:p-8 shadow-lg shadow-[#ff9628]/30 max-w-2xl mx-auto">
+          <div className="bg-white/5 backdrop-blur-[20px] border-2 border-[#ff9628]/50 rounded-xl p-6 md:p-8 max-w-2xl mx-auto">
             <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-[#ff9628]/30">
+              <div className="w-20 h-20 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center mx-auto mb-6">
                 <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
@@ -1408,7 +1408,7 @@ export default function DiffuseIntegrationPage() {
               <button
                 onClick={handleConnect}
                 disabled={connectLoading || !diffuseEmail || !diffusePassword}
-                className="w-full bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white px-8 py-4 rounded-xl font-medium text-[16px] leading-[1.6] hover:shadow-lg hover:shadow-[#ff9628]/30 hover:scale-105 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="w-full bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white px-8 py-4 rounded-xl font-medium text-[16px] leading-[1.6] hover:scale-105 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {connectLoading ? "Connecting..." : "Connect Account"}
               </button>
@@ -1417,11 +1417,11 @@ export default function DiffuseIntegrationPage() {
         ) : (
           <div>
             {/* Connected Status */}
-            <div className="bg-gradient-to-br from-[#c086fa]/10 via-white/5 to-[#ff9628]/10 backdrop-blur-[20px] rounded-xl p-6 shadow-lg shadow-[#ff9628]/20 mb-8 border border-[#ff9628]/20">
+            <div className="bg-gradient-to-br from-[#c086fa]/10 via-white/5 to-[#ff9628]/10 backdrop-blur-[20px] rounded-xl p-6 mb-8 border-2 border-[#ff9628]/40">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-5">
                   {/* User Profile Picture */}
-                  <div className="relative w-14 h-14 rounded-xl overflow-hidden shadow-lg ring-2 ring-[#ff9628]/50">
+                  <div className="relative w-14 h-14 rounded-xl overflow-hidden ring-2 ring-[#ff9628]">
                     {profile?.avatar_url ? (
                       <img 
                         src={profile.avatar_url} 
@@ -1455,7 +1455,7 @@ export default function DiffuseIntegrationPage() {
             </div>
 
             {/* Organizations & Projects */}
-            <div className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl shadow-lg shadow-[#ff9628]/20">
+            <div className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl">
               <div className="p-6 md:p-8 border-b border-white/10">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1498,7 +1498,7 @@ export default function DiffuseIntegrationPage() {
                         <div className="mb-6">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                              <div className="w-14 h-14 bg-white/10 border border-white/20 backdrop-blur-[20px] rounded-xl flex items-center justify-center shadow-lg">
+                              <div className="w-14 h-14 bg-white/10 border border-white/20 backdrop-blur-[20px] rounded-xl flex items-center justify-center">
                                 <svg className="w-8 h-8 text-[#dbdbdb]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                 </svg>
@@ -1610,7 +1610,7 @@ export default function DiffuseIntegrationPage() {
                                   <button
                                     onClick={() => handleImport(project)}
                                     disabled={!project.all_outputs || project.all_outputs.length === 0 || importingProjectId === project.id}
-                                    className="w-full px-5 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white hover:shadow-[0_10px_15px_-3px_rgba(255,150,40,0.5)] hover:scale-[1.03] rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="w-full px-5 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white hover:scale-[1.03] rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                   >
                                     {importingProjectId === project.id ? (
                                       <>
@@ -1649,7 +1649,7 @@ export default function DiffuseIntegrationPage() {
                       <div className="mb-6">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-gradient-to-br from-[#ff9628]/20 to-[#c086fa]/20 border border-[#ff9628]/40 backdrop-blur-[20px] rounded-xl flex items-center justify-center shadow-lg">
+                            <div className="w-14 h-14 bg-gradient-to-br from-[#ff9628]/20 to-[#c086fa]/20 border border-[#ff9628]/40 backdrop-blur-[20px] rounded-xl flex items-center justify-center">
                               <svg className="w-8 h-8 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                               </svg>
@@ -1745,7 +1745,7 @@ export default function DiffuseIntegrationPage() {
                               <button
                                 onClick={() => handleImport(project)}
                                 disabled={!project.all_outputs || project.all_outputs.length === 0 || importingProjectId === project.id}
-                                className="w-full px-5 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white hover:shadow-[0_10px_15px_-3px_rgba(255,150,40,0.5)] hover:scale-[1.03] rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="w-full px-5 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white hover:scale-[1.03] rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                               >
                                 {importingProjectId === project.id ? (
                                   <>
@@ -1784,14 +1784,14 @@ export default function DiffuseIntegrationPage() {
         {showOutputSelector && outputSelectorData && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowOutputSelector(false)}>
             <div 
-              className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-8 max-w-2xl w-full shadow-[0_20px_25px_-5px_rgba(255,150,40,0.4)] max-h-[80vh] overflow-y-auto"
+              className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
               style={{ fontFamily: 'var(--font-space-grotesk)' }}
             >
               {/* Modal Header */}
               <div className="mb-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center shadow-lg">
+                  <div className="w-12 h-12 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center">
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
@@ -1927,14 +1927,14 @@ export default function DiffuseIntegrationPage() {
         {showConfirmModal && confirmModalData && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowConfirmModal(false)}>
             <div 
-              className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-8 max-w-md w-full shadow-[0_20px_25px_-5px_rgba(255,150,40,0.4)]"
+              className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-8 max-w-md w-full"
               onClick={(e) => e.stopPropagation()}
               style={{ fontFamily: 'var(--font-space-grotesk)' }}
             >
               {/* Modal Header */}
               <div className="mb-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center shadow-lg">
+                  <div className="w-12 h-12 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center">
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -1958,7 +1958,7 @@ export default function DiffuseIntegrationPage() {
                 </button>
                 <button
                   onClick={confirmModalData.onConfirm}
-                  className="flex-1 px-6 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white hover:shadow-[0_10px_15px_-3px_rgba(255,150,40,0.4)] rounded-xl transition-all duration-300"
+                  className="flex-1 px-6 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white rounded-xl transition-all duration-300"
                 >
                   OK
                 </button>
