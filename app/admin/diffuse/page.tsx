@@ -1304,22 +1304,9 @@ export default function DiffuseIntegrationPage() {
           <div className="flex items-center justify-between mb-2">
             <div>
               {/* diffuse.ai Logo */}
-              <div className="flex items-center gap-4 mb-4">
-                <h1 className="text-[48px] font-bold text-white leading-[1.2] tracking-[-0.01em]">
-                  diffuse<span className="text-[#ff9628]">.ai</span>
-                </h1>
-                <a
-                  href="https://diffuse-ai-blush.vercel.app/dashboard"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#ff9628] rounded-xl transition-all duration-300 flex items-center gap-2 backdrop-blur-[20px]"
-                >
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                  <span className="text-white">Visit diffuse<span className="text-[#ff9628]">.ai</span></span>
-                </a>
-              </div>
+              <h1 className="text-[48px] font-bold text-white leading-[1.2] tracking-[-0.01em] mb-4">
+                diffuse<span className="text-[#ff9628]">.ai</span>
+              </h1>
               <p className="text-[#dbdbdb] text-[18px] leading-[1.6]">
                 Connect your diffuse.ai account to import generated articles
               </p>
@@ -1418,7 +1405,7 @@ export default function DiffuseIntegrationPage() {
         ) : (
           <div>
             {/* Connected Status */}
-            <div className="bg-gradient-to-br from-[#c086fa]/10 via-white/5 to-[#ff9628]/10 backdrop-blur-[20px] rounded-xl p-6 mb-8 border border-white/10">
+            <div className="bg-white/5 backdrop-blur-[20px] rounded-xl p-6 mb-8 border border-white/10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-5">
                   {/* User Profile Picture */}
@@ -1446,12 +1433,25 @@ export default function DiffuseIntegrationPage() {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={handleDisconnect}
-                  className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-red-400 hover:text-white bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition-all duration-300"
-                >
-                  Disconnect
-                </button>
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://diffuse-ai-blush.vercel.app/dashboard"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#ff9628] rounded-xl transition-all duration-300 flex items-center gap-2 backdrop-blur-[20px]"
+                  >
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    <span className="text-white">Visit diffuse<span className="text-[#ff9628]">.ai</span></span>
+                  </a>
+                  <button
+                    onClick={handleDisconnect}
+                    className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-red-400 hover:text-white bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition-all duration-300"
+                  >
+                    Disconnect
+                  </button>
+                </div>
               </div>
             </div>
 
