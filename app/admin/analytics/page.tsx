@@ -1215,7 +1215,10 @@ export default function AnalyticsPage() {
             {/* Traffic Sources */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-[color:var(--color-dark)]">Traffic Sources</h3>
+                <h3 className="text-lg font-bold text-[color:var(--color-dark)] flex items-center">
+                  Traffic Sources
+                  <InfoTooltip text="How visitors found your site. Detected from the browser's referrer URL and UTM parameters." />
+                </h3>
                 <button
                   onClick={() => setShowTrafficChart(!showTrafficChart)}
                   className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition"
@@ -1267,10 +1270,24 @@ export default function AnalyticsPage() {
                   {trafficSources.map((source) => {
                     const total = trafficSources.reduce((sum, s) => sum + s.count, 0);
                     const percentage = ((source.count / total) * 100).toFixed(1);
+                    
+                    // Get tooltip text for each source type
+                    const sourceTooltips: Record<string, string> = {
+                      'direct': 'Visitors who typed your URL directly, used a bookmark, or clicked a link without referrer data (e.g., from email apps).',
+                      'search': 'Visitors from search engines like Google, Bing, Yahoo, DuckDuckGo. They found you through organic search results.',
+                      'social': 'Visitors from social media platforms like Facebook, Twitter, LinkedIn, Instagram, Reddit, TikTok.',
+                      'referral': 'Visitors who clicked a link on another website that led to your site. External sites linking to your content.',
+                      'internal': 'Navigation within your own site. When users click links between your pages (homepage → article, etc.).',
+                      'shared_link': 'Visitors from shared links with tracking parameters (share buttons, URL parameters like ?share=1 or ?ref=).'
+                    };
+                    
                     return (
                       <div key={source.source}>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-gray-700 capitalize">{source.source}</span>
+                          <span className="font-medium text-gray-700 capitalize flex items-center">
+                            {source.source}
+                            <InfoTooltip text={sourceTooltips[source.source] || 'Traffic from this source.'} />
+                          </span>
                           <span className="text-gray-900 font-semibold">{source.count} ({percentage}%)</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -1289,7 +1306,10 @@ export default function AnalyticsPage() {
             {/* Device Breakdown */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-[color:var(--color-dark)]">Device Distribution</h3>
+                <h3 className="text-lg font-bold text-[color:var(--color-dark)] flex items-center">
+                  Device Distribution
+                  <InfoTooltip text="Types of devices visitors use to access your site. Detected from the browser's user agent string." />
+                </h3>
                 <button
                   onClick={() => setShowDeviceChart(!showDeviceChart)}
                   className="px-3 py-1.5 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md transition"
@@ -1341,10 +1361,21 @@ export default function AnalyticsPage() {
                   {deviceBreakdown.map((device) => {
                     const total = deviceBreakdown.reduce((sum, d) => sum + d.count, 0);
                     const percentage = ((device.count / total) * 100).toFixed(1);
+                    
+                    // Get tooltip text for each device type
+                    const deviceTooltips: Record<string, string> = {
+                      'desktop': 'Desktop and laptop computers. Includes Windows, Mac, Linux, and Chromebook users.',
+                      'mobile': 'Smartphones. Includes iPhone, Android phones, and other mobile devices. Detected by screen size and user agent.',
+                      'tablet': 'Tablets like iPad, Android tablets, Surface, and Kindle. Larger than phones but not full desktop screens.'
+                    };
+                    
                     return (
                       <div key={device.device}>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-gray-700 capitalize">{device.device}</span>
+                          <span className="font-medium text-gray-700 capitalize flex items-center">
+                            {device.device}
+                            <InfoTooltip text={deviceTooltips[device.device] || 'Traffic from this device type.'} />
+                          </span>
                           <span className="text-gray-900 font-semibold">{device.count} ({percentage}%)</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
