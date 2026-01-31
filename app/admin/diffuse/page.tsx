@@ -1326,7 +1326,8 @@ export default function DiffuseIntegrationPage() {
             </div>
             <Link
               href="/admin"
-              className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all duration-300 backdrop-blur-[20px]"
+              className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all duration-300 backdrop-blur-[20px]"
+              style={{ color: 'white' }}
             >
               ← Back to Dashboard
             </Link>
@@ -1417,11 +1418,11 @@ export default function DiffuseIntegrationPage() {
         ) : (
           <div>
             {/* Connected Status */}
-            <div className="bg-gradient-to-br from-[#c086fa]/10 via-white/5 to-[#ff9628]/10 backdrop-blur-[20px] rounded-xl p-6 mb-8 border-2 border-[#ff9628]/40">
+            <div className="bg-gradient-to-br from-[#c086fa]/10 via-white/5 to-[#ff9628]/10 backdrop-blur-[20px] rounded-xl p-6 mb-8 border border-white/10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-5">
                   {/* User Profile Picture */}
-                  <div className="relative w-14 h-14 rounded-xl overflow-hidden ring-2 ring-[#ff9628]">
+                  <div className="relative w-14 h-14 rounded-xl overflow-hidden">
                     {profile?.avatar_url ? (
                       <img 
                         src={profile.avatar_url} 
