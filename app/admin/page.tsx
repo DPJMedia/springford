@@ -303,6 +303,28 @@ export default function AdminPage() {
             </div>
           </Link>
 
+          {/* Edit Profile (All Admins) */}
+          <Link
+            href="/profile"
+            className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-600 transition">
+                <svg className="w-6 h-6 text-indigo-600 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-[color:var(--color-dark)] group-hover:text-indigo-600 transition">
+                  Edit Profile
+                </h3>
+                <p className="text-sm text-[color:var(--color-medium)]">
+                  Update your account information
+                </p>
+              </div>
+            </div>
+          </Link>
+
           {/* DiffuseAI Integration (All Admins) */}
           <Link
             href="/admin/diffuse"
