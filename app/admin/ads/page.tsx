@@ -10,6 +10,7 @@ import type { Ad, AdSetting, AdSlotAssignment } from "@/lib/types/database";
 const AD_SLOTS = [
   // Homepage slots (numbered)
   { value: "homepage-banner-top", label: "Section 1: Banner Below Hero" },
+  { value: "homepage-banner-top-mobile", label: "Section 1.2: Banner Below Hero (Mobile Only)" },
   { value: "homepage-sidebar-top", label: "Section 2: Sidebar Top (Above Trending)" },
   { value: "homepage-sidebar-middle", label: "Section 3: Sidebar Middle" },
   { value: "homepage-sidebar-bottom", label: "Section 4: Sidebar Bottom" },

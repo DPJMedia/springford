@@ -511,12 +511,14 @@ export default function Home() {
             <NewsletterForm />
           </section>
 
-          {/* AD SECTION 1 */}
+          {/* AD SECTION 1: Desktop = 970x90, Mobile = Section 1.2 (300x150) */}
           <section className="mb-8">
-            <AdSlot 
-              slot="homepage-banner-top" 
-              className="w-full"
-            />
+            <div className="hidden lg:block">
+              <AdSlot slot="homepage-banner-top" className="w-full" />
+            </div>
+            <div className="lg:hidden">
+              <AdSlot slot="homepage-banner-top-mobile" className="w-full" />
+            </div>
           </section>
 
           {loading ? (

@@ -162,6 +162,9 @@ function HomepagePreview({
       {/* AD SECTION 1: Banner Below Hero */}
       {renderAdSlot("homepage-banner-top", 1, "Banner Below Hero", "970x90 (10.8:1)", "h-24")}
 
+      {/* AD SECTION 1.2: Banner Below Hero (Mobile Only) */}
+      {renderAdSlot("homepage-banner-top-mobile", 1.2, "Banner Below Hero (Mobile Only)", "300x150 (2:1)", "h-24")}
+
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Main Content */}

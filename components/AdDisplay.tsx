@@ -226,6 +226,7 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
     // Main-page slots: exact aspect ratios so "Fill section" doesn't crop; mobile-friendly min-heights
     const is970x90Banner =
       adSlot === "homepage-banner-top" || adSlot === "homepage-banner-bottom";
+    const isMobileHeroBanner = adSlot === "homepage-banner-top-mobile"; // 300x150 (2:1), mobile-only
     const is300x300Sidebar = adSlot === "homepage-sidebar-top";
     const is300x250Sidebar =
       adSlot === "homepage-sidebar-middle" || adSlot === "homepage-sidebar-bottom";
@@ -243,6 +244,10 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
       // 970x90: desktop = full width natural height (original). Mobile only: 90px + horizontal scroll.
       containerClass = "w-full max-md:h-[90px] max-md:overflow-x-auto max-md:overflow-y-hidden max-md:scroll-smooth";
       heightClass = "w-full h-auto max-md:h-[90px] max-md:w-auto max-md:min-w-[100%] max-md:object-contain max-md:object-left-top";
+    } else if (isMobileHeroBanner) {
+      // 300x150 (2:1): mobile-only rectangle under hero; full width, no crop
+      containerClass = "w-full aspect-[2/1]";
+      heightClass = "w-full h-full object-contain";
     } else if (is300x300Sidebar) {
       containerClass = "w-full aspect-square";
       heightClass = "h-full object-cover max-md:object-contain";
@@ -272,6 +277,7 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
     // Object-fit: slots above set it in heightClass (incl. mobile contain); others use fill_section
     const objectFit =
       is970x90Banner ||
+      isMobileHeroBanner ||
       is728x90Banner ||
       isArticleInline ||
       isArticleSidebar ||
