@@ -222,43 +222,73 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
     const isBanner = adSlot.includes("banner");
     const isSidebar = adSlot.includes("sidebar");
     const isInline = adSlot.includes("inline");
-    
-    // Set fixed height based on ad type to match preview
+
+    // Main-page slots: exact aspect ratios so "Fill section" doesn't crop; some scale up to fill space
+    const is970x90Banner =
+      adSlot === "homepage-banner-top" || adSlot === "homepage-banner-bottom";
+    const is300x300Sidebar = adSlot === "homepage-sidebar-top";
+    const is300x250Sidebar =
+      adSlot === "homepage-sidebar-middle" || adSlot === "homepage-sidebar-bottom";
+
+    // Container and image sizing
+    let containerClass = "";
     let heightClass = "h-32"; // Default inline height
-    if (isBanner) {
-      heightClass = "h-24"; // Banner: 96px (970x90 or 728x90)
+    if (is970x90Banner) {
+      // 970x90: no fixed aspect — image uses w-full h-auto so it always fills width and touches hero edges
+      containerClass = "w-full";
+      heightClass = "h-auto";
+    } else if (is300x300Sidebar) {
+      // 300x300 (1:1): full width of sidebar so slot is bigger; aspect-square prevents crop
+      containerClass = "w-full aspect-square";
+      heightClass = "h-full";
+    } else if (is300x250Sidebar) {
+      // 300x250 (1.2:1): full width of sidebar, exact aspect ratio so ads fit without being cut off
+      containerClass = "w-full aspect-[300/250]";
+      heightClass = "h-full";
+    } else if (isBanner) {
+      heightClass = "h-24"; // Banner: 96px (728x90 main content)
     } else if (isSidebar) {
-      // Larger sidebar ads for article page
       if (adSlot === "article-sidebar-top") {
-        heightClass = "h-[500px]"; // Top sidebar: 500px (very tall ad, aligns with article image)
+        heightClass = "h-[500px]";
       } else if (adSlot === "article-sidebar-bottom") {
-        heightClass = "h-[500px]"; // Bottom sidebar: 500px (same size as top, sticky)
-      } else if (adSlot === "homepage-sidebar-top") {
-        heightClass = "h-64"; // Homepage sidebar top: 256px (box-shaped, static)
+        heightClass = "h-[500px]";
       } else {
-        heightClass = "h-48"; // Default sidebar: 192px (300x250)
+        heightClass = "h-48"; // Fallback sidebar
       }
     } else if (isInline) {
-      heightClass = "h-32"; // Inline: 128px (728x90)
+      heightClass = "h-32";
     }
-    
-    // Determine object-fit based on per-slot fill_section setting
-    const objectFit = ad.fill_section_for_slot !== false ? "object-cover" : "object-contain";
-    
+
+    // 970x90 banners: no object-fit — w-full h-auto so image always fills width (touches hero edges), full ad visible
+    // Other slots: object-cover when fill_section is true, else object-contain
+    const objectFit = is970x90Banner
+      ? ""
+      : ad.fill_section_for_slot !== false
+        ? "object-cover"
+        : "object-contain";
+
     return (
       <a
         ref={adRef}
         href={ad.link_url}
         target="_blank"
         rel="noopener noreferrer"
-        className={`block hover:opacity-90 transition-opacity ${className}`}
+        title="Advertisement"
+        className={`block relative ${containerClass || ""} ${className}`}
         onClick={handleAdClick}
       >
         <img
           src={ad.image_url}
           alt={ad.title || "Advertisement"}
-          className={`w-full rounded-lg ${heightClass} ${objectFit}`}
+          className={`w-full rounded-lg ${heightClass} ${objectFit}`.trim()}
         />
+        <span
+          className={`absolute bottom-1 right-2 text-[10px] font-normal pointer-events-none ${!(ad.ad_label_color && /^#[0-9A-Fa-f]{6}$/.test(ad.ad_label_color)) ? "text-gray-500" : ""}`}
+          style={ad.ad_label_color && /^#[0-9A-Fa-f]{6}$/.test(ad.ad_label_color) ? { color: ad.ad_label_color } : undefined}
+          aria-hidden
+        >
+          Advertisement
+        </span>
       </a>
     );
   }

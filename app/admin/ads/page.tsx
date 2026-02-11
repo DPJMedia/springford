@@ -51,6 +51,7 @@ export default function AdsManagerPage() {
     display_order: 0,
     is_active: true,
     fill_section: true, // Default to fill section
+    ad_label_color: "", // Hex for "Advertisement" label (empty = default gray)
   });
   // Per-slot fill section settings
   const [slotFillSettings, setSlotFillSettings] = useState<Record<string, boolean>>({});
@@ -526,6 +527,7 @@ export default function AdsManagerPage() {
             display_order: formData.display_order,
             is_active: formData.is_active,
             fill_section: formData.fill_section,
+            ad_label_color: formData.ad_label_color?.trim() || null,
           })
           .eq("id", editingAd.id);
 
@@ -565,6 +567,7 @@ export default function AdsManagerPage() {
             display_order: formData.display_order,
             is_active: formData.is_active,
             fill_section: formData.fill_section,
+            ad_label_color: formData.ad_label_color?.trim() || null,
             created_by: user.id,
           })
           .select()
@@ -659,6 +662,7 @@ export default function AdsManagerPage() {
         display_order: ad.display_order || 0,
         is_active: ad.is_active,
         fill_section: true,
+        ad_label_color: (ad as Ad & { ad_label_color?: string | null }).ad_label_color || "",
       });
       // Load per-slot fill settings
       const fillSettings: Record<string, boolean> = {};
@@ -685,6 +689,7 @@ export default function AdsManagerPage() {
         display_order: 0,
         is_active: true,
         fill_section: true,
+        ad_label_color: "",
       });
       setSlotFillSettings({});
       setImagePreview(null);
@@ -1034,6 +1039,31 @@ export default function AdsManagerPage() {
                       placeholder="https://example.com"
                       required
                     />
+                  </div>
+
+                  {/* Advertisement label color */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[color:var(--color-dark)] mb-2">
+                      Advertisement label color
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Color of the &quot;Advertisement&quot; text at the bottom of this ad. Leave empty for default gray (good for light backgrounds).
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={formData.ad_label_color && /^#[0-9A-Fa-f]{6}$/.test(formData.ad_label_color) ? formData.ad_label_color : "#6b7280"}
+                        onChange={(e) => setFormData({ ...formData, ad_label_color: e.target.value })}
+                        className="h-10 w-14 cursor-pointer rounded border border-gray-300"
+                      />
+                      <input
+                        type="text"
+                        value={formData.ad_label_color}
+                        onChange={(e) => setFormData({ ...formData, ad_label_color: e.target.value })}
+                        className="flex-1 border border-gray-300 rounded-md px-4 py-2 font-mono text-sm"
+                        placeholder="#6b7280 or leave empty for default"
+                      />
+                    </div>
                   </div>
 
                   {/* Selected Slots Display */}
