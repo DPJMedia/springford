@@ -171,6 +171,13 @@ function HomepagePreview({
             <p className="text-gray-500 text-sm mb-4">Article content goes here...</p>
           </div>
 
+          {/* Disclaimer: Sections 5, 6, 7 are desktop-only on the live site */}
+          <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
+            <p className="text-xs text-amber-800">
+              <strong>Note:</strong> Ads in Sections 5, 6, and 7 (728×90) appear on <strong>desktop only</strong>. They do not show on mobile.
+            </p>
+          </div>
+
           {/* AD SECTION 5: Main Content Top */}
           {renderAdSlot("homepage-content-top", 5, "Main Content Top", "728x90 (8:1)", "h-24")}
 

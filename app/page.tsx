@@ -550,8 +550,8 @@ export default function Home() {
                     )}
                   </section>
 
-                  {/* AD SECTION 5 - MAIN CONTENT TOP */}
-                  <div className="relative pt-8">
+                  {/* AD SECTION 5 - MAIN CONTENT TOP (hidden on mobile) */}
+                  <div className="relative pt-8 hidden lg:block">
                     <AdSlot 
                       slot="homepage-content-top" 
                       className="w-full"
@@ -568,6 +568,47 @@ export default function Home() {
                     })} 
                     sectionName="latest"
                   />
+
+                  {/* Mobile: Section 2 ad (300x300) above Most Read */}
+                  <div className="pt-8 lg:hidden">
+                    <AdSlot slot="homepage-sidebar-top" className="w-full" />
+                  </div>
+
+                  {/* Most Read - mobile only: appears under Latest News and Section 2 ad */}
+                  <div className="lg:hidden">
+                    <div className="bg-white rounded-lg p-4 shadow-sm">
+                      <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
+                        Most Read
+                      </h3>
+                      {trendingArticles.length === 0 ? (
+                        <p className="text-sm text-[color:var(--color-medium)] text-center py-4">
+                          No articles yet
+                        </p>
+                      ) : (
+                        <div>
+                          {trendingArticles.map((article, index) => (
+                            <Link
+                              key={article.id}
+                              href={`/article/${article.slug}`}
+                              className="flex gap-3 items-start group py-3 border-b border-gray-200 last:border-0"
+                            >
+                              <span className="text-2xl font-black text-gray-300 flex-shrink-0">
+                                {index + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2">
+                                  {article.title}
+                                </h4>
+                                <p className="text-xs text-[color:var(--color-medium)] mt-1">
+                                  {article.view_count.toLocaleString()} views
+                                </p>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Spring City */}
                   {springCityArticles.length > 0 && (
@@ -587,8 +628,8 @@ export default function Home() {
                     />
                   )}
 
-                  {/* AD SECTION 6 - MAIN CONTENT MIDDLE 1 */}
-                  <div className="relative pt-8">
+                  {/* AD SECTION 6 - MAIN CONTENT MIDDLE 1 (hidden on mobile) */}
+                  <div className="relative pt-8 hidden lg:block">
                     <AdSlot 
                       slot="homepage-content-middle-1" 
                       className="w-full"
@@ -622,12 +663,17 @@ export default function Home() {
                     />
                   )}
 
-                  {/* AD SECTION 7 - MAIN CONTENT MIDDLE 2 */}
-                  <div className="relative pt-8">
+                  {/* AD SECTION 7 - MAIN CONTENT MIDDLE 2 (hidden on mobile) */}
+                  <div className="relative pt-8 hidden lg:block">
                     <AdSlot 
                       slot="homepage-content-middle-2" 
                       className="w-full"
                     />
+                  </div>
+
+                  {/* Mobile: second 300x300-style ad a few sections down (after School District) */}
+                  <div className="pt-8 lg:hidden">
+                    <AdSlot slot="homepage-sidebar-middle" className="w-full" />
                   </div>
 
                   {/* Politics */}
@@ -669,16 +715,16 @@ export default function Home() {
 
                 {/* SIDEBAR */}
                 <aside className="lg:col-span-4 space-y-6">
-                  {/* AD SECTION 2 - SIDEBAR TOP (STATIC BOX) */}
-                  <div className="relative pt-8">
+                  {/* AD SECTION 2 - SIDEBAR TOP (desktop only; on mobile shown in main column) */}
+                  <div className="relative pt-8 hidden lg:block">
                     <AdSlot 
                       slot="homepage-sidebar-top" 
                       className="w-full"
                     />
                   </div>
 
-                  {/* Most Read - Numbered List */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
+                  {/* Most Read - desktop only; on mobile shown under Latest News in main column */}
+                  <div className="hidden lg:block bg-white rounded-lg p-4 shadow-sm">
                     <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
                       Most Read
                     </h3>
@@ -712,8 +758,8 @@ export default function Home() {
                     )}
                   </div>
 
-                  {/* AD SECTION 3 - SIDEBAR MIDDLE */}
-                  <div className="relative pt-8">
+                  {/* AD SECTION 3 - SIDEBAR MIDDLE (desktop only; on mobile shown in main column) */}
+                  <div className="relative pt-8 hidden lg:block">
                     <AdSlot 
                       slot="homepage-sidebar-middle" 
                       className="w-full"
@@ -759,8 +805,8 @@ export default function Home() {
                     )}
                   </div>
 
-                  {/* AD SECTION 4 - SIDEBAR BOTTOM */}
-                  <div className="relative pt-8">
+                  {/* AD SECTION 4 - SIDEBAR BOTTOM (desktop only on homepage) */}
+                  <div className="relative pt-8 hidden lg:block">
                     <AdSlot 
                       slot="homepage-sidebar-bottom" 
                       className="w-full"

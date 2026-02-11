@@ -223,49 +223,65 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
     const isSidebar = adSlot.includes("sidebar");
     const isInline = adSlot.includes("inline");
 
-    // Main-page slots: exact aspect ratios so "Fill section" doesn't crop; some scale up to fill space
+    // Main-page slots: exact aspect ratios so "Fill section" doesn't crop; mobile-friendly min-heights
     const is970x90Banner =
       adSlot === "homepage-banner-top" || adSlot === "homepage-banner-bottom";
     const is300x300Sidebar = adSlot === "homepage-sidebar-top";
     const is300x250Sidebar =
       adSlot === "homepage-sidebar-middle" || adSlot === "homepage-sidebar-bottom";
+    const is728x90Banner =
+      adSlot.includes("content-top") ||
+      adSlot.includes("content-middle");
+    const isArticleSidebar =
+      adSlot === "article-sidebar-top" || adSlot === "article-sidebar-bottom";
+    const isArticleInline = adSlot === "article-inline-1" || adSlot === "article-inline-2";
 
-    // Container and image sizing
+    // Container and image sizing — responsive for mobile (min-heights, object-contain so full ad visible)
     let containerClass = "";
-    let heightClass = "h-32"; // Default inline height
+    let heightClass = "h-32";
     if (is970x90Banner) {
-      // 970x90: no fixed aspect — image uses w-full h-auto so it always fills width and touches hero edges
-      containerClass = "w-full";
-      heightClass = "h-auto";
+      // 970x90: on mobile 90px height, horizontal scroll; label positioned inside visible image (image ~36px tall with object-contain)
+      containerClass = "w-full h-[90px] overflow-x-auto overflow-y-hidden scroll-smooth md:overflow-visible md:h-auto md:min-h-0";
+      heightClass = "h-[90px] w-auto min-w-[100%] object-contain object-left-top md:h-auto md:w-full md:min-w-0 md:object-none";
     } else if (is300x300Sidebar) {
-      // 300x300 (1:1): full width of sidebar so slot is bigger; aspect-square prevents crop
       containerClass = "w-full aspect-square";
-      heightClass = "h-full";
+      heightClass = "h-full object-contain sm:object-cover";
     } else if (is300x250Sidebar) {
-      // 300x250 (1.2:1): full width of sidebar, exact aspect ratio so ads fit without being cut off
       containerClass = "w-full aspect-[300/250]";
-      heightClass = "h-full";
+      heightClass = "h-full object-contain sm:object-cover";
+    } else if (is728x90Banner || isArticleInline) {
+      // 728x90: on mobile fixed 90px height + object-contain so full ad visible
+      containerClass = "w-full h-[90px] md:h-24";
+      heightClass = "w-full h-full object-contain md:object-cover";
     } else if (isBanner) {
-      heightClass = "h-24"; // Banner: 96px (728x90 main content)
+      containerClass = "w-full h-[90px] md:h-24";
+      heightClass = "w-full h-full object-contain md:object-cover";
     } else if (isSidebar) {
-      if (adSlot === "article-sidebar-top") {
-        heightClass = "h-[500px]";
-      } else if (adSlot === "article-sidebar-bottom") {
-        heightClass = "h-[500px]";
+      if (isArticleSidebar) {
+        // Article sidebar: shorter on mobile so not cut off; full 500px on desktop
+        containerClass = "w-full h-[280px] sm:h-[320px] lg:h-[500px]";
+        heightClass = "w-full h-full object-contain lg:object-cover";
       } else {
-        heightClass = "h-48"; // Fallback sidebar
+        heightClass = "h-48";
       }
     } else if (isInline) {
-      heightClass = "h-32";
+      containerClass = "w-full h-[90px] md:h-32";
+      heightClass = "w-full h-full object-contain md:object-cover";
     }
 
-    // 970x90 banners: no object-fit — w-full h-auto so image always fills width (touches hero edges), full ad visible
-    // Other slots: object-cover when fill_section is true, else object-contain
-    const objectFit = is970x90Banner
-      ? ""
-      : ad.fill_section_for_slot !== false
-        ? "object-cover"
-        : "object-contain";
+    // Object-fit: slots above set it in heightClass (incl. mobile contain); others use fill_section
+    const objectFit =
+      is970x90Banner ||
+      is728x90Banner ||
+      isArticleInline ||
+      isArticleSidebar ||
+      is300x300Sidebar ||
+      is300x250Sidebar ||
+      isBanner
+        ? ""
+        : ad.fill_section_for_slot !== false
+          ? "object-cover"
+          : "object-contain";
 
     return (
       <a
