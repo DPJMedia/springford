@@ -240,33 +240,33 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
     let containerClass = "";
     let heightClass = "h-32";
     if (is970x90Banner) {
-      // 970x90: on mobile 90px height, horizontal scroll; label positioned inside visible image (image ~36px tall with object-contain)
-      containerClass = "w-full h-[90px] overflow-x-auto overflow-y-hidden scroll-smooth md:overflow-visible md:h-auto md:min-h-0";
-      heightClass = "h-[90px] w-auto min-w-[100%] object-contain object-left-top md:h-auto md:w-full md:min-w-0 md:object-none";
+      // 970x90: desktop = full width natural height (original). Mobile only: 90px + horizontal scroll.
+      containerClass = "w-full max-md:h-[90px] max-md:overflow-x-auto max-md:overflow-y-hidden max-md:scroll-smooth";
+      heightClass = "w-full h-auto max-md:h-[90px] max-md:w-auto max-md:min-w-[100%] max-md:object-contain max-md:object-left-top";
     } else if (is300x300Sidebar) {
       containerClass = "w-full aspect-square";
-      heightClass = "h-full object-contain sm:object-cover";
+      heightClass = "h-full object-cover max-md:object-contain";
     } else if (is300x250Sidebar) {
       containerClass = "w-full aspect-[300/250]";
-      heightClass = "h-full object-contain sm:object-cover";
+      heightClass = "h-full object-cover max-md:object-contain";
     } else if (is728x90Banner || isArticleInline) {
-      // 728x90: on mobile fixed 90px height + object-contain so full ad visible
-      containerClass = "w-full h-[90px] md:h-24";
-      heightClass = "w-full h-full object-contain md:object-cover";
+      // 728x90: slot taller (728/108) so full ad visible; full width, object-cover
+      containerClass = "w-full aspect-[728/108] max-md:aspect-auto max-md:h-[90px]";
+      heightClass = "w-full h-full object-cover max-md:object-contain max-md:h-full";
     } else if (isBanner) {
-      containerClass = "w-full h-[90px] md:h-24";
-      heightClass = "w-full h-full object-contain md:object-cover";
+      containerClass = "w-full aspect-[728/108] max-md:aspect-auto max-md:h-[90px]";
+      heightClass = "w-full h-full object-cover max-md:object-contain max-md:h-full";
     } else if (isSidebar) {
       if (isArticleSidebar) {
-        // Article sidebar: shorter on mobile so not cut off; full 500px on desktop
+        // Article sidebar: mobile 280/320px + contain; desktop lg = 500px + cover
         containerClass = "w-full h-[280px] sm:h-[320px] lg:h-[500px]";
         heightClass = "w-full h-full object-contain lg:object-cover";
       } else {
         heightClass = "h-48";
       }
     } else if (isInline) {
-      containerClass = "w-full h-[90px] md:h-32";
-      heightClass = "w-full h-full object-contain md:object-cover";
+      containerClass = "w-full max-md:h-[90px]";
+      heightClass = "w-full h-32 object-contain max-md:h-full";
     }
 
     // Object-fit: slots above set it in heightClass (incl. mobile contain); others use fill_section
