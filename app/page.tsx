@@ -49,22 +49,22 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
             <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8 text-white">
             {article.is_breaking && (
-              <span className="inline-block bg-red-600 text-white text-xs font-bold px-3 py-1 rounded mb-3">
+              <span className="inline-block bg-red-600 text-white text-xs font-bold px-3 py-1 rounded mb-2 sm:mb-3">
                 BREAKING NEWS
               </span>
             )}
-            <h1 className="text-4xl font-black leading-tight mb-3 group-hover:text-blue-400 transition">
+            <h1 className="text-2xl font-black leading-tight mb-2 sm:mb-3 sm:text-3xl md:text-4xl group-hover:text-blue-400 transition">
               {article.title}
             </h1>
             {article.subtitle && (
-              <p className="text-xl text-gray-200 mb-3">{article.subtitle}</p>
+              <p className="text-base sm:text-lg md:text-xl text-gray-200 mb-2 sm:mb-3">{article.subtitle}</p>
             )}
             {article.excerpt && (
-              <p className="text-base text-gray-300 line-clamp-2">{article.excerpt}</p>
+              <p className="text-sm sm:text-base text-gray-300 line-clamp-2">{article.excerpt}</p>
             )}
-            <div className="mt-4 text-sm text-gray-400">
+            <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-400">
               {article.author_name} • {formattedDate}
             </div>
           </div>
