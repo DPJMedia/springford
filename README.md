@@ -2,7 +2,7 @@
 
 A modern, full-featured news website platform built with Next.js, TypeScript, Tailwind CSS, and Supabase. Includes seamless integration with [DiffuseAI](https://diffuse-ai-blush.vercel.app) for AI-powered content generation.
 
-**Live Site:** [Spring-Ford Press](https://springfordpress.vercel.app)
+**Live Site:** [Spring-Ford Press](https://springford.press)
 
 ---
 
