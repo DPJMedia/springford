@@ -224,20 +224,23 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
       });
   }, [article.id, article.section, article.author_name, supabase]);
 
+  // Format dates with time in EST (e.g. "Jan 22, 2026 at 9:31 AM EST")
   const publishedDate = article.published_at
-    ? new Date(article.published_at).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
+    ? (() => {
+        const d = new Date(article.published_at!);
+        const datePart = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
+        const timePart = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/New_York", timeZoneName: "short" });
+        return `${datePart} at ${timePart}`;
+      })()
     : "";
 
   const updatedDate = article.updated_at
-    ? new Date(article.updated_at).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
+    ? (() => {
+        const d = new Date(article.updated_at);
+        const datePart = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
+        const timePart = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/New_York", timeZoneName: "short" });
+        return `${datePart} at ${timePart}`;
+      })()
     : "";
 
   // Check if article was updated after publishing (meaningful update)
@@ -262,6 +265,13 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Main Article Content - 8 columns */}
             <article ref={articleRef} className="lg:col-span-8">
+              {/* Advertisement label - subtle, centered, above content */}
+              {article.is_advertisement && (
+                <div className="mb-4 flex justify-center items-center px-4 py-2 rounded-lg bg-gray-100 border border-gray-200">
+                  <span className="text-xs font-medium tracking-wider text-gray-600">advertisement article</span>
+                </div>
+              )}
+
               {/* Breadcrumb */}
               <div className="mb-4 text-sm text-[color:var(--color-medium)]">
                 <Link href="/" className="hover:text-[color:var(--color-riviera-blue)]">

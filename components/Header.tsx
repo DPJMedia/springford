@@ -282,13 +282,6 @@ export function Header() {
               </svg>
               Search
             </button>
-            <Link
-              href="/advertise"
-              onClick={() => setShowMobileNav(false)}
-              className="rounded-full border border-[color:var(--color-border)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition"
-            >
-              Advertise
-            </Link>
             {(!user || !newsletterSubscribed) && (
               <Link
                 href="/subscribe"

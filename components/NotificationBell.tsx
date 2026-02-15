@@ -7,9 +7,10 @@ import Link from "next/link";
 interface Notification {
   id: string;
   message: string;
-  type: "article" | "ad";
+  type: string; // article_published, article_edited, ad_published, ad_expired_deleted (or legacy: article, ad)
   target_id: string;
   target_type: "article" | "ad";
+  actor_name?: string | null;
   is_read: boolean;
   created_at: string;
 }
@@ -96,12 +97,20 @@ export function NotificationBell() {
   }
 
   function getTargetUrl(notification: Notification): string {
-    if (notification.target_type === "article") {
+    if (notification.target_type === "article" || notification.type?.includes("article")) {
       return "/admin/articles";
-    } else if (notification.target_type === "ad") {
+    }
+    if (notification.target_type === "ad" || notification.type?.includes("ad")) {
       return "/admin/ads";
     }
     return "/admin";
+  }
+
+  function getDisplayType(notification: Notification): "Article" | "Ad" {
+    if (notification.target_type === "article" || ["article_published", "article_edited"].includes(notification.type || "")) {
+      return "Article";
+    }
+    return "Ad";
   }
 
   function formatTimeAgo(dateString: string): string {
@@ -197,12 +206,12 @@ export function NotificationBell() {
                         <div className="flex items-center gap-2">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              notification.type === "article"
+                              getDisplayType(notification) === "Article"
                                 ? "bg-blue-100 text-blue-800"
                                 : "bg-purple-100 text-purple-800"
                             }`}
                           >
-                            {notification.type === "article" ? "Article" : "Ad"}
+                            {getDisplayType(notification)}
                           </span>
                           <span className="text-xs text-gray-500">
                             {formatTimeAgo(notification.created_at)}

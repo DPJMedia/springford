@@ -60,12 +60,20 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
             <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8 text-white">
+          <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+            {article.is_advertisement && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/15 backdrop-blur text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                <svg className="w-3 h-3 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
+                Advertisement
+              </span>
+            )}
             {article.is_breaking && (
-              <span className="inline-block bg-red-600 text-white text-xs font-bold px-3 py-1 rounded mb-2 sm:mb-3">
+              <span className="inline-block bg-red-600 text-white text-xs font-bold px-3 py-1 rounded">
                 BREAKING NEWS
               </span>
             )}
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8 text-white">
             <h1 className="text-2xl font-black leading-tight mb-2 sm:mb-3 sm:text-3xl md:text-4xl group-hover:text-blue-400 transition">
               {article.title}
             </h1>
@@ -90,6 +98,11 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
         <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition h-full flex flex-col min-w-0">
           {article.image_url ? (
             <div className="relative h-48 overflow-hidden flex-shrink-0">
+              {article.is_advertisement && (
+                <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800/70 text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                  Advertisement
+                </span>
+              )}
               <img
                 src={article.image_url}
                 alt={article.title}
@@ -123,7 +136,7 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
 
   if (size === "compact") {
     return (
-      <Link href={`/article/${article.slug}`} className="block group py-3 border-b border-gray-200 last:border-0">
+      <Link href={`/article/${article.slug}`} className="block group py-3 border-b border-gray-200 last:border-0 relative">
         <div className="flex gap-3">
           {article.image_url && (
             <div className="flex-shrink-0 w-20 h-20 overflow-hidden rounded">
@@ -135,9 +148,14 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-bold text-[color:var(--color-dark)] mb-1 group-hover:text-blue-600 transition line-clamp-2">
-              {article.title}
-            </h4>
+            <div className="flex items-center gap-2 mb-1">
+              {article.is_advertisement && (
+                <span className="text-[9px] font-medium uppercase tracking-wider text-gray-500">Ad</span>
+              )}
+              <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2 flex-1 min-w-0">
+                {article.title}
+              </h4>
+            </div>
             <div className="text-xs text-[color:var(--color-medium)]">
               {formattedDate}
             </div>
@@ -152,6 +170,11 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
       <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition h-full flex flex-col">
         {article.image_url ? (
           <div className="relative h-40 overflow-hidden flex-shrink-0">
+            {article.is_advertisement && (
+              <span className="absolute top-2 left-2 z-10 inline-flex items-center px-2 py-0.5 rounded bg-gray-800/70 text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                Advertisement
+              </span>
+            )}
             <img
               src={article.image_url}
               alt={article.title}
@@ -160,6 +183,11 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
           </div>
         ) : (
           <div className="relative h-40 overflow-hidden flex-shrink-0 bg-gradient-to-br from-blue-100 via-blue-50 to-gray-100 flex items-center justify-center">
+            {article.is_advertisement && (
+              <span className="absolute top-2 left-2 z-10 inline-flex items-center px-2 py-0.5 rounded bg-gray-600/80 text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                Advertisement
+              </span>
+            )}
             <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
             </svg>

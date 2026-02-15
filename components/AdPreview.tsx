@@ -46,6 +46,7 @@ const mockArticle: Article = {
   breaking_news_duration: 0,
   breaking_news_set_at: null,
   allow_comments: false,
+  is_advertisement: false,
   updated_by: null,
 };
 

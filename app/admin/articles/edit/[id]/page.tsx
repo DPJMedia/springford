@@ -39,6 +39,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   const [isBreaking, setIsBreaking] = useState(false);
   const [breakingNewsDuration, setBreakingNewsDuration] = useState(24);
   const [allowComments, setAllowComments] = useState(true);
+  const [isAdvertisement, setIsAdvertisement] = useState(false);
   const [scheduledFor, setScheduledFor] = useState("");
   
   const [loading, setLoading] = useState(true);
@@ -149,6 +150,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
       
       setIsFeatured(data.is_featured);
       setIsBreaking(data.is_breaking);
+      setIsAdvertisement(data.is_advertisement ?? false);
       setBreakingNewsDuration(data.breaking_news_duration || 24);
       setAllowComments(data.allow_comments);
       
@@ -312,6 +314,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           breaking_news_duration: breakingNewsDuration,
           breaking_news_set_at: isBreaking && !article?.is_breaking ? new Date().toISOString() : (isBreaking ? article?.breaking_news_set_at : null),
           allow_comments: allowComments,
+          is_advertisement: isAdvertisement,
           meta_title: metaTitle || null,
           meta_description: metaDescription || null,
           author_name: poweredByDiffuse 
@@ -442,6 +445,21 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                   </p>
                 </div>
               )}
+
+              {/* Is the article an advertisement? */}
+              <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="is-advertisement"
+                  checked={isAdvertisement}
+                  onChange={(e) => setIsAdvertisement(e.target.checked)}
+                  className="w-5 h-5 text-[color:var(--color-riviera-blue)] bg-white border-gray-300 rounded focus:ring-[color:var(--color-riviera-blue)] focus:ring-2 cursor-pointer"
+                />
+                <label htmlFor="is-advertisement" className="text-sm font-medium text-gray-900 cursor-pointer">
+                  Is the article an advertisement?
+                </label>
+                <Tooltip text="When checked, a subtle 'Advertisement' label will appear on this article in the feed and on the article page so readers know it's sponsored content." />
+              </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">

@@ -142,7 +142,12 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
                   className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group"
                 >
                   {article.image_url && (
-                    <div className="aspect-video overflow-hidden">
+                    <div className="relative aspect-video overflow-hidden">
+                      {article.is_advertisement && (
+                        <span className="absolute top-2 left-2 z-10 inline-flex items-center px-2 py-0.5 rounded bg-gray-800/70 text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                          Advertisement
+                        </span>
+                      )}
                       <img
                         src={article.image_url}
                         alt={article.title}
@@ -150,11 +155,20 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
                       />
                     </div>
                   )}
-                  <div className="p-4">
-                    {article.category && (
-                      <span className="inline-block px-2 py-1 text-xs font-bold text-[color:var(--color-riviera-blue)] bg-blue-50 rounded mb-2">
-                        {article.category}
-                      </span>
+                  <div className="p-4 relative">
+                    {(article.is_advertisement || article.category) && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {article.is_advertisement && (
+                          <span className="inline-block px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-gray-600 bg-gray-100 rounded">
+                            Advertisement
+                          </span>
+                        )}
+                        {article.category && (
+                          <span className="inline-block px-2 py-1 text-xs font-bold text-[color:var(--color-riviera-blue)] bg-blue-50 rounded">
+                            {article.category}
+                          </span>
+                        )}
+                      </div>
                     )}
                     <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-2 group-hover:text-[color:var(--color-riviera-blue)] transition">
                       {article.title}

@@ -58,6 +58,7 @@ export interface Article {
   breaking_news_duration: number; // Hours to stay as breaking news
   breaking_news_set_at: string | null; // When marked as breaking news
   allow_comments: boolean;
+  is_advertisement: boolean;
   updated_by: string | null;
 }
 
