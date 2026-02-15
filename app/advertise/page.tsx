@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -8,7 +8,7 @@ import Link from "next/link";
 
 const STORAGE_KEY = "springford_advertise_submitted";
 
-export default function AdvertisePage() {
+function AdvertisePageContent() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -263,5 +263,23 @@ export default function AdvertisePage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+export default function AdvertisePage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <Header />
+          <main className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[color:var(--color-riviera-blue)] border-r-transparent" />
+          </main>
+          <Footer />
+        </>
+      }
+    >
+      <AdvertisePageContent />
+    </Suspense>
   );
 }
