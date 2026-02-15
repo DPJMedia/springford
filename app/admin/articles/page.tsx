@@ -34,12 +34,7 @@ export default function ArticlesManagementPage() {
 
   useEffect(() => {
     checkAdminAndFetchArticles();
-    
-    // Load saved placements from localStorage
-    const savedPicks = localStorage.getItem("editorsPicks");
-    if (savedPicks) {
-      setEditorsPicks(JSON.parse(savedPicks));
-    }
+    fetchEditorsPicks();
     
     const savedOverrides = localStorage.getItem("mostReadOverrides");
     if (savedOverrides) {
@@ -85,6 +80,21 @@ export default function ArticlesManagementPage() {
 
     setIsAdmin(true);
     await fetchArticles();
+  }
+
+  async function fetchEditorsPicks() {
+    const { data } = await supabase
+      .from("editors_picks")
+      .select("article_id, position")
+      .order("position", { ascending: true });
+    
+    if (data && data.length > 0) {
+      const picks: string[] = ["", "", ""];
+      data.forEach((row: { article_id: string; position: number }) => {
+        picks[row.position - 1] = row.article_id;
+      });
+      setEditorsPicks(picks);
+    }
   }
 
   async function fetchArticles() {
@@ -361,10 +371,22 @@ export default function ArticlesManagementPage() {
                 )}
               </div>
               <button
-                onClick={() => {
+                onClick={async () => {
                   const filteredPicks = editorsPicks.filter(Boolean);
-                  localStorage.setItem("editorsPicks", JSON.stringify(filteredPicks));
-                  alert(`Editor's Picks saved successfully! (${filteredPicks.length} articles selected)`);
+                  try {
+                    // Replace all picks in DB
+                    await supabase.from("editors_picks").delete().in("position", [1, 2, 3]);
+                    for (let i = 0; i < filteredPicks.length; i++) {
+                      await supabase.from("editors_picks").insert({
+                        article_id: filteredPicks[i],
+                        position: i + 1,
+                      });
+                    }
+                    alert(`Editor's Picks saved successfully! (${filteredPicks.length} articles selected)`);
+                  } catch (err) {
+                    console.error(err);
+                    alert("Failed to save Editor's Picks. Please try again.");
+                  }
                 }}
                 className="mt-4 px-6 py-2 bg-[color:var(--color-riviera-blue)] text-white rounded-md font-semibold hover:bg-opacity-90 transition"
               >

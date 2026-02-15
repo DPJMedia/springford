@@ -25,6 +25,17 @@ function AdSlot({
   );
 }
 
+// Truncate excerpt to ~2 lines with ellipsis (consistent across all article cards)
+function truncateExcerpt(text: string | null, maxLength = 140): string {
+  if (!text || typeof text !== "string") return "";
+  const stripped = text.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  if (stripped.length <= maxLength) return stripped;
+  const truncated = stripped.slice(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(" ");
+  const cutAt = lastSpace > maxLength * 0.7 ? lastSpace : maxLength;
+  return truncated.slice(0, cutAt).trim() + "...";
+}
+
 // Article Card Component
 function ArticleCard({ article, size = "default" }: { article: Article; size?: "hero" | "featured" | "default" | "compact" }) {
   const formattedDate = article.published_at
@@ -62,7 +73,7 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
               <p className="text-base sm:text-lg md:text-xl text-gray-200 mb-2 sm:mb-3">{article.subtitle}</p>
             )}
             {article.excerpt && (
-              <p className="text-sm sm:text-base text-gray-300 line-clamp-2">{article.excerpt}</p>
+              <p className="text-sm sm:text-base text-gray-300">{truncateExcerpt(article.excerpt, 120)}</p>
             )}
             <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-400">
               {article.author_name} • {formattedDate}
@@ -75,8 +86,8 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
 
   if (size === "featured") {
     return (
-      <Link href={`/article/${article.slug}`} className="block group h-full">
-        <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition h-full flex flex-col">
+      <Link href={`/article/${article.slug}`} className="block group h-full min-w-0">
+        <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition h-full flex flex-col min-w-0">
           {article.image_url ? (
             <div className="relative h-48 overflow-hidden flex-shrink-0">
               <img
@@ -92,13 +103,13 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
               </svg>
             </div>
           )}
-          <div className="p-5 flex-1 flex flex-col">
-            <h3 className="font-bold text-xl text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition line-clamp-3">
+          <div className="p-5 flex-1 flex flex-col min-w-0">
+            <h3 className="font-bold text-xl text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition line-clamp-3 h-[5rem]">
               {article.title}
             </h3>
             {article.excerpt && (
-              <p className="text-sm text-[color:var(--color-medium)] mb-3 flex-1 line-clamp-2">
-                {article.excerpt}
+              <p className="text-sm text-[color:var(--color-medium)] mb-3 flex-1">
+                {truncateExcerpt(article.excerpt)}
               </p>
             )}
             <div className="text-xs text-[color:var(--color-medium)] mt-auto">
@@ -154,13 +165,13 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
             </svg>
           </div>
         )}
-        <div className="p-4 flex-1 flex flex-col">
+        <div className="p-4 flex-1 flex flex-col min-w-0">
           <h3 className="font-bold text-base text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition line-clamp-2">
             {article.title}
           </h3>
           {article.excerpt && (
-            <p className="text-sm text-[color:var(--color-medium)] mb-2 flex-1 line-clamp-2">
-              {article.excerpt}
+            <p className="text-sm text-[color:var(--color-medium)] mb-2 flex-1">
+              {truncateExcerpt(article.excerpt)}
             </p>
           )}
           <div className="text-xs text-[color:var(--color-medium)] mt-auto">
@@ -413,27 +424,25 @@ export default function Home() {
       setFeaturedArticles(featuredResult.data as any);
     }
 
-    // Handle Editor's Picks
-    const savedPicks = localStorage.getItem("editorsPicks");
-    if (savedPicks) {
-      try {
-        const pickIds = JSON.parse(savedPicks);
-        if (pickIds && pickIds.length > 0) {
-          const { data: picksData } = await supabase
-            .from("articles")
-            .select("id, title, slug, published_at")
-            .in("id", pickIds)
-            .eq("status", "published");
-          
-          if (picksData) {
-            const sortedPicks = pickIds
-              .map((id: string) => picksData.find((a) => a.id === id))
-              .filter(Boolean);
-            setEditorsPicks(sortedPicks as any);
-          }
-        }
-      } catch (error) {
-        console.error("Error loading editor's picks:", error);
+    // Handle Editor's Picks (from DB - visible to all users, persists until removed)
+    const { data: picksRows } = await supabase
+      .from("editors_picks")
+      .select("article_id, position")
+      .order("position", { ascending: true });
+    
+    if (picksRows && picksRows.length > 0) {
+      const pickIds = picksRows.map((r: { article_id: string }) => r.article_id);
+      const { data: picksData } = await supabase
+        .from("articles")
+        .select("id, title, slug, published_at, excerpt, image_url, author_name, subtitle, section, sections, category, tags")
+        .in("id", pickIds)
+        .eq("status", "published");
+      
+      if (picksData) {
+        const sortedPicks = pickIds
+          .map((id: string) => picksData.find((a: any) => a.id === id))
+          .filter(Boolean);
+        setEditorsPicks(sortedPicks as any);
       }
     } else if (featuredResult.data) {
       setEditorsPicks(featuredResult.data.slice(0, 3) as any);

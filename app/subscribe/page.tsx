@@ -1,3 +1,6 @@
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
+
 export default function SubscribePage() {
   const plans = [
     {
@@ -18,8 +21,10 @@ export default function SubscribePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[color:var(--color-surface)]">
-      <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+    <>
+      <Header />
+      <main className="min-h-screen bg-[color:var(--color-surface)]">
+        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="text-center">
           <p className="eyebrow text-[color:var(--color-medium)]">Subscribe</p>
           <h1 className="headline text-2xl font-semibold text-[color:var(--color-dark)]">
@@ -51,8 +56,10 @@ export default function SubscribePage() {
             </div>
           ))}
         </div>
+        </div>
       </main>
-    </div>
+      <Footer />
+    </>
   );
 }
 

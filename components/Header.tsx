@@ -1,24 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import { Avatar } from "./Avatar";
 import { NotificationBell } from "./NotificationBell";
+import { SearchDropdown } from "./SearchDropdown";
 
 export function Header() {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
   const [userName, setUserName] = useState<string>("");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
   const supabase = createClient();
 
   const nav = [
-    { label: "Top Stories", href: "/#top-stories" },
-    { label: "Latest", href: "/#latest" },
     { label: "Spring City", href: "/#spring-city" },
     { label: "Royersford", href: "/#royersford" },
     { label: "Limerick", href: "/#limerick" },
@@ -38,12 +40,13 @@ export function Header() {
         // Check if user is admin and get name
         supabase
           .from("user_profiles")
-          .select("is_admin, is_super_admin, full_name, avatar_url")
+          .select("is_admin, is_super_admin, full_name, avatar_url, newsletter_subscribed")
           .eq("id", user.id)
           .single()
           .then(({ data }) => {
             if (data) {
               setIsAdmin(data.is_admin || data.is_super_admin);
+              setNewsletterSubscribed(data.newsletter_subscribed || false);
               setUserName(data.full_name || user.email?.split("@")[0] || "User");
               setUserAvatar(data.avatar_url);
             }
@@ -59,18 +62,20 @@ export function Header() {
       if (session?.user) {
         supabase
           .from("user_profiles")
-          .select("is_admin, is_super_admin, full_name, avatar_url")
+          .select("is_admin, is_super_admin, full_name, avatar_url, newsletter_subscribed")
           .eq("id", session.user.id)
           .single()
           .then(({ data }) => {
             if (data) {
               setIsAdmin(data.is_admin || data.is_super_admin);
+              setNewsletterSubscribed(data.newsletter_subscribed || false);
               setUserName(data.full_name || session.user.email?.split("@")[0] || "User");
               setUserAvatar(data.avatar_url);
             }
           });
       } else {
         setIsAdmin(false);
+        setNewsletterSubscribed(false);
         setUserName("");
         setUserAvatar(null);
       }
@@ -100,16 +105,16 @@ export function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-[color:var(--color-border)] bg-white backdrop-blur">
       {/* Main Header */}
-      <div className="mx-auto flex w-full max-w-none items-center justify-between gap-2 px-3 py-1.5 sm:px-6 lg:px-8">
+      <div className="relative mx-auto flex w-full max-w-none items-center justify-between gap-2 px-3 py-1.5 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+        <Link href="/" className="flex items-center gap-2 flex-shrink-0 z-10">
           <span className="masthead text-lg sm:text-xl font-semibold text-[color:var(--color-dark)] whitespace-nowrap" style={{ letterSpacing: '-0.02em' }}>
             Spring-Ford Press
           </span>
         </Link>
 
-        {/* Desktop Navigation - Hidden on mobile/tablet */}
-        <nav className="hidden xl:flex items-center gap-0.5 text-sm font-semibold text-[color:var(--color-dark)] flex-1 justify-center">
+        {/* Desktop Navigation - Centered on page (2xl+ to avoid overlap with buttons) */}
+        <nav className="hidden 2xl:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 text-sm font-semibold text-[color:var(--color-dark)]">
           {nav.map((item) => (
             <a
               key={item.label}
@@ -121,12 +126,12 @@ export function Header() {
           ))}
         </nav>
 
-        {/* Right Side - User Menu & Mobile Toggle */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Hamburger Menu Button - Visible on mobile/tablet */}
+        {/* Right Side - Search, Advertise, Subscribe, User Menu & Mobile Toggle */}
+        <div className="flex items-center gap-2 flex-shrink-0 z-10">
+          {/* Hamburger Menu Button - Visible below 2xl to prevent nav/button overlap */}
           <button
             onClick={() => setShowMobileNav(!showMobileNav)}
-            className="xl:hidden p-2 rounded-md hover:bg-gray-100"
+            className="2xl:hidden p-2 rounded-md hover:bg-gray-100"
             aria-label="Toggle menu"
           >
             <svg className="w-6 h-6 text-[color:var(--color-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -141,15 +146,42 @@ export function Header() {
           {user ? (
             <>
               {isAdmin && <NotificationBell />}
+              <div className="relative">
+                <button
+                  ref={searchButtonRef}
+                  onClick={() => setShowSearch(!showSearch)}
+                  className="p-2 rounded-full hover:bg-gray-100 transition text-[color:var(--color-dark)]"
+                  aria-label="Search"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </button>
+                <SearchDropdown isOpen={showSearch} onClose={() => setShowSearch(false)} anchorRef={searchButtonRef} />
+              </div>
+              <Link
+                href="/advertise"
+                className="rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
+              >
+                Advertise
+              </Link>
+              {!newsletterSubscribed && (
+                <Link
+                  href="/subscribe"
+                  className="rounded-full bg-[color:var(--color-riviera-blue)] px-2 sm:px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition flex-shrink-0"
+                >
+                  Subscribe
+                </Link>
+              )}
               <div className="relative user-menu">
                 <button
                   onClick={() => setShowMenu(!showMenu)}
-                  className="flex items-center gap-1 sm:gap-2 rounded-full bg-gray-100 px-2 sm:px-3 py-1.5 hover:bg-gray-200 transition"
+                  className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-gray-100 px-2 sm:px-3 py-1.5 hover:bg-gray-200 transition"
                 >
-                  <Avatar src={userAvatar} name={userName} email={user.email} size="sm" />
                   <span className="hidden sm:inline text-sm font-semibold text-[color:var(--color-dark)]">
-                    Welcome, {userName}
+                    {userName}
                   </span>
+                  <Avatar src={userAvatar} name={userName} email={user.email} size="sm" />
                   <svg className="h-4 w-4 text-[color:var(--color-medium)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -199,19 +231,73 @@ export function Header() {
               </div>
             </>
           ) : (
-            <Link
-              href="/login"
-              className="rounded-full bg-[color:var(--color-riviera-blue)] px-3 py-1 text-xs font-semibold text-white transition hover:bg-opacity-90"
-            >
-              Log in
-            </Link>
+            <>
+              <div className="relative">
+                <button
+                  ref={searchButtonRef}
+                  onClick={() => setShowSearch(!showSearch)}
+                  className="p-2 rounded-full hover:bg-gray-100 transition text-[color:var(--color-dark)]"
+                  aria-label="Search"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </button>
+                <SearchDropdown isOpen={showSearch} onClose={() => setShowSearch(false)} anchorRef={searchButtonRef} />
+              </div>
+              <Link
+                href="/advertise"
+                className="rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
+              >
+                Advertise
+              </Link>
+              <Link
+                href="/subscribe"
+                className="rounded-full bg-[color:var(--color-riviera-blue)] px-2 sm:px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition flex-shrink-0"
+              >
+                Subscribe
+              </Link>
+              <Link
+                href="/login"
+                className="rounded-full bg-[color:var(--color-riviera-blue)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-opacity-90"
+              >
+                Log in
+              </Link>
+            </>
           )}
         </div>
       </div>
 
       {/* Mobile Navigation Dropdown */}
       {showMobileNav && (
-        <div className="xl:hidden border-t border-[color:var(--color-border)] bg-white">
+        <div className="2xl:hidden border-t border-[color:var(--color-border)] bg-white">
+          <div className="px-4 py-3 flex flex-wrap gap-2 border-b border-[color:var(--color-border)]">
+            <button
+              onClick={() => { setShowMobileNav(false); setShowSearch(true); }}
+              className="flex items-center gap-2 rounded-full border border-[color:var(--color-border)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Search
+            </button>
+            <Link
+              href="/advertise"
+              onClick={() => setShowMobileNav(false)}
+              className="rounded-full border border-[color:var(--color-border)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition"
+            >
+              Advertise
+            </Link>
+            {(!user || !newsletterSubscribed) && (
+              <Link
+                href="/subscribe"
+                onClick={() => setShowMobileNav(false)}
+                className="rounded-full bg-[color:var(--color-riviera-blue)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition"
+              >
+                Subscribe
+              </Link>
+            )}
+          </div>
           <nav className="px-4 py-3 space-y-1">
             {nav.map((item) => (
               <a
