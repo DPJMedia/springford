@@ -104,8 +104,8 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-[color:var(--color-border)] bg-white backdrop-blur">
-      {/* Main Header - Flex layout so nav is bounded and cannot overlap right-side buttons */}
-      <div className="relative mx-auto flex w-full max-w-none items-center gap-2 px-3 py-1.5 sm:px-6 lg:px-8">
+      {/* Main Header */}
+      <div className="relative mx-auto flex w-full max-w-none items-center justify-between gap-2 px-3 py-1.5 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 flex-shrink-0 z-10">
           <span className="masthead text-lg sm:text-xl font-semibold text-[color:var(--color-dark)] whitespace-nowrap" style={{ letterSpacing: '-0.02em' }}>
@@ -113,13 +113,13 @@ export function Header() {
           </span>
         </Link>
 
-        {/* Desktop Navigation - Flex-1 middle section; constrained so no overlap with buttons */}
-        <nav className="hidden xl:flex flex-1 min-w-0 justify-center items-center gap-0.5 text-sm font-semibold text-[color:var(--color-dark)] overflow-hidden">
+        {/* Desktop Navigation - Centered on page (2xl+ to avoid overlap with buttons) */}
+        <nav className="hidden 2xl:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 text-sm font-semibold text-[color:var(--color-dark)]">
           {nav.map((item) => (
             <a
               key={item.label}
               href={item.href}
-              className="rounded-md px-2 py-1 text-[11px] transition hover:bg-gray-100 whitespace-nowrap flex-shrink-0"
+              className="rounded-md px-2 py-1 text-[11px] transition hover:bg-gray-100 whitespace-nowrap"
             >
               {item.label}
             </a>
@@ -128,10 +128,10 @@ export function Header() {
 
         {/* Right Side - Search, Advertise, Subscribe, User Menu & Mobile Toggle */}
         <div className="flex items-center gap-2 flex-shrink-0 z-10">
-          {/* Hamburger Menu Button - Visible below xl; "menu" label only when hamburger is shown */}
+          {/* Hamburger Menu Button - Visible below 2xl to prevent nav/button overlap */}
           <button
             onClick={() => setShowMobileNav(!showMobileNav)}
-            className="xl:hidden flex items-center gap-1 p-2 rounded-md hover:bg-gray-100"
+            className="2xl:hidden flex items-center gap-1 p-2 rounded-md hover:bg-gray-100"
             aria-label="Toggle menu"
           >
             <svg className="w-6 h-6 text-[color:var(--color-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,7 +271,7 @@ export function Header() {
 
       {/* Mobile Navigation Dropdown */}
       {showMobileNav && (
-        <div className="xl:hidden border-t border-[color:var(--color-border)] bg-white">
+        <div className="2xl:hidden border-t border-[color:var(--color-border)] bg-white">
           <div className="px-4 py-3 flex flex-wrap gap-2 border-b border-[color:var(--color-border)]">
             <button
               onClick={() => { setShowMobileNav(false); setShowSearch(true); }}
@@ -316,4 +316,3 @@ export function Header() {
     </header>
   );
 }
-
