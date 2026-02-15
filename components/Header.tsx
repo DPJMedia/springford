@@ -113,8 +113,9 @@ export function Header() {
           </span>
         </Link>
 
-        {/* Desktop Navigation - Centered on page (2xl+ to avoid overlap with buttons) */}
-        <nav className="hidden 2xl:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 text-sm font-semibold text-[color:var(--color-dark)]">
+        {/* Desktop Navigation - Centered on page (lg+ = 1024px; collapses only when very narrow) */}
+        <nav className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-1 text-sm font-semibold text-[color:var(--color-dark)]">
+          <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-medium)] mr-1">menu</span>
           {nav.map((item) => (
             <a
               key={item.label}
@@ -128,10 +129,10 @@ export function Header() {
 
         {/* Right Side - Search, Advertise, Subscribe, User Menu & Mobile Toggle */}
         <div className="flex items-center gap-2 flex-shrink-0 z-10">
-          {/* Hamburger Menu Button - Visible below 2xl to prevent nav/button overlap */}
+          {/* Hamburger Menu Button - Visible below lg (1024px); nav links show above that */}
           <button
             onClick={() => setShowMobileNav(!showMobileNav)}
-            className="2xl:hidden p-2 rounded-md hover:bg-gray-100"
+            className="lg:hidden flex items-center gap-1 p-2 rounded-md hover:bg-gray-100"
             aria-label="Toggle menu"
           >
             <svg className="w-6 h-6 text-[color:var(--color-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -141,6 +142,7 @@ export function Header() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               )}
             </svg>
+            <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-medium)]">menu</span>
           </button>
 
           {user ? (
@@ -270,7 +272,7 @@ export function Header() {
 
       {/* Mobile Navigation Dropdown */}
       {showMobileNav && (
-        <div className="2xl:hidden border-t border-[color:var(--color-border)] bg-white">
+        <div className="lg:hidden border-t border-[color:var(--color-border)] bg-white">
           <div className="px-4 py-3 flex flex-wrap gap-2 border-b border-[color:var(--color-border)]">
             <button
               onClick={() => { setShowMobileNav(false); setShowSearch(true); }}
