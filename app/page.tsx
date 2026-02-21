@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { NewsletterForm } from "@/components/NewsletterForm";
+import { NewsletterPopupBanner } from "@/components/NewsletterPopupBanner";
 import { AdDisplay } from "@/components/AdDisplay";
 import type { Article } from "@/lib/types/database";
 import Link from "next/link";
@@ -501,6 +502,9 @@ export default function Home() {
   return (
     <>
       <Header />
+      <Suspense fallback={null}>
+        <NewsletterPopupBanner />
+      </Suspense>
       <main className="bg-[color:var(--color-surface)] min-h-screen">
         {/* Breaking News Banner */}
         {breakingNews.length > 0 && (

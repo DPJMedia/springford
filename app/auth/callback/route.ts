@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
+  const returnTo = searchParams.get('returnTo')
   const newsletterParam = searchParams.get('newsletter')
 
   if (code) {
@@ -47,9 +48,16 @@ export async function GET(request: Request) {
           .eq('id', data.user.id)
       }
       
-      // Redirect to requested page (e.g. /reset-password) or default confirm
-      const nextPath = searchParams.get('next') || '/auth/confirm'
-      const redirectUrl = nextPath.startsWith('/') ? `${origin}${nextPath}` : `${origin}/auth/confirm`
+      // Redirect to returnTo?welcome=1 (e.g. from signup flow) or next or default confirm
+      let redirectPath = '/auth/confirm'
+      if (returnTo) {
+        const path = returnTo.startsWith('/') ? returnTo : `/${returnTo}`
+        redirectPath = `${path}${path.includes('?') ? '&' : '?'}welcome=1`
+      } else {
+        const nextPath = searchParams.get('next')
+        if (nextPath && nextPath.startsWith('/')) redirectPath = nextPath
+      }
+      const redirectUrl = redirectPath.startsWith('http') ? redirectPath : `${origin}${redirectPath}`
       const response = NextResponse.redirect(redirectUrl)
       
       // Set session cookies explicitly

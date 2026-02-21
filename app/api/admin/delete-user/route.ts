@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -74,6 +75,19 @@ export async function POST(request: NextRequest) {
         { error: `Failed to delete user: ${deleteError.message}` },
         { status: 500 }
       );
+    }
+
+    // Delete user from Supabase Auth (Authentication > Users)
+    try {
+      const adminClient = createAdminClient();
+      const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId);
+      if (authDeleteError) {
+        console.error('Error deleting user from Auth:', authDeleteError);
+        // User is already removed from user_profiles; log but don't fail the request
+      }
+    } catch (authErr) {
+      console.error('Error creating admin client or deleting from Auth:', authErr);
+      // Continue - user is already removed from app data
     }
 
     return NextResponse.json({ success: true });

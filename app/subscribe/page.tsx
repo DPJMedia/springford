@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SubscribeBenefitsAnimation } from "@/components/SubscribeBenefitsAnimation";
 import { ConfirmSubscriptionModal } from "@/components/ConfirmSubscriptionModal";
 import { SubscribeSuccessModal } from "@/components/SubscribeSuccessModal";
+import { NoAccountModal } from "@/components/NoAccountModal";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 const SUBSCRIBER_TERMS = [
   "First to know when new articles publish",
@@ -19,12 +21,16 @@ const SUBSCRIBER_TERMS = [
 ];
 
 export default function SubscribePage() {
+  const searchParams = useSearchParams();
+  const welcome = searchParams.get("welcome") === "1";
   const [user, setUser] = useState<any>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showNoAccountModal, setShowNoAccountModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const hasOpenedWelcomeModal = useRef(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -34,6 +40,13 @@ export default function SubscribePage() {
     } = supabase.auth.onAuthStateChange(() => checkUserStatus());
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (welcome && user && !isSubscribed && !loading && !hasOpenedWelcomeModal.current) {
+      hasOpenedWelcomeModal.current = true;
+      setShowConfirmModal(true);
+    }
+  }, [welcome, user, isSubscribed, loading]);
 
   async function checkUserStatus() {
     const {
@@ -56,7 +69,10 @@ export default function SubscribePage() {
 
   function handleClaimClick(e: React.FormEvent) {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      setShowNoAccountModal(true);
+      return;
+    }
     setShowConfirmModal(true);
   }
 
@@ -142,18 +158,21 @@ export default function SubscribePage() {
               <div className="mt-8">
                 {!user ? (
                   <div className="flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
-                    <Link
-                      href="/signup"
-                      className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-dark)] px-8 py-4 text-base font-bold text-white shadow-lg transition hover:bg-[#333]"
-                    >
-                      Create account to claim
-                    </Link>
-                    <Link
-                      href="/login"
-                      className="inline-flex items-center justify-center rounded-full border-2 border-[color:var(--color-dark)] px-8 py-4 text-base font-semibold text-[color:var(--color-dark)] transition hover:bg-[color:var(--color-dark)] hover:text-white"
-                    >
-                      Already have an account? Log in
-                    </Link>
+                    <form onSubmit={handleClaimClick} className="flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
+                      <button
+                        type="submit"
+                        className="inline-flex items-center justify-center rounded-full bg-[#1a1a1a] px-8 py-4 text-base font-bold shadow-lg transition hover:bg-[#333]"
+                        style={{ color: "#ffffff" }}
+                      >
+                        Claim my free 3 months
+                      </button>
+                      <Link
+                        href="/login"
+                        className="inline-flex items-center justify-center text-center rounded-full border-2 border-[color:var(--color-dark)] px-8 py-4 text-base font-semibold text-[color:var(--color-dark)] transition hover:bg-[color:var(--color-dark)] hover:!text-white"
+                      >
+                        Already have an account? Log in
+                      </Link>
+                    </form>
                   </div>
                 ) : isSubscribed ? (
                   <p className="text-[color:var(--color-medium)] font-medium">
@@ -199,11 +218,18 @@ export default function SubscribePage() {
       </main>
       <Footer />
 
+      <NoAccountModal
+        isOpen={showNoAccountModal}
+        onClose={() => setShowNoAccountModal(false)}
+        returnTo="/subscribe"
+      />
+
       <ConfirmSubscriptionModal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
         onConfirm={handleConfirmSubscribe}
         confirming={confirming}
+        title={welcome && user ? `Thank you for signing up, ${user.user_metadata?.full_name || "there"}!` : undefined}
       />
 
       <SubscribeSuccessModal isOpen={showSuccessModal} />

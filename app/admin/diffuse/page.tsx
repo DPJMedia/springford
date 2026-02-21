@@ -1235,7 +1235,9 @@ export default function DiffuseIntegrationPage() {
           },
         ],
         status: "draft" as const,
-        author_name: author, // Use Diffuse.AI as author
+        author_name: author, // Use Diffuse.AI as author (byline)
+        author_id: user?.id ?? null, // Real user who imported
+        updated_by: user?.id ?? null, // Real user who imported (actor for any future notifications)
         section: sections[0] || "general",
         sections: sections,
         category: category,

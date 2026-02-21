@@ -7,6 +7,7 @@ type Props = {
   onClose: () => void;
   onConfirm: () => void;
   confirming?: boolean;
+  title?: string;
 };
 
 export function ConfirmSubscriptionModal({
@@ -14,6 +15,7 @@ export function ConfirmSubscriptionModal({
   onClose,
   onConfirm,
   confirming = false,
+  title = "Confirm subscription",
 }: Props) {
   if (!isOpen) return null;
 
@@ -37,7 +39,7 @@ export function ConfirmSubscriptionModal({
         </button>
 
         <h2 className="text-xl font-semibold text-[color:var(--color-dark)] mb-3">
-          Confirm subscription
+          {title}
         </h2>
         <p className="text-sm text-[color:var(--color-medium)] mb-4">
           Are you sure you want to sign up for the Spring-Ford Press newsletter? You&apos;ll receive our welcome email and be among the first to get neighborhood news.
@@ -60,7 +62,7 @@ export function ConfirmSubscriptionModal({
             type="button"
             onClick={onClose}
             disabled={confirming}
-            className="flex-1 rounded-full border-2 border-[color:var(--color-dark)] px-4 py-2.5 text-sm font-semibold text-[color:var(--color-dark)] transition hover:bg-[color:var(--color-dark)] hover:text-white disabled:opacity-50"
+            className="flex-1 rounded-full border-2 border-[color:var(--color-dark)] px-4 py-2.5 text-sm font-semibold text-[color:var(--color-dark)] transition hover:bg-[color:var(--color-dark)] hover:!text-white disabled:opacity-50"
           >
             Cancel
           </button>

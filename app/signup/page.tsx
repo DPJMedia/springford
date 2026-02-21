@@ -4,16 +4,25 @@ import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
-async function signInWithGoogle(newsletterSubscribed: boolean) {
+function buildCallbackUrl(params: { returnTo?: string }) {
+  const search = new URLSearchParams();
+  if (params.returnTo) search.set("returnTo", params.returnTo);
+  const qs = search.toString();
+  return `${typeof window !== "undefined" ? window.location.origin : ""}/auth/callback${qs ? `?${qs}` : ""}`;
+}
+
+async function signInWithGoogle(returnTo?: string) {
   const supabase = createClient();
+  const redirectTo = buildCallbackUrl({ returnTo });
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${window.location.origin}/auth/callback?newsletter=${newsletterSubscribed ? 'true' : 'false'}`,
+      redirectTo,
       queryParams: {
-        access_type: 'offline',
-        prompt: 'consent',
+        access_type: "offline",
+        prompt: "consent",
       },
     },
   });
@@ -80,12 +89,13 @@ function validatePasswordRequirements(password: string) {
 }
 
 export default function SignupPage() {
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get("returnTo") || "/subscribe";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
-  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -116,23 +126,29 @@ export default function SignupPage() {
     }
 
     // Proceed with signup
-    const { error } = await supabase.auth.signUp({
+    const emailRedirectTo = buildCallbackUrl({ returnTo });
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           full_name: fullName,
           username: username,
-          newsletter_subscribed: newsletterSubscribed,
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo,
       },
     });
 
     if (error) {
       setError(error.message);
       setLoading(false);
+    } else if (data?.session) {
+      // User is logged in (email confirmation disabled) – redirect to returnTo with welcome
+      const url = new URL(returnTo, window.location.origin);
+      url.searchParams.set("welcome", "1");
+      router.replace(url.pathname + url.search);
     } else {
+      // Email confirmation required – show success screen
       setSuccess(true);
       setLoading(false);
     }
@@ -154,8 +170,10 @@ export default function SignupPage() {
               {email}
             </p>
             <p className="text-sm text-[color:var(--color-medium)] leading-relaxed">
-              Please click the confirmation link in your email to activate your account. 
-              You'll be redirected back to the site once confirmed.
+              Please click the confirmation link in your email to activate your account.
+              {returnTo === "/subscribe"
+                ? " You'll be taken right back to claim your free 3 months once confirmed."
+                : " You'll be redirected back to the site once confirmed."}
             </p>
             <div className="mt-6 pt-6 border-t border-[color:var(--color-border)]">
               <p className="text-xs text-[color:var(--color-medium)]">
@@ -200,7 +218,7 @@ export default function SignupPage() {
           {/* Google Sign In */}
           <button
             type="button"
-            onClick={() => signInWithGoogle(newsletterSubscribed)}
+            onClick={() => signInWithGoogle(returnTo)}
             className="w-full flex items-center justify-center gap-3 rounded-lg border-2 border-[color:var(--color-border)] px-4 py-2.5 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition mb-4"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -339,20 +357,6 @@ export default function SignupPage() {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Newsletter Subscription Checkbox */}
-            <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-md border border-[color:var(--color-border)]">
-              <input
-                id="newsletter"
-                type="checkbox"
-                checked={newsletterSubscribed}
-                onChange={(e) => setNewsletterSubscribed(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-[color:var(--color-border)] text-[color:var(--color-riviera-blue)] focus:ring-[color:var(--color-riviera-blue)]"
-              />
-              <label htmlFor="newsletter" className="text-xs text-[color:var(--color-medium)] leading-relaxed cursor-pointer">
-                Sign up for our newsletter to receive weekly highlights on neighborhood stories, council agendas, and upcoming meetings. No spam. Ever.
-              </label>
             </div>
 
             {error && (
