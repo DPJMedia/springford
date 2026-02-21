@@ -1,19 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-async function signInWithGoogle() {
+function buildCallbackUrl(returnTo?: string) {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const params = new URLSearchParams();
+  if (returnTo) params.set("returnTo", returnTo);
+  return `${origin}/auth/callback${params.toString() ? `?${params.toString()}` : ""}`;
+}
+
+async function signInWithGoogle(returnTo?: string) {
   const supabase = createClient();
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: buildCallbackUrl(returnTo),
       queryParams: {
-        access_type: 'offline',
-        prompt: 'consent',
+        access_type: "offline",
+        prompt: "consent",
       },
     },
   });
@@ -22,7 +29,9 @@ async function signInWithGoogle() {
   }
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get("returnTo") || "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -45,7 +54,7 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      router.push("/");
+      router.push(returnTo);
       router.refresh();
     }
   };
@@ -68,7 +77,7 @@ export default function LoginPage() {
           {/* Google Sign In */}
           <button
             type="button"
-            onClick={signInWithGoogle}
+            onClick={() => signInWithGoogle(returnTo)}
             className="w-full flex items-center justify-center gap-3 rounded-lg border-2 border-[color:var(--color-border)] px-4 py-2.5 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition mb-4"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -173,7 +182,7 @@ export default function LoginPage() {
               Don't have an account?
             </p>
             <Link
-              href="/signup"
+              href={returnTo !== "/" ? `/signup?returnTo=${encodeURIComponent(returnTo)}` : "/signup"}
               className="inline-flex w-full items-center justify-center rounded-full border-2 border-[color:var(--color-riviera-blue)] px-4 py-2.5 text-sm font-semibold text-[color:var(--color-riviera-blue)] hover:bg-[color:var(--color-riviera-blue)] hover:text-white transition"
             >
               Create Account
@@ -191,6 +200,18 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center px-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--color-riviera-blue)] border-r-transparent" />
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   );
 }
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
@@ -20,11 +21,26 @@ function SupportPageContent() {
   const searchParams = useSearchParams();
   const success = searchParams.get("success") === "true";
   const canceled = searchParams.get("canceled") === "true";
+  const welcome = searchParams.get("welcome") === "1";
 
+  const [user, setUser] = useState<{ email?: string } | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [selectedAmount, setSelectedAmount] = useState<number>(2500); // $25 default
   const [customDollars, setCustomDollars] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      setUser(u ?? null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u ?? null));
+    });
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   const useCustom = customDollars !== "";
   const customNum = parseFloat(customDollars) || 0;
@@ -35,14 +51,14 @@ function SupportPageContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isValid) return;
+    if (!isValid || !user?.email) return;
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/support/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amountCents }),
+        body: JSON.stringify({ amountCents, customerEmail: user.email }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -80,7 +96,40 @@ function SupportPageContent() {
             </p>
           )}
 
-          {!success && (
+          {authLoading && (
+            <div className="mt-10 flex justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--color-riviera-blue)] border-r-transparent" />
+            </div>
+          )}
+
+          {!authLoading && !user && !success && (
+            <div className="mt-10 rounded-xl border border-[color:var(--color-border)] bg-white p-6 shadow-soft sm:p-8 text-center">
+              <p className="text-[color:var(--color-dark)] font-semibold mb-2">Create an account or sign in to contribute</p>
+              <p className="text-sm text-[color:var(--color-medium)] mb-6">Your thank-you email and receipt will be sent to your Spring-Ford Press account email.</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link
+                  href="/signup?returnTo=/support"
+                  className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-dark)] py-3 px-6 text-sm font-bold text-white hover:bg-[#333] transition"
+                >
+                  Create account
+                </Link>
+                <Link
+                  href="/login?returnTo=/support"
+                  className="inline-flex items-center justify-center rounded-full border-2 border-[color:var(--color-dark)] py-3 px-6 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-[color:var(--color-dark)] hover:text-white transition"
+                >
+                  Log in
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {!success && user && welcome && (
+            <p className="mt-6 text-center text-sm text-[color:var(--color-riviera-blue)] font-medium">
+              Thanks for creating your account. Choose an amount below to contribute.
+            </p>
+          )}
+
+          {!authLoading && user && !success && (
             <form onSubmit={handleSubmit} className="mt-10 rounded-xl border border-[color:var(--color-border)] bg-white p-6 shadow-soft sm:p-8">
               <p className="text-sm font-semibold text-[color:var(--color-dark)] mb-3">Choose an amount</p>
               <div className="flex flex-wrap gap-2 mb-4">

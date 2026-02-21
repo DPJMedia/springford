@@ -90,7 +90,10 @@ SENDGRID_FROM_NAME=Spring-Ford Press
 NEXT_PUBLIC_SITE_URL=https://springford.press
 
 # Stripe (Support / one-time contributions)
-STRIPE_SECRET_KEY=sk_live_...   # Never commit the real key; use .env.local and Vercel env vars
+STRIPE_SECRET_KEY=sk_live_...
+# Required for donation thank-you emails. Create a webhook in Stripe Dashboard → Developers → Webhooks
+# Endpoint URL: https://your-domain.com/api/webhooks/stripe — Events: checkout.session.completed, checkout.session.async_payment_succeeded
+STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
 ### Step 3: Database Setup

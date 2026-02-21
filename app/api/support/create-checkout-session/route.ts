@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const amountCents = Math.round(Number(body.amountCents) || 0);
+    const customerEmail = typeof body.customerEmail === "string" && body.customerEmail.trim() ? body.customerEmail.trim() : undefined;
 
     if (amountCents < MIN_AMOUNT_CENTS) {
       return NextResponse.json(
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
+      ...(customerEmail && { customer_email: customerEmail }),
       line_items: [
         {
           quantity: 1,
