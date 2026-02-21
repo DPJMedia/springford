@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -88,7 +88,7 @@ function validatePasswordRequirements(password: string) {
   return hasMinLength && hasSpecialOrNumber;
 }
 
-export default function SignupPage() {
+function SignupPageContent() {
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/subscribe";
   const [email, setEmail] = useState("");
@@ -431,6 +431,18 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center px-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--color-riviera-blue)] border-r-transparent" />
+      </div>
+    }>
+      <SignupPageContent />
+    </Suspense>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -20,7 +20,7 @@ const SUBSCRIBER_TERMS = [
   "No spam — only what matters to your community",
 ];
 
-export default function SubscribePage() {
+function SubscribePageContent() {
   const searchParams = useSearchParams();
   const welcome = searchParams.get("welcome") === "1";
   const [user, setUser] = useState<any>(null);
@@ -234,5 +234,21 @@ export default function SubscribePage() {
 
       <SubscribeSuccessModal isOpen={showSuccessModal} />
     </>
+  );
+}
+
+export default function SubscribePage() {
+  return (
+    <Suspense fallback={
+      <>
+        <Header />
+        <main className="min-h-screen flex items-center justify-center bg-[color:var(--color-surface)]">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--color-riviera-blue)] border-r-transparent" />
+        </main>
+        <Footer />
+      </>
+    }>
+      <SubscribePageContent />
+    </Suspense>
   );
 }
