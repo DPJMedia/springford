@@ -109,7 +109,8 @@ function SupportPageContent() {
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link
                   href="/signup?returnTo=/support"
-                  className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-dark)] py-3 px-6 text-sm font-bold text-white hover:bg-[#333] transition"
+                  className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-dark)] py-3 px-6 text-sm font-bold hover:bg-[#333] transition"
+                  style={{ color: "#ffffff" }}
                 >
                   Create account
                 </Link>

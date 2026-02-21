@@ -74,8 +74,9 @@ export function NotificationBell() {
       return;
     }
 
-    setNotifications(data || []);
-    setUnreadCount(data?.filter((n) => !n.is_read).length || 0);
+    const filtered = (data || []).filter((n) => !isDiffuseAiNotification(n));
+    setNotifications(filtered);
+    setUnreadCount(filtered.filter((n) => !n.is_read).length);
   }
 
   async function markAsRead(notificationId: string) {
@@ -94,6 +95,19 @@ export function NotificationBell() {
       .eq("id", notificationId);
 
     loadNotifications();
+  }
+
+  function isDiffuseAiNotification(n: Notification): boolean {
+    const name = (n.actor_name || "").toLowerCase();
+    const msg = (n.message || "").toLowerCase();
+    return (
+      name.includes("powered by diffuse") ||
+      name.includes("diffuse.ai") ||
+      name.includes("diffuse ai") ||
+      msg.includes("powered by diffuse") ||
+      msg.includes("diffuse.ai edited") ||
+      msg.includes("diffuse ai edited")
+    );
   }
 
   function getTargetUrl(notification: Notification): string {
