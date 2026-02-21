@@ -3,7 +3,10 @@ import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://springford.press";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.springford.press";
+const TOS_URL = SITE_URL.replace(/\/$/, "") + "/terms-of-service";
+const PRIVACY_URL = SITE_URL.replace(/\/$/, "") + "/privacy-policy";
+const CONTACT_URL = SITE_URL.replace(/\/$/, "") + "/contact";
 
 function buildThankYouEmailHtml(amountDollars: string, receiptUrl: string | null): string {
   const receiptSection = receiptUrl
@@ -46,8 +49,14 @@ function buildThankYouEmailHtml(amountDollars: string, receiptUrl: string | null
             </td>
           </tr>
         </table>
-        <p style="margin: 24px 0 0; font-size: 13px; color: #666666;">
+        <p style="margin: 24px 0 0; font-size: 13px; color: #666666; text-align: center;">
           <a href="${SITE_URL}" style="color: #2b8aa8; text-decoration: underline;">Spring-Ford Press</a>
+          &nbsp;|&nbsp;
+          <a href="${TOS_URL}" style="color: #2b8aa8; text-decoration: underline;">Terms of Service</a>
+          &nbsp;|&nbsp;
+          <a href="${PRIVACY_URL}" style="color: #2b8aa8; text-decoration: underline;">Privacy Policy</a>
+          &nbsp;|&nbsp;
+          <a href="${CONTACT_URL}" style="color: #2b8aa8; text-decoration: underline;">Contact Us</a>
         </p>
       </td>
     </tr>
@@ -121,7 +130,7 @@ export async function POST(request: NextRequest) {
   }
 
   const html = buildThankYouEmailHtml(amountDollars, receiptUrl);
-  const plainText = `Thank you for your contribution to Spring-Ford Press.\n\nAmount: ${amountDollars}\n\n${receiptUrl ? `View your receipt: ${receiptUrl}\n\n` : ""}— The Spring-Ford Press team\n${SITE_URL}`;
+  const plainText = `Thank you for your contribution to Spring-Ford Press.\n\nAmount: ${amountDollars}\n\n${receiptUrl ? `View your receipt: ${receiptUrl}\n\n` : ""}— The Spring-Ford Press team\n\nSpring-Ford Press: ${SITE_URL}\nTerms of Service: ${TOS_URL}\nPrivacy Policy: ${PRIVACY_URL}\nContact Us: ${CONTACT_URL}`;
 
   try {
     const res = await fetch(SENDGRID_API_URL, {

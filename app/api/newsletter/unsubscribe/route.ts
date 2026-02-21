@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 const SITE_URL = "https://www.springford.press";
+const TOS_URL = "https://www.springford.press/terms-of-service";
+const PRIVACY_URL = "https://www.springford.press/privacy-policy";
+const CONTACT_URL = "https://www.springford.press/contact";
 
 function buildDepartureEmailHtml(): string {
   return `<!DOCTYPE html>
@@ -41,7 +44,13 @@ function buildDepartureEmailHtml(): string {
           <tr>
             <td style="padding: 20px 48px 24px; border-top: 1px solid #e5e5e5; text-align: center;">
               <p style="margin: 0; font-size: 12px; color: #666666;">
-                <a href="${SITE_URL}" style="color: #000000;">Spring-Ford Press</a>
+                <a href="${SITE_URL}" style="color: #000000; text-decoration: underline;">Spring-Ford Press</a>
+                &nbsp;|&nbsp;
+                <a href="${TOS_URL}" style="color: #000000; text-decoration: underline;">Terms of Service</a>
+                &nbsp;|&nbsp;
+                <a href="${PRIVACY_URL}" style="color: #000000; text-decoration: underline;">Privacy Policy</a>
+                &nbsp;|&nbsp;
+                <a href="${CONTACT_URL}" style="color: #000000; text-decoration: underline;">Contact Us</a>
               </p>
             </td>
           </tr>
@@ -101,7 +110,7 @@ export async function POST(request: Request) {
           {
             type: "text/plain",
             value:
-              "We're sorry to see you go.\n\nYou've been unsubscribed from the Spring-Ford Press newsletter. If you change your mind, you can resubscribe at springford.press/subscribe.\n\n— The Spring-Ford Press team",
+              "We're sorry to see you go.\n\nYou've been unsubscribed from the Spring-Ford Press newsletter. If you change your mind, you can resubscribe at springford.press/subscribe.\n\n— The Spring-Ford Press team\n\nSpring-Ford Press: " + SITE_URL + "\nTerms of Service: " + TOS_URL + "\nPrivacy Policy: " + PRIVACY_URL + "\nContact Us: " + CONTACT_URL,
           },
           {
             type: "text/html",

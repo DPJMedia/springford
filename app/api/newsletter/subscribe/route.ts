@@ -7,6 +7,7 @@ const SENDGRID_API_URL = 'https://api.sendgrid.com/v3/mail/send'
 const SITE_URL = 'https://www.springford.press'
 const TOS_URL = 'https://www.springford.press/terms-of-service'
 const PRIVACY_URL = 'https://www.springford.press/privacy-policy'
+const CONTACT_URL = 'https://www.springford.press/contact'
 
 // Site fonts: masthead=Playfair Display, headlines=Newsreader, body=Red Hat Display
 const FONTS_LINK = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Newsreader:ital,wght@0,400;0,600;0,700&family=Red+Hat+Display:wght@400;500;600&display=swap'
@@ -61,6 +62,8 @@ function buildWelcomeEmailHtml(): string {
                 <a href="${TOS_URL}" style="color: #000000; text-decoration: underline;">Terms of Service</a>
                 &nbsp;|&nbsp;
                 <a href="${PRIVACY_URL}" style="color: #000000; text-decoration: underline;">Privacy Policy</a>
+                &nbsp;|&nbsp;
+                <a href="${CONTACT_URL}" style="color: #000000; text-decoration: underline;">Contact Us</a>
               </p>
               <p style="margin: 12px 0 0; font-size: 12px; color: #666666; text-align: center; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif;">
                 Neighborhood-First Reporting
@@ -108,7 +111,7 @@ export async function POST(request: Request) {
       content: [
         {
           type: 'text/plain',
-          value: 'Welcome to the Spring-Ford Press Newsletter.\n\nYou\'re part of a group that gets the news first. As a subscriber, you\'ll be among the first to know when new articles publish, with access to premium stories and exclusive neighborhood coverage.\n\nWe\'ll send you our weekly briefing and timely updates—no spam, just what matters to you and your community.\n\n— The Spring-Ford Press team\n\nSpring-Ford Press: ' + SITE_URL + '\nTerms of Service: ' + TOS_URL + '\nPrivacy Policy: ' + PRIVACY_URL,
+          value: 'Welcome to the Spring-Ford Press Newsletter.\n\nYou\'re part of a group that gets the news first. As a subscriber, you\'ll be among the first to know when new articles publish, with access to premium stories and exclusive neighborhood coverage.\n\nWe\'ll send you our weekly briefing and timely updates—no spam, just what matters to you and your community.\n\n— The Spring-Ford Press team\n\nSpring-Ford Press: ' + SITE_URL + '\nTerms of Service: ' + TOS_URL + '\nPrivacy Policy: ' + PRIVACY_URL + '\nContact Us: ' + CONTACT_URL,
         },
         {
           type: 'text/html',
