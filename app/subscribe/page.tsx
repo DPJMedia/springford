@@ -66,7 +66,10 @@ export default function SubscribePage() {
     try {
       const { error: updateError } = await supabase
         .from("user_profiles")
-        .update({ newsletter_subscribed: true })
+        .update({
+          newsletter_subscribed: true,
+          newsletter_subscribed_at: new Date().toISOString(),
+        })
         .eq("id", user.id);
       if (updateError) throw updateError;
       setShowConfirmModal(false);

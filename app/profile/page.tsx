@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { CancelNewsletterModal } from "@/components/CancelNewsletterModal";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -25,6 +26,11 @@ export default function ProfilePage() {
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Newsletter tab and cancel
+  const [activeTab, setActiveTab] = useState<"profile" | "newsletter">("profile");
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   
   const router = useRouter();
   const supabase = createClient();
@@ -222,6 +228,22 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleCancelNewsletter() {
+    setCancelling(true);
+    try {
+      const res = await fetch("/api/newsletter/unsubscribe", { method: "POST" });
+      if (!res.ok) throw new Error("Failed to unsubscribe");
+      setShowCancelModal(false);
+      setProfile({ ...profile, newsletter_subscribed: false, newsletter_subscribed_at: null });
+      setSuccess("You have been unsubscribed. A confirmation email has been sent.");
+      setTimeout(() => setSuccess(null), 5000);
+    } catch {
+      setError("Failed to unsubscribe. Please try again.");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   function getInitials(name: string | null, email: string | null): string {
     if (name) {
       const parts = name.split(' ');
@@ -275,7 +297,35 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {/* Tabs */}
+        <div className="flex gap-1 mb-4 border-b border-[color:var(--color-border)]">
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className={`px-4 py-3 text-sm font-semibold transition border-b-2 -mb-px ${
+              activeTab === "profile"
+                ? "border-[color:var(--color-dark)] text-[color:var(--color-dark)]"
+                : "border-transparent text-[color:var(--color-medium)] hover:text-[color:var(--color-dark)]"
+            }`}
+          >
+            Profile
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("newsletter")}
+            className={`px-4 py-3 text-sm font-semibold transition border-b-2 -mb-px ${
+              activeTab === "newsletter"
+                ? "border-[color:var(--color-dark)] text-[color:var(--color-dark)]"
+                : "border-transparent text-[color:var(--color-medium)] hover:text-[color:var(--color-dark)]"
+            }`}
+          >
+            Newsletter
+          </button>
+        </div>
+
         <div className="bg-white rounded-lg shadow-sm border border-[color:var(--color-border)] p-6">
+          {activeTab === "profile" ? (
+          <>
           {/* Profile Picture Section */}
           <div className="flex items-center gap-6 mb-8 pb-8 border-b border-[color:var(--color-border)]">
             <div className="relative">
@@ -355,10 +405,10 @@ export default function ProfilePage() {
                   </h2>
                   {profile.newsletter_subscribed ? (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold border border-amber-200">
-                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .55-.45 1-1 1H6c-.55 0-1-.45-1-1v-1h14v1z" />
                       </svg>
-                      Premium Member
+                      Newsletter Subscriber
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-2">
@@ -520,8 +570,86 @@ export default function ProfilePage() {
               </p>
             </div>
           </div>
+          </>
+          ) : (
+          /* Newsletter tab */
+          <div className="space-y-6">
+            {!profile.newsletter_subscribed ? (
+              <>
+                <h2 className="text-lg font-semibold text-[color:var(--color-dark)]">
+                  Newsletter subscription
+                </h2>
+                <p className="text-sm text-[color:var(--color-medium)]">
+                  Get the latest neighborhood news, premium articles, and exclusive updates by subscribing to the Spring-Ford Press newsletter.
+                </p>
+                <Link
+                  href="/subscribe"
+                  className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-opacity-90"
+                >
+                  Subscribe
+                </Link>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-semibold text-[color:var(--color-dark)]">
+                  Newsletter subscription
+                </h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-[color:var(--color-medium)] mb-1">
+                      Subscribed since
+                    </label>
+                    <p className="text-sm text-[color:var(--color-dark)]">
+                      {profile.newsletter_subscribed_at
+                        ? new Date(profile.newsletter_subscribed_at).toLocaleDateString(undefined, {
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[color:var(--color-medium)] mb-1">
+                      Plan
+                    </label>
+                    <p className="text-sm font-semibold text-[color:var(--color-dark)]">
+                      Free tier — 3 months free
+                    </p>
+                    <p className="text-xs text-[color:var(--color-medium)] mt-0.5">
+                      You are not being charged.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-[color:var(--color-border)]">
+                  <h3 className="text-sm font-semibold text-[color:var(--color-dark)] mb-2">
+                    Cancel newsletter
+                  </h3>
+                  <p className="text-xs text-[color:var(--color-medium)] mb-3">
+                    Unsubscribe from the Spring-Ford Press newsletter. You will receive a confirmation email and can resubscribe anytime.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelModal(true)}
+                    className="text-sm font-semibold text-red-600 hover:text-red-700 underline"
+                  >
+                    Cancel newsletter
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          )}
         </div>
       </div>
+
+      <CancelNewsletterModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={handleCancelNewsletter}
+        cancelling={cancelling}
+      />
     </div>
   );
 }
