@@ -24,14 +24,7 @@ function buildWelcomeEmailHtml(): string {
 <body style="margin:0; padding:0; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif; background-color: #e8e8e8;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #e8e8e8;">
     <tr>
-      <td style="padding: 24px 20px 16px; text-align: center;">
-        <p style="margin: 0; font-size: 12px; color: #666666; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif;">
-          <a href="${SITE_URL}" style="color: #333333; text-decoration: underline;">Trouble viewing this email? View in web browser</a>
-        </p>
-      </td>
-    </tr>
-    <tr>
-      <td align="center" style="padding: 16px 20px 32px;">
+      <td align="center" style="padding: 24px 20px 32px;">
         <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #000000; letter-spacing: -0.02em; font-family: 'Playfair Display', Didot, 'Bodoni MT', serif;">Spring-Ford Press</h1>
       </td>
     </tr>
