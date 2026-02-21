@@ -3,11 +3,10 @@ import { NextResponse } from 'next/server'
 
 const SENDGRID_API_URL = 'https://api.sendgrid.com/v3/mail/send'
 
-// Site colors: riviera-blue #2b8aa8, dark #1a1a1a, medium #666666
+// White-and-black aesthetic; no logo image (email clients often block SVGs)
 function buildWelcomeEmailHtml(siteBaseUrl: string): string {
-  const logoUrl = siteBaseUrl
-    ? `${siteBaseUrl.replace(/\/$/, '')}/springford-press-logo.svg`
-    : ''
+  const siteHost = siteBaseUrl ? siteBaseUrl.replace(/^https?:\/\//, '').replace(/\/$/, '') : 'springford.press'
+  const siteLink = siteBaseUrl ? siteBaseUrl.replace(/\/$/, '') : 'https://springford.press'
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -15,43 +14,40 @@ function buildWelcomeEmailHtml(siteBaseUrl: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Thank you for subscribing</title>
 </head>
-<body style="margin:0; padding:0; font-family: Georgia, 'Times New Roman', serif; background-color: #fafafa;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #fafafa; min-height: 100vh;">
+<body style="margin:0; padding:0; font-family: Georgia, 'Times New Roman', serif; background-color: #ffffff;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #ffffff;">
     <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 520px; background: #ffffff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.08); overflow: hidden;">
+      <td align="center" style="padding: 48px 24px 56px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 640px; background: #ffffff; border: 1px solid #e5e5e5; border-radius: 2px;">
           <tr>
-            <td style="background: linear-gradient(135deg, #2b8aa8 0%, #57959f 100%); padding: 40px 32px; text-align: center;">
-              ${logoUrl ? `<img src="${logoUrl}" alt="Spring-Ford Press" width="180" height="95" style="display: inline-block; max-width: 180px; height: auto;" />` : ''}
-              ${!logoUrl ? '<span style="font-size: 28px; font-weight: bold; color: #ffffff; letter-spacing: -0.02em;">Spring-Ford Press</span>' : ''}
+            <td style="padding: 48px 56px 32px; border-bottom: 1px solid #e5e5e5;">
+              <p style="margin: 0 0 8px; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #666666;">Newsletter</p>
+              <h1 style="margin: 0 0 4px; font-size: 32px; font-weight: 700; color: #000000; letter-spacing: -0.02em;">Spring-Ford Press</h1>
+              <p style="margin: 0; font-size: 14px; color: #666666;"><a href="${siteLink}" style="color: #000000; text-decoration: none;">${siteHost}</a></p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 36px 32px 32px;">
-              <h1 style="margin: 0 0 16px; font-size: 24px; font-weight: 700; color: #1a1a1a; letter-spacing: -0.02em;">
+            <td style="padding: 40px 56px 48px;">
+              <h2 style="margin: 0 0 24px; font-size: 26px; font-weight: 700; color: #000000; letter-spacing: -0.02em;">
                 Thank you for subscribing!
-              </h1>
-              <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #1a1a1a;">
+              </h2>
+              <p style="margin: 0 0 20px; font-size: 18px; line-height: 1.65; color: #1a1a1a;">
                 You're all set. We'll keep you updated with the latest neighborhood stories, local news, council agendas, and upcoming meetings.
               </p>
-              <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #666666;">
+              <p style="margin: 0 0 32px; font-size: 17px; line-height: 1.65; color: #333333;">
                 Look for our weekly briefing in your inbox. No spam—just what matters to you and your community.
               </p>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top: 28px;">
-                <tr>
-                  <td>
-                    <div style="width: 60px; height: 4px; background-color: #2b8aa8; border-radius: 2px;"></div>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin: 24px 0 0; font-size: 14px; color: #666666;">
+              <p style="margin: 0; font-size: 16px; color: #333333;">
                 — The Spring-Ford Press team
               </p>
             </td>
           </tr>
           <tr>
-            <td style="padding: 20px 32px; background-color: #fafafa; border-top: 1px solid rgba(0,0,0,0.08); text-align: center;">
-              <p style="margin: 0; font-size: 12px; color: #666666;">
+            <td style="padding: 28px 56px 32px; border-top: 1px solid #e5e5e5; text-align: center;">
+              <p style="margin: 0; font-size: 14px; color: #333333;">
+                <a href="${siteLink}" style="color: #000000; text-decoration: underline;">${siteHost}</a>
+              </p>
+              <p style="margin: 10px 0 0; font-size: 12px; color: #666666;">
                 Neighborhood-First Reporting
               </p>
               <p style="margin: 4px 0 0; font-size: 11px; color: #999999;">
@@ -102,7 +98,7 @@ export async function POST(request: Request) {
       content: [
         {
           type: 'text/plain',
-          value: 'Thank you for subscribing to the Spring-Ford Press newsletter.\n\nWe\'ll keep you updated with neighborhood stories, local news, council agendas, and upcoming meetings. Look for our weekly briefing in your inbox. No spam—just what matters to you and your community.\n\n— The Spring-Ford Press team',
+          value: 'Thank you for subscribing to the Spring-Ford Press newsletter.\n\nWe\'ll keep you updated with neighborhood stories, local news, council agendas, and upcoming meetings. Look for our weekly briefing in your inbox. No spam—just what matters to you and your community.\n\n— The Spring-Ford Press team\n\nspringford.press',
         },
         {
           type: 'text/html',
