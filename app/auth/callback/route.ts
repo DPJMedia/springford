@@ -36,12 +36,53 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && data.session && data.user) {
+      const user = data.user
+      const meta = user.user_metadata || {}
+      const provider = (user.app_metadata?.provider as string) ?? user.identities?.[0]?.provider
+
+      // Google sign-in: sync name, avatar, and ensure profile exists; redirect to set username if missing
+      if (provider === 'google') {
+        const fullName = meta.full_name ?? meta.name ?? null
+        const avatarUrl = meta.avatar_url ?? meta.picture ?? null
+
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('id, username')
+          .eq('id', user.id)
+          .single()
+
+        const updates: Record<string, unknown> = {}
+        if (fullName) updates.full_name = fullName
+        if (avatarUrl) updates.avatar_url = avatarUrl
+        if (Object.keys(updates).length > 0) {
+          await supabase
+            .from('user_profiles')
+            .update(updates)
+            .eq('id', user.id)
+        }
+
+        const needsUsername = !profile?.username || profile.username.trim() === ''
+        if (needsUsername) {
+          const setUsernamePath = '/auth/set-username'
+          const returnToParam = returnTo ? `returnTo=${encodeURIComponent(returnTo)}` : ''
+          const nextParam = searchParams.get('next') && !returnTo ? `next=${encodeURIComponent(searchParams.get('next')!)}` : ''
+          const qs = [returnToParam, nextParam].filter(Boolean).join('&')
+          const redirectUrlSetUsername = `${origin}${setUsernamePath}${qs ? `?${qs}` : ''}`
+          const response = NextResponse.redirect(redirectUrlSetUsername)
+          const sessionCookies = [
+            { name: 'sb-access-token', value: data.session.access_token, options: { path: '/', maxAge: 60 * 60 * 24 * 7 } },
+            { name: 'sb-refresh-token', value: data.session.refresh_token, options: { path: '/', maxAge: 60 * 60 * 24 * 7 } },
+          ]
+          sessionCookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
+          return response
+        }
+      }
+
       // Handle newsletter subscription preference
       const newsletterSubscribed = newsletterParam === 'true' || 
         (data.user.user_metadata?.newsletter_subscribed === true)
       
       if (newsletterSubscribed) {
-        // Update user profile with newsletter preference
         await supabase
           .from('user_profiles')
           .update({ newsletter_subscribed: true })
