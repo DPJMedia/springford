@@ -82,6 +82,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 # DiffuseAI Supabase (for integration)
 NEXT_PUBLIC_DIFFUSE_SUPABASE_URL=https://ddwcafuxatmejxcfkwhu.supabase.co
 NEXT_PUBLIC_DIFFUSE_ANON_KEY=your_diffuse_anon_key_here
+
+# SendGrid (newsletter welcome emails)
+SENDGRID_API_KEY=your_sendgrid_api_key_here
+SENDGRID_FROM_EMAIL=admin@dpjmedia.com
+SENDGRID_FROM_NAME=Spring-Ford Press
+NEXT_PUBLIC_SITE_URL=https://springford.press
 ```
 
 ### Step 3: Database Setup
