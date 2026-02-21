@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -71,8 +71,18 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [showWeakPasswordWarning, setShowWeakPasswordWarning] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  // Ensure we have a session from the reset link (established by auth/callback)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setHasSession(!!session);
+      setSessionReady(true);
+    });
+  }, []);
 
   const passwordStrength = useMemo(() => calculatePasswordStrength(password), [password]);
   const meetsRequirements = useMemo(() => validatePasswordRequirements(password), [password]);
@@ -118,6 +128,47 @@ export default function ResetPasswordPage() {
       }, 2000);
     }
   };
+
+  // Waiting for session check
+  if (!sessionReady) {
+    return (
+      <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center px-4">
+        <div className="w-full max-w-md text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[color:var(--color-riviera-blue)] border-r-transparent mb-4" />
+          <p className="text-sm text-[color:var(--color-medium)]">Checking your link...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No session: link expired or opened page directly
+  if (!hasSession) {
+    return (
+      <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center px-4">
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-lg p-8 shadow-soft ring-1 ring-[color:var(--color-border)] text-center">
+            <h2 className="text-xl font-semibold text-[color:var(--color-dark)] mb-3">
+              Invalid or expired link
+            </h2>
+            <p className="text-sm text-[color:var(--color-medium)] mb-6">
+              Your reset link may have expired or is invalid. Please request a new password reset link.
+            </p>
+            <Link
+              href="/forgot-password"
+              className="inline-block rounded-full bg-[color:var(--color-riviera-blue)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#2b7a92]"
+            >
+              Request new reset link
+            </Link>
+            <div className="mt-4">
+              <Link href="/login" className="text-sm text-[color:var(--color-medium)] hover:underline">
+                ← Back to login
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (success) {
     return (

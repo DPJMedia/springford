@@ -47,8 +47,9 @@ export async function GET(request: Request) {
           .eq('id', data.user.id)
       }
       
-      // Create response with redirect
-      const redirectUrl = `${origin}/auth/confirm`
+      // Redirect to requested page (e.g. /reset-password) or default confirm
+      const nextPath = searchParams.get('next') || '/auth/confirm'
+      const redirectUrl = nextPath.startsWith('/') ? `${origin}${nextPath}` : `${origin}/auth/confirm`
       const response = NextResponse.redirect(redirectUrl)
       
       // Set session cookies explicitly
