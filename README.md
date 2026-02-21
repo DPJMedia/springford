@@ -88,6 +88,9 @@ SENDGRID_API_KEY=your_sendgrid_api_key_here
 SENDGRID_FROM_EMAIL=admin@dpjmedia.com
 SENDGRID_FROM_NAME=Spring-Ford Press
 NEXT_PUBLIC_SITE_URL=https://springford.press
+
+# Stripe (Support / one-time contributions)
+STRIPE_SECRET_KEY=sk_live_...   # Never commit the real key; use .env.local and Vercel env vars
 ```
 
 ### Step 3: Database Setup

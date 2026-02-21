@@ -166,6 +166,12 @@ export function Header() {
               >
                 Advertise
               </Link>
+              <Link
+                href="/support"
+                className="rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
+              >
+                Support
+              </Link>
               {!newsletterSubscribed && (
                 <Link
                   href="/subscribe"
@@ -253,6 +259,12 @@ export function Header() {
                 Advertise
               </Link>
               <Link
+                href="/support"
+                className="rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
+              >
+                Support
+              </Link>
+              <Link
                 href="/subscribe"
                 className="rounded-full bg-[color:var(--color-riviera-blue)] px-2 sm:px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition flex-shrink-0"
               >
@@ -282,6 +294,13 @@ export function Header() {
               </svg>
               Search
             </button>
+            <Link
+              href="/support"
+              onClick={() => setShowMobileNav(false)}
+              className="rounded-full border border-[color:var(--color-border)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition"
+            >
+              Support
+            </Link>
             {(!user || !newsletterSubscribed) && (
               <Link
                 href="/subscribe"

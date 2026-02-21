@@ -16,7 +16,7 @@ export function Footer() {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs">
-            <a href="mailto:news@dpjmedia.com" className="hover:text-[color:var(--color-dark)] transition">
+            <a href="/contact" className="hover:text-[color:var(--color-dark)] transition">
               Contact
             </a>
             <a href="/terms-of-service" className="hover:text-[color:var(--color-dark)] transition">
