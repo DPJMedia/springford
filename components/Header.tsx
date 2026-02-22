@@ -103,12 +103,12 @@ export function Header() {
   }, [showMenu]);
 
   return (
-    <header className="sticky top-0 z-20 border-b border-[color:var(--color-border)] bg-white backdrop-blur w-full max-w-[100vw] overflow-x-hidden">
+    <header className="sticky top-0 z-20 border-b border-[color:var(--color-border)] bg-white backdrop-blur">
       {/* Main Header */}
-      <div className="relative mx-auto flex w-full max-w-none items-center justify-between gap-2 px-3 py-1.5 sm:px-6 lg:px-8 min-w-0">
+      <div className="relative mx-auto flex w-full max-w-none items-center justify-between gap-2 px-3 py-1.5 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 flex-shrink-0 z-10 min-w-0">
-          <span className="masthead text-lg sm:text-xl font-semibold text-[color:var(--color-dark)] whitespace-nowrap truncate" style={{ letterSpacing: '-0.02em' }}>
+        <Link href="/" className="flex items-center gap-2 flex-shrink-0 z-10">
+          <span className="masthead text-lg sm:text-xl font-semibold text-[color:var(--color-dark)] whitespace-nowrap" style={{ letterSpacing: '-0.02em' }}>
             Spring-Ford Press
           </span>
         </Link>
@@ -126,28 +126,12 @@ export function Header() {
           ))}
         </nav>
 
-        {/* Mobile right side: only below 2xl */}
-        <div className="flex items-center gap-1.5 2xl:hidden flex-shrink-0 z-10 min-w-0">
-          {user ? (
-            <Link href="/profile" className="flex items-center rounded-full p-1 hover:bg-gray-100 transition flex-shrink-0" aria-label="My profile">
-              <Avatar src={userAvatar} name={userName} email={user.email} size="sm" />
-            </Link>
-          ) : (
-            <Link href="/login" className="rounded-full bg-[color:var(--color-riviera-blue)] px-2.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 flex-shrink-0">
-              Log in
-            </Link>
-          )}
-          <Link href="/support" className="rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0 whitespace-nowrap">
-            Support
-          </Link>
-          {!newsletterSubscribed && (
-            <Link href="/subscribe" className="rounded-full bg-[color:var(--color-riviera-blue)] px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition flex-shrink-0 whitespace-nowrap">
-              Subscribe
-            </Link>
-          )}
+        {/* Right Side - Search, Advertise, Subscribe, User Menu & Mobile Toggle */}
+        <div className="flex items-center gap-2 flex-shrink-0 z-10">
+          {/* Hamburger Menu Button - Visible below 2xl to prevent nav/button overlap */}
           <button
             onClick={() => setShowMobileNav(!showMobileNav)}
-            className="flex items-center gap-1 p-2 rounded-md hover:bg-gray-100 flex-shrink-0"
+            className="2xl:hidden flex items-center gap-1 p-2 rounded-md hover:bg-gray-100"
             aria-label="Toggle menu"
           >
             <svg className="w-6 h-6 text-[color:var(--color-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -159,10 +143,7 @@ export function Header() {
             </svg>
             <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-medium)]">menu</span>
           </button>
-        </div>
 
-        {/* Desktop right side: exact original bar, only visible at 2xl+ (no hamburger - original had it 2xl:hidden) */}
-        <div className="hidden 2xl:flex items-center gap-2 flex-shrink-0 z-10">
           {user ? (
             <>
               {isAdmin && <NotificationBell />}
@@ -300,7 +281,7 @@ export function Header() {
         </div>
       </div>
 
-      {/* Mobile Navigation Dropdown - Search, Advertise, Notifications (if admin), Profile/Logout, nav links */}
+      {/* Mobile Navigation Dropdown */}
       {showMobileNav && (
         <div className="2xl:hidden border-t border-[color:var(--color-border)] bg-white">
           <div className="px-4 py-3 flex flex-wrap gap-2 border-b border-[color:var(--color-border)]">
@@ -314,34 +295,22 @@ export function Header() {
               Search
             </button>
             <Link
-              href="/advertise"
+              href="/support"
               onClick={() => setShowMobileNav(false)}
               className="rounded-full border border-[color:var(--color-border)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition"
             >
-              Advertise
+              Support
             </Link>
-            {user && isAdmin && (
-              <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
-                <NotificationBell />
-              </div>
+            {(!user || !newsletterSubscribed) && (
+              <Link
+                href="/subscribe"
+                onClick={() => setShowMobileNav(false)}
+                className="rounded-full bg-[color:var(--color-riviera-blue)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition"
+              >
+                Subscribe
+              </Link>
             )}
           </div>
-          {user && (
-            <div className="px-4 py-2 border-b border-[color:var(--color-border)] space-y-0">
-              <Link href="/profile" onClick={() => setShowMobileNav(false)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-100 rounded-md transition">
-                <Avatar src={userAvatar} name={userName} email={user.email} size="sm" />
-                My Profile
-              </Link>
-              {isAdmin && (
-                <Link href="/admin" onClick={() => setShowMobileNav(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-[color:var(--color-dark)] hover:bg-gray-100 rounded-md transition">
-                  Dashboard
-                </Link>
-              )}
-              <button onClick={() => { setShowMobileNav(false); handleLogout(); }} className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-100 rounded-md w-full text-left">
-                Log out
-              </button>
-            </div>
-          )}
           <nav className="px-4 py-3 space-y-1">
             {nav.map((item) => (
               <a
