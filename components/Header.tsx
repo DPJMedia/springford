@@ -126,8 +126,8 @@ export function Header() {
           ))}
         </nav>
 
-        {/* Right Side - Mobile: Login/PFP, Support, Subscribe, Menu. Desktop (2xl+): full bar unchanged */}
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 z-10 min-w-0">
+        {/* Right Side - Mobile: Login/PFP, Support, Subscribe, Menu. Desktop (2xl+): exact original bar */}
+        <div className="flex items-center gap-2 flex-shrink-0 z-10 min-w-0">
           {/* Mobile only: Login or Avatar, Support, Subscribe */}
           <div className="flex items-center gap-1.5 2xl:hidden">
             {user ? (
@@ -164,12 +164,11 @@ export function Header() {
             <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-medium)]">menu</span>
           </button>
 
-          {/* Desktop only (2xl+): full bar - Search, Advertise, Support, Subscribe, User dropdown */}
-          <div className="hidden 2xl:flex items-center gap-2">
+          {/* Desktop (2xl+): same as original - direct children, no wrapper */}
           {user ? (
             <>
-              {isAdmin && <NotificationBell />}
-              <div className="relative">
+              {isAdmin && <div className="hidden 2xl:block"><NotificationBell /></div>}
+              <div className="relative hidden 2xl:block">
                 <button
                   ref={searchButtonRef}
                   onClick={() => setShowSearch(!showSearch)}
@@ -184,25 +183,25 @@ export function Header() {
               </div>
               <Link
                 href="/advertise"
-                className="rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
+                className="hidden 2xl:inline-flex rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
               >
                 Advertise
               </Link>
               <Link
                 href="/support"
-                className="rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
+                className="hidden 2xl:inline-flex rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
               >
                 Support
               </Link>
               {!newsletterSubscribed && (
                 <Link
                   href="/subscribe"
-                  className="rounded-full bg-[color:var(--color-riviera-blue)] px-2 sm:px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition flex-shrink-0"
+                  className="hidden 2xl:inline-flex rounded-full bg-[color:var(--color-riviera-blue)] px-2 sm:px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition flex-shrink-0"
                 >
                   Subscribe
                 </Link>
               )}
-              <div className="relative user-menu">
+              <div className="relative user-menu hidden 2xl:block">
                 <button
                   onClick={() => setShowMenu(!showMenu)}
                   className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-gray-100 px-2 sm:px-3 py-1.5 hover:bg-gray-200 transition"
@@ -261,7 +260,7 @@ export function Header() {
             </>
           ) : (
             <>
-              <div className="relative">
+              <div className="relative hidden 2xl:block">
                 <button
                   ref={searchButtonRef}
                   onClick={() => setShowSearch(!showSearch)}
@@ -276,31 +275,30 @@ export function Header() {
               </div>
               <Link
                 href="/advertise"
-                className="rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
+                className="hidden 2xl:inline-flex rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
               >
                 Advertise
               </Link>
               <Link
                 href="/support"
-                className="rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
+                className="hidden 2xl:inline-flex rounded-full border border-[color:var(--color-border)] bg-white px-2 sm:px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
               >
                 Support
               </Link>
               <Link
                 href="/subscribe"
-                className="rounded-full bg-[color:var(--color-riviera-blue)] px-2 sm:px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition flex-shrink-0"
+                className="hidden 2xl:inline-flex rounded-full bg-[color:var(--color-riviera-blue)] px-2 sm:px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition flex-shrink-0"
               >
                 Subscribe
               </Link>
               <Link
                 href="/login"
-                className="rounded-full bg-[color:var(--color-riviera-blue)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-opacity-90"
+                className="hidden 2xl:inline-flex rounded-full bg-[color:var(--color-riviera-blue)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-opacity-90"
               >
                 Log in
               </Link>
             </>
           )}
-          </div>
         </div>
       </div>
 
