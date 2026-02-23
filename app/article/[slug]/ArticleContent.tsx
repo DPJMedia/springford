@@ -416,6 +416,15 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                                 p: ({ ...props }) => (
                                   <p {...props} className="mb-4 leading-relaxed" />
                                 ),
+                                ul: ({ ...props }) => (
+                                  <ul {...props} className="markdown-list markdown-list-ul" style={{ listStyleType: 'disc', paddingLeft: '1.5rem', marginLeft: '1.5rem' }} />
+                                ),
+                                ol: ({ ...props }) => (
+                                  <ol {...props} className="markdown-list markdown-list-ol" style={{ listStyleType: 'decimal', paddingLeft: '1.5rem', marginLeft: '1.5rem' }} />
+                                ),
+                                li: ({ ...props }) => (
+                                  <li {...props} className="markdown-list-item" style={{ marginBottom: '0.5rem' }} />
+                                ),
                               }}
                             >
                               {block.content || ''}
@@ -463,6 +472,15 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                         ),
                         p: ({ ...props }) => (
                           <p {...props} className="mb-4 leading-relaxed" />
+                        ),
+                        ul: ({ ...props }) => (
+                          <ul {...props} className="markdown-list markdown-list-ul" style={{ listStyleType: 'disc', paddingLeft: '1.5rem', marginLeft: '1.5rem' }} />
+                        ),
+                        ol: ({ ...props }) => (
+                          <ol {...props} className="markdown-list markdown-list-ol" style={{ listStyleType: 'decimal', paddingLeft: '1.5rem', marginLeft: '1.5rem' }} />
+                        ),
+                        li: ({ ...props }) => (
+                          <li {...props} className="markdown-list-item" style={{ marginBottom: '0.5rem' }} />
                         ),
                       }}
                     >

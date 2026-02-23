@@ -133,14 +133,32 @@ a {
   color: #1d4ed8;
 }
 
+/* Bullet and numbered lists: circle bullets, indented */
 .markdown-content ul,
 .markdown-content ol {
   margin-left: 1.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
+  margin-top: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-content ul {
+  list-style-type: disc !important;
+  list-style-position: outside !important;
+}
+
+.markdown-content ul li::marker {
+  color: var(--color-dark);
+}
+
+.markdown-content ol {
+  list-style-type: decimal !important;
+  list-style-position: outside !important;
 }
 
 .markdown-content li {
   margin-bottom: 0.5rem;
+  padding-left: 0.25rem;
 }
 
 /* Subscribe page benefits animation */

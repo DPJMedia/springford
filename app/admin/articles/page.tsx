@@ -57,7 +57,7 @@ export default function ArticlesManagementPage() {
       clearInterval(refreshInterval);
       clearInterval(timeInterval);
     };
-  }, [filter, isAdmin]);
+  }, [isAdmin]);
 
   async function checkAdminAndFetchArticles() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -99,7 +99,7 @@ export default function ArticlesManagementPage() {
 
   async function fetchArticles() {
     setLoading(true);
-    
+
     // First, auto-publish any scheduled articles whose time has arrived
     try {
       const { data: publishResult } = await supabase.rpc('auto_publish_scheduled_articles');
@@ -109,18 +109,12 @@ export default function ArticlesManagementPage() {
     } catch (error) {
       console.error("Error auto-publishing:", error);
     }
-    
-    // Then fetch all articles
-    let query = supabase
+
+    // Always fetch all articles so tab counts are accurate; we filter for display in the UI
+    const { data, error } = await supabase
       .from("articles")
       .select("id, title, section, status, published_at, scheduled_for, created_at, author_name, view_count, share_count")
       .order("created_at", { ascending: false });
-
-    if (filter !== "all" && filter !== "placements") {
-      query = query.eq("status", filter);
-    }
-
-    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching articles:", error);
@@ -129,6 +123,13 @@ export default function ArticlesManagementPage() {
     }
     setLoading(false);
   }
+
+  // Tab counts: derived from full list so "All" = published + scheduled + draft (what the page shows)
+  const allCount = articles.filter((a) => a.status !== "archived").length;
+  const publishedCount = articles.filter((a) => a.status === "published").length;
+  const draftCount = articles.filter((a) => a.status === "draft").length;
+  const scheduledCount = articles.filter((a) => a.status === "scheduled").length;
+  const archivedCount = articles.filter((a) => a.status === "archived").length;
 
   async function deleteArticle(id: string) {
     if (!confirm("Are you sure you want to delete this article?")) return;
@@ -253,7 +254,7 @@ export default function ArticlesManagementPage() {
                     : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
                 }`}
               >
-                All ({articles.length})
+                All ({allCount})
               </button>
               <button
                 onClick={() => setFilter("published")}
@@ -263,7 +264,7 @@ export default function ArticlesManagementPage() {
                     : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
                 }`}
               >
-                Published
+                Published ({publishedCount})
               </button>
               <button
                 onClick={() => setFilter("draft")}
@@ -273,7 +274,7 @@ export default function ArticlesManagementPage() {
                     : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
                 }`}
               >
-                Drafts
+                Drafts ({draftCount})
               </button>
               <button
                 onClick={() => setFilter("scheduled")}
@@ -283,7 +284,7 @@ export default function ArticlesManagementPage() {
                     : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
                 }`}
               >
-                Scheduled
+                Scheduled ({scheduledCount})
               </button>
               <button
                 onClick={() => setFilter("archived")}
@@ -293,7 +294,7 @@ export default function ArticlesManagementPage() {
                     : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
                 }`}
               >
-                Archived
+                Archived ({archivedCount})
               </button>
               <button
                 onClick={() => setFilter("placements")}

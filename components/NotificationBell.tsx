@@ -170,7 +170,7 @@ export function NotificationBell() {
       </button>
 
       {showDropdown && (
-        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl ring-1 ring-black ring-opacity-5 z-50 max-h-[500px] overflow-hidden flex flex-col">
+        <div className="absolute left-0 mt-2 w-96 bg-white rounded-lg shadow-xl ring-1 ring-black ring-opacity-5 z-50 max-h-[500px] overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h3 className="text-sm font-bold text-gray-900">Notifications</h3>
             {unreadCount > 0 && (

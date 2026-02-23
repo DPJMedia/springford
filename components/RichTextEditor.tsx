@@ -56,24 +56,101 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     }
   }, [articleSearchQuery, articles]);
 
-  // Handle @ symbol for article mentions
+  // Show circular bullet (•) and indent in editor; store as "- " for markdown
+  const toDisplay = (markdown: string) =>
+    (markdown ?? "").replace(/(^|\n)(\s*)([-*])(\s)/g, "$1  •$4");
+  const toMarkdown = (display: string) =>
+    (display ?? "").replace(/(^|\n)(\s*)•(\s)/g, "$1-$3");
+
+  // Cursor position: textarea shows display string; we edit markdown. Convert between them.
+  const markdownToDisplayPosition = (markdown: string, mdPos: number): number => {
+    let extra = 0;
+    const re = /(^|\n)(\s*)([-*])(\s)/g;
+    let m;
+    while ((m = re.exec(markdown)) !== null) {
+      if (m.index + m[0].length <= mdPos) extra += 2;
+      else break;
+    }
+    return mdPos + extra;
+  };
+  const displayToMarkdownPosition = (display: string, dispPos: number): number => {
+    let subtract = 0;
+    const re = /(^|\n)(\s*)•(\s)/g;
+    let m;
+    while ((m = re.exec(display)) !== null) {
+      if (m.index + m[0].length <= dispPos) subtract += 2;
+      else break;
+    }
+    return dispPos - subtract;
+  };
+
+  // Handle @ symbol, Escape, and bullet list Enter / Shift+Enter
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "@") {
       setShowArticleSearch(true);
       setArticleSearchQuery("");
-    } else if (e.key === "Escape") {
+      return;
+    }
+    if (e.key === "Escape") {
       setShowArticleSearch(false);
       setShowLinkModal(false);
+      return;
+    }
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const displayValue = toDisplay(value);
+    const posDisplay = textarea.selectionStart;
+    const pos = displayToMarkdownPosition(displayValue, posDisplay);
+    const lineStart = value.substring(0, pos).lastIndexOf("\n") + 1;
+    const currentLine = value.substring(lineStart).split("\n")[0] || "";
+    const isBulletLine = /^\s*[-*]\s/.test(currentLine);
+
+    if (e.key === "Enter") {
+      const bulletContent = currentLine.replace(/^\s*[-*]\s*/, "").trim();
+      const emptyBulletLine = isBulletLine && !bulletContent;
+
+      if (e.shiftKey) {
+        // Shift+Enter: new line without bullet (exit list)
+        if (isBulletLine) {
+          e.preventDefault();
+          const insert = "\n";
+          const newValue = value.substring(0, pos) + insert + value.substring(pos);
+          onChange(newValue);
+          const newMdPos = pos + insert.length;
+          const newDispPos = markdownToDisplayPosition(newValue, newMdPos);
+          setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(newDispPos, newDispPos);
+          }, 0);
+        }
+        return;
+      }
+      // Enter: if in bullet list, new bullet line (or exit if line is empty, like Google Docs)
+      if (isBulletLine) {
+        e.preventDefault();
+        const insert = emptyBulletLine ? "\n" : "\n- ";
+        const newValue = value.substring(0, pos) + insert + value.substring(pos);
+        onChange(newValue);
+        const newMdPos = pos + insert.length;
+        const newDispPos = markdownToDisplayPosition(newValue, newMdPos);
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(newDispPos, newDispPos);
+        }, 0);
+      }
     }
   };
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    onChange(text);
+    const displayText = e.target.value;
+    const markdown = toMarkdown(displayText);
+    onChange(markdown);
 
-    // Check for @ mentions
+    // Check for @ mentions (use markdown for logic)
     const cursorPosition = e.target.selectionStart;
-    const textBeforeCursor = text.substring(0, cursorPosition);
+    const textBeforeCursor = displayText.substring(0, cursorPosition);
     const lastAtSymbol = textBeforeCursor.lastIndexOf("@");
     
     if (lastAtSymbol !== -1) {
@@ -153,6 +230,65 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     textareaRef.current?.focus();
   };
 
+  const insertBulletList = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const displayValue = toDisplay(value);
+    const startDisp = textarea.selectionStart;
+    const endDisp = textarea.selectionEnd;
+    const start = displayToMarkdownPosition(displayValue, startDisp);
+    const end = displayToMarkdownPosition(displayValue, endDisp);
+    const text = value;
+    const textBeforeSelection = text.substring(0, start);
+    const textAfterSelection = text.substring(end);
+    const selectedText = text.substring(start, end);
+
+    const lineStart = textBeforeSelection.lastIndexOf("\n") + 1;
+    const afterNewline = textAfterSelection.indexOf("\n");
+    const lineEnd = end + (afterNewline >= 0 ? afterNewline : textAfterSelection.length);
+
+    if (selectedText) {
+      // Multiple lines or selection: prefix each line with "- "
+      const lines = selectedText.split("\n");
+      const bulletLines = lines.map((line) => {
+        const trimmed = line.replace(/^\s*[-*]\s*/, "");
+        return trimmed ? `- ${trimmed}` : (line ? `- ${line}` : "- ");
+      });
+      const newSelection = bulletLines.join("\n");
+      const newValue = text.substring(0, start) + newSelection + text.substring(end);
+      onChange(newValue);
+      const newEndMd = start + newSelection.length;
+      const newEndDisp = markdownToDisplayPosition(newValue, newEndMd);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(newEndDisp, newEndDisp);
+      }, 0);
+    } else {
+      // No selection: add/remove bullet at start of current line
+      const currentLine = text.substring(lineStart, lineEnd);
+      const alreadyBullet = /^\s*[-*]\s/.test(currentLine);
+      let newValue: string;
+      let newCursorMd: number;
+
+      if (alreadyBullet) {
+        const withoutBullet = currentLine.replace(/^\s*[-*]\s*/, "");
+        newValue = text.substring(0, lineStart) + withoutBullet + text.substring(lineEnd);
+        newCursorMd = lineStart + withoutBullet.length;
+      } else {
+        const bulletLine = `- ${currentLine}`;
+        newValue = text.substring(0, lineStart) + bulletLine + text.substring(lineEnd);
+        newCursorMd = lineStart + 2; // cursor after "- " (ready to type)
+      }
+      onChange(newValue);
+      const newCursorDisp = markdownToDisplayPosition(newValue, newCursorMd);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(newCursorDisp, newCursorDisp);
+      }, 0);
+    }
+  };
+
   const insertArticleReference = (article: Article) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -206,15 +342,24 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         >
           🔗 Link
         </button>
+        <button
+          type="button"
+          onClick={insertBulletList}
+          className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 flex items-center gap-1"
+          title="Bullet list (prefix line or selection with -)"
+        >
+          <span className="text-lg leading-none">•</span>
+          <span className="text-sm">Bullets</span>
+        </button>
         <div className="text-sm text-gray-500 ml-auto">
           Type <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">@</kbd> to reference articles
         </div>
       </div>
 
-      {/* Textarea */}
+      {/* Textarea: show • (circle) and indent; store as "- " for markdown */}
       <textarea
         ref={textareaRef}
-        value={value}
+        value={toDisplay(value)}
         onChange={handleInput}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
@@ -290,6 +435,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
           <li>• <strong>Bold:</strong> Select text and click B button or use **text**</li>
           <li>• <strong>Italic:</strong> Select text and click I button or use *text*</li>
           <li>• <strong>Link:</strong> Select text, click Link button, enter URL</li>
+          <li>• <strong>Bullets:</strong> Click Bullets to start a list. Enter = new bullet line; Shift+Enter = new line without bullet (like Google Docs).</li>
           <li>• <strong>Reference Article:</strong> Type @ and select from list</li>
         </ul>
       </div>

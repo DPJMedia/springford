@@ -62,7 +62,7 @@ function AdvertisePageContent() {
                     </span>
                   </Link>
                   <h1 className="headline text-2xl font-bold text-[color:var(--color-dark)] leading-tight">
-                    Unlock success with print and digital marketing solutions
+                    Unlock success with digital marketing solutions
                   </h1>
                   <div className="mt-4 h-1 w-16 bg-[color:var(--color-riviera-blue)] rounded" />
                   <p className="mt-6 text-sm text-[color:var(--color-medium)] leading-relaxed">

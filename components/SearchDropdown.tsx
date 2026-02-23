@@ -52,7 +52,7 @@ export function SearchDropdown({ isOpen, onClose, anchorRef }: SearchDropdownPro
   return (
     <div
       ref={containerRef}
-      className="absolute right-0 top-full mt-1 z-50 w-72 sm:w-80"
+      className="absolute left-0 top-full mt-1 z-50 w-72 sm:w-80 min-w-[18rem]"
       role="search"
     >
       <form
