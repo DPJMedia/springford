@@ -34,6 +34,9 @@ export function Footer() {
             <a href="/subscribe" className="hover:text-[color:var(--color-dark)] transition">
               Subscribe
             </a>
+            <a href="/support" className="hover:text-[color:var(--color-dark)] transition">
+              Support
+            </a>
           </div>
         </div>
         <p className="text-xs">Independent, neighborhood-first reporting.</p>
