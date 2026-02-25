@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -257,6 +257,13 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
 
   const articleUrl = `/article/${article.slug}`;
 
+  // Never show "Hero" to readers — use real section or category (e.g. Spring City, Public Meetings)
+  const displaySection =
+    article.section === "hero"
+      ? (article.sections?.[0] || article.category || "News").trim() || "News"
+      : article.section;
+  const displaySectionLabel = displaySection.replace(/-/g, " ");
+
   return (
     <>
       <Header />
@@ -272,13 +279,13 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                 </div>
               )}
 
-              {/* Breadcrumb */}
+              {/* Breadcrumb — never show "Hero"; only real section (e.g. Spring City) */}
               <div className="mb-4 text-sm text-[color:var(--color-medium)]">
                 <Link href="/" className="hover:text-[color:var(--color-riviera-blue)]">
                   Home
                 </Link>
                 <span className="mx-2">›</span>
-                <span className="capitalize">{article.section}</span>
+                <span className="capitalize">{displaySectionLabel}</span>
               </div>
 
               {/* Article Header */}
@@ -289,8 +296,8 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                   </span>
                 )}
                 <div className="text-sm font-semibold text-blue-600 mb-2 uppercase tracking-wide">
-                  {article.section}
-                  {article.category && ` • ${article.category}`}
+                  {displaySectionLabel.toUpperCase()}
+                  {article.category && displaySectionLabel.toLowerCase() !== (article.category || "").toLowerCase() && ` • ${(article.category || "").replace(/-/g, " ").toUpperCase()}`}
                 </div>
                 <h1 className="text-4xl md:text-5xl font-black text-[color:var(--color-dark)] mb-4 leading-tight">
                   {article.title}
@@ -383,76 +390,82 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                 </figure>
               )}
 
-              {/* Article Content */}
-              <div className="prose prose-lg max-w-none mb-8">
-                {article.content_blocks && Array.isArray(article.content_blocks) && article.content_blocks.length > 0 ? (
-                  // Render blocks
-                  article.content_blocks
-                    .sort((a: any, b: any) => a.order - b.order)
-                    .map((block: any) => {
-                      if (block.type === "text") {
-                        return (
-                          <div
-                            key={block.id}
-                            className="text-lg leading-relaxed text-[color:var(--color-dark)] mb-6 article-text-block markdown-content"
-                          >
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                a: ({ ...props }) => (
-                                  <a
-                                    {...props}
-                                    className="text-blue-600 hover:text-blue-800 underline font-normal"
-                                    target={props.href?.startsWith('http') ? '_blank' : undefined}
-                                    rel={props.href?.startsWith('http') ? 'noopener noreferrer' : undefined}
-                                  />
-                                ),
-                                strong: ({ ...props }) => (
-                                  <strong {...props} className="font-bold" style={{ fontWeight: 700 }} />
-                                ),
-                                em: ({ ...props }) => (
-                                  <em {...props} className="italic" style={{ fontStyle: 'italic' }} />
-                                ),
-                                p: ({ ...props }) => (
-                                  <p {...props} className="mb-4 leading-relaxed" />
-                                ),
-                                ul: ({ ...props }) => (
-                                  <ul {...props} className="markdown-list markdown-list-ul" style={{ listStyleType: 'disc', paddingLeft: '1.5rem', marginLeft: '1.5rem' }} />
-                                ),
-                                ol: ({ ...props }) => (
-                                  <ol {...props} className="markdown-list markdown-list-ol" style={{ listStyleType: 'decimal', paddingLeft: '1.5rem', marginLeft: '1.5rem' }} />
-                                ),
-                                li: ({ ...props }) => (
-                                  <li {...props} className="markdown-list-item" style={{ marginBottom: '0.5rem' }} />
-                                ),
-                              }}
-                            >
-                              {block.content || ''}
-                            </ReactMarkdown>
-                          </div>
-                        );
-                      } else if (block.type === "image") {
-                        return (
-                          <figure key={block.id} className="my-8">
-                            <img
-                              src={block.url}
-                              alt={block.caption || "Article image"}
-                              className="w-full rounded-lg shadow-lg"
-                            />
-                            {(block.caption || block.credit) && (
-                              <figcaption className="mt-3 text-sm text-[color:var(--color-medium)] italic">
-                                {block.caption}
-                                {block.credit && ` - Photo: ${block.credit}`}
-                              </figcaption>
-                            )}
-                          </figure>
-                        );
-                      }
-                      return null;
-                    })
-                ) : (
-                  // Fallback for legacy content
-                  <div className="text-lg leading-relaxed text-[color:var(--color-dark)] markdown-content">
+              {/* Article Content — first ad between block 1 and 2, second ad at bottom */}
+              {article.content_blocks && Array.isArray(article.content_blocks) && article.content_blocks.length > 0 ? (
+                <>
+                  <div className="prose prose-lg max-w-none">
+                    {article.content_blocks
+                      .sort((a: any, b: any) => a.order - b.order)
+                      .map((block: any, index: number) => (
+                        <Fragment key={block.id}>
+                          {block.type === "text" ? (
+                            <div className="text-lg leading-relaxed text-[color:var(--color-dark)] mb-6 article-text-block markdown-content">
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  a: ({ ...props }) => (
+                                    <a
+                                      {...props}
+                                      className="text-blue-600 hover:text-blue-800 underline font-normal"
+                                      target={props.href?.startsWith('http') ? '_blank' : undefined}
+                                      rel={props.href?.startsWith('http') ? 'noopener noreferrer' : undefined}
+                                    />
+                                  ),
+                                  strong: ({ ...props }) => (
+                                    <strong {...props} className="font-bold" style={{ fontWeight: 700 }} />
+                                  ),
+                                  em: ({ ...props }) => (
+                                    <em {...props} className="italic" style={{ fontStyle: 'italic' }} />
+                                  ),
+                                  p: ({ ...props }) => (
+                                    <p {...props} className="mb-4 leading-relaxed" />
+                                  ),
+                                  ul: ({ ...props }) => (
+                                    <ul {...props} className="markdown-list markdown-list-ul" style={{ listStyleType: 'disc', paddingLeft: '1.5rem', marginLeft: '1.5rem' }} />
+                                  ),
+                                  ol: ({ ...props }) => (
+                                    <ol {...props} className="markdown-list markdown-list-ol" style={{ listStyleType: 'decimal', paddingLeft: '1.5rem', marginLeft: '1.5rem' }} />
+                                  ),
+                                  li: ({ ...props }) => (
+                                    <li {...props} className="markdown-list-item" style={{ marginBottom: '0.5rem' }} />
+                                  ),
+                                }}
+                              >
+                                {block.content || ''}
+                              </ReactMarkdown>
+                            </div>
+                          ) : block.type === "image" ? (
+                            <figure className="my-8">
+                              <img
+                                src={block.url}
+                                alt={block.caption || "Article image"}
+                                className="w-full rounded-lg shadow-lg"
+                              />
+                              {(block.caption || block.credit) && (
+                                <figcaption className="mt-3 text-sm text-[color:var(--color-medium)] italic">
+                                  {block.caption}
+                                  {block.credit && ` - Photo: ${block.credit}`}
+                                </figcaption>
+                              )}
+                            </figure>
+                          ) : null}
+                          {/* First ad after first content block */}
+                          {index === 0 && (
+                            <div className="my-8 not-prose">
+                              <AdDisplay adSlot="article-inline-1" className="w-full" />
+                            </div>
+                          )}
+                        </Fragment>
+                      ))}
+                  </div>
+                  {/* Second ad at bottom of article */}
+                  <div className="mt-8 mb-8">
+                    <AdDisplay adSlot="article-inline-2" className="w-full" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="prose prose-lg max-w-none mb-8 text-lg leading-relaxed text-[color:var(--color-dark)] markdown-content">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
@@ -487,23 +500,15 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                       {article.content || ''}
                     </ReactMarkdown>
                   </div>
-                )}
-              </div>
-
-              {/* INLINE AD 1 */}
-              <div className="mb-8">
-                <AdDisplay adSlot="article-inline-1" className="w-full" />
-              </div>
-
-              {/* Continue article content... */}
-              <div className="prose prose-lg max-w-none mb-8">
-                {/* Additional content would continue here in a real implementation */}
-              </div>
-
-              {/* INLINE AD 2 */}
-              <div className="mb-8">
-                <AdDisplay adSlot="article-inline-2" className="w-full" />
-              </div>
+                  {/* Legacy single-body: both ads at bottom */}
+                  <div className="mb-8">
+                    <AdDisplay adSlot="article-inline-1" className="w-full" />
+                  </div>
+                  <div className="mb-8">
+                    <AdDisplay adSlot="article-inline-2" className="w-full" />
+                  </div>
+                </>
+              )}
 
               {/* Tags */}
               {article.tags && article.tags.length > 0 && (
