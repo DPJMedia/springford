@@ -207,12 +207,14 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
     }
     fetchAuthorProfile();
 
-    // Fetch related articles from same section
+    // Fetch related articles from same section (use first non-hero section when article is in hero)
+    const nonHero = (article.sections || []).filter((s) => String(s).toLowerCase().trim() !== "hero");
+    const sectionForRelated = nonHero.length > 0 ? nonHero[0] : article.section;
     supabase
       .from("articles")
       .select("*")
       .eq("status", "published")
-      .eq("section", article.section)
+      .eq("section", sectionForRelated)
       .neq("id", article.id)
       .lte("published_at", new Date().toISOString())
       .order("published_at", { ascending: false })
@@ -222,7 +224,7 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
           setRelatedArticles(data);
         }
       });
-  }, [article.id, article.section, article.author_name, supabase]);
+  }, [article.id, article.section, article.sections, article.author_name, supabase]);
 
   // Format dates with time in EST (e.g. "Jan 22, 2026 at 9:31 AM EST")
   const publishedDate = article.published_at
@@ -257,12 +259,18 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
 
   const articleUrl = `/article/${article.slug}`;
 
-  // Never show "Hero" to readers — use real section or category (e.g. Spring City, Public Meetings)
-  const displaySection =
-    article.section === "hero"
-      ? (article.sections?.[0] || article.category || "News").trim() || "News"
-      : article.section;
-  const displaySectionLabel = displaySection.replace(/-/g, " ");
+  // Never show "Hero" to readers. Use first non-hero section from sections array; if only hero is selected, show nothing above title.
+  const nonHeroSections = (article.sections || []).filter(
+    (s) => String(s).toLowerCase().trim() !== "hero"
+  );
+  const displaySection: string | null =
+    article.section !== "hero"
+      ? article.section
+      : nonHeroSections.length > 0
+        ? nonHeroSections[0]
+        : null;
+  const displaySectionLabel = displaySection ? displaySection.replace(/-/g, " ") : "";
+  const showSectionAboveTitle = Boolean(displaySection);
 
   return (
     <>
@@ -279,13 +287,17 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                 </div>
               )}
 
-              {/* Breadcrumb — never show "Hero"; only real section (e.g. Spring City) */}
+              {/* Breadcrumb — only show section when it's not Hero; if only Hero selected, just "Home" */}
               <div className="mb-4 text-sm text-[color:var(--color-medium)]">
                 <Link href="/" className="hover:text-[color:var(--color-riviera-blue)]">
                   Home
                 </Link>
-                <span className="mx-2">›</span>
-                <span className="capitalize">{displaySectionLabel}</span>
+                {showSectionAboveTitle && (
+                  <>
+                    <span className="mx-2">›</span>
+                    <span className="capitalize">{displaySectionLabel}</span>
+                  </>
+                )}
               </div>
 
               {/* Article Header */}
@@ -295,10 +307,12 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                     BREAKING NEWS
                   </span>
                 )}
-                <div className="text-sm font-semibold text-blue-600 mb-2 uppercase tracking-wide">
-                  {displaySectionLabel.toUpperCase()}
-                  {article.category && displaySectionLabel.toLowerCase() !== (article.category || "").toLowerCase() && ` • ${(article.category || "").replace(/-/g, " ").toUpperCase()}`}
-                </div>
+                {showSectionAboveTitle && (
+                  <div className="text-sm font-semibold text-blue-600 mb-2 uppercase tracking-wide">
+                    {displaySectionLabel.toUpperCase()}
+                    {article.category && displaySectionLabel.toLowerCase() !== (article.category || "").toLowerCase() && ` • ${(article.category || "").replace(/-/g, " ").toUpperCase()}`}
+                  </div>
+                )}
                 <h1 className="text-4xl md:text-5xl font-black text-[color:var(--color-dark)] mb-4 leading-tight">
                   {article.title}
                 </h1>
@@ -458,10 +472,12 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                         </Fragment>
                       ))}
                   </div>
-                  {/* Second ad at bottom of article */}
-                  <div className="mt-8 mb-8">
-                    <AdDisplay adSlot="article-inline-2" className="w-full" />
-                  </div>
+                  {/* Second ad only when there are 2+ blocks; single-block articles show only the first ad */}
+                  {article.content_blocks.length > 1 && (
+                    <div className="mt-8 mb-8">
+                      <AdDisplay adSlot="article-inline-2" className="w-full" />
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
