@@ -168,7 +168,7 @@ export function Header() {
           </div>
 
           {/* Center: Logo - dead center; on mobile only, nudge up so aligned with search/hamburger buttons */}
-          <Link href="/" className="flex items-center justify-center flex-shrink-0 z-10 -mt-2 xl:mt-0">
+          <Link href="/" className="flex items-center justify-center flex-shrink-0 z-10 -mt-1.5 xl:mt-0">
             <span className="masthead text-2xl sm:text-3xl font-semibold text-[color:var(--color-dark)] whitespace-nowrap leading-tight" style={{ letterSpacing: "-0.02em" }}>
               Spring-Ford Press
             </span>
