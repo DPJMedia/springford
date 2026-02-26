@@ -15,12 +15,24 @@ interface Notification {
   created_at: string;
 }
 
-export function NotificationBell() {
+type NotificationBellProps = {
+  /** When true, no bell is rendered; parent shows count and panel via isOpen/onClose/onUnreadCountChange */
+  embedded?: boolean;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onUnreadCountChange?: (count: number) => void;
+};
+
+export function NotificationBell({ embedded = false, isOpen = false, onClose, onUnreadCountChange }: NotificationBellProps = {}) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+
+  const isControlled = embedded && onClose !== undefined;
+  const showPanel = isControlled ? isOpen : showDropdown;
+  const setShowPanel = isControlled ? (onClose ? () => onClose() : () => {}) : setShowDropdown;
 
   useEffect(() => {
     loadNotifications();
@@ -47,8 +59,9 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    // Close dropdown when clicking outside
+    // Close dropdown when clicking outside (standalone bell only)
     const handleClickOutside = (event: MouseEvent) => {
+      if (embedded) return;
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
       }
@@ -56,7 +69,7 @@ export function NotificationBell() {
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [embedded]);
 
   async function loadNotifications() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -76,7 +89,9 @@ export function NotificationBell() {
 
     const filtered = (data || []).filter((n) => !isDiffuseAiNotification(n));
     setNotifications(filtered);
-    setUnreadCount(filtered.filter((n) => !n.is_read).length);
+    const count = filtered.filter((n) => !n.is_read).length;
+    setUnreadCount(count);
+    onUnreadCountChange?.(count);
   }
 
   async function markAsRead(notificationId: string) {
@@ -142,35 +157,19 @@ export function NotificationBell() {
     return date.toLocaleDateString();
   }
 
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setShowDropdown(!showDropdown)}
-        className="relative p-2 rounded-full hover:bg-gray-100 transition"
-        aria-label="Notifications"
-      >
-        <svg
-          className="w-5 h-5 text-gray-700"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-          />
-        </svg>
-        {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-600 rounded-full">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
-      </button>
+  useEffect(() => {
+    onUnreadCountChange?.(unreadCount);
+  }, [unreadCount, onUnreadCountChange]);
 
-      {showDropdown && (
-        <div className="absolute left-0 mt-2 w-96 bg-white rounded-lg shadow-xl ring-1 ring-black ring-opacity-5 z-50 max-h-[500px] overflow-hidden flex flex-col">
+  const panel = (
+    <>
+      {showPanel && (
+        <div
+          className={embedded
+            ? "w-full min-w-[18rem] max-h-[500px] overflow-hidden flex flex-col border-0"
+            : "absolute left-0 mt-2 w-96 bg-white rounded-lg shadow-xl ring-1 ring-black ring-opacity-5 z-50 max-h-[500px] overflow-hidden flex flex-col"}
+          ref={embedded ? undefined : dropdownRef}
+        >
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h3 className="text-sm font-bold text-gray-900">Notifications</h3>
             {unreadCount > 0 && (
@@ -210,7 +209,7 @@ export function NotificationBell() {
                         href={getTargetUrl(notification)}
                         onClick={() => {
                           markAsRead(notification.id);
-                          setShowDropdown(false);
+                          setShowPanel(false);
                         }}
                         className="flex-1 min-w-0"
                       >
@@ -283,6 +282,40 @@ export function NotificationBell() {
           )}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return panel;
+  }
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setShowDropdown(!showDropdown)}
+        className="relative p-2 rounded-full hover:bg-gray-100 transition"
+        aria-label="Notifications"
+      >
+        <svg
+          className="w-5 h-5 text-gray-700"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+          />
+        </svg>
+        {unreadCount > 0 && (
+          <span className="absolute top-0 right-0 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-600 rounded-full">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+      {panel}
     </div>
   );
 }

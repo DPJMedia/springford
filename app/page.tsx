@@ -26,15 +26,10 @@ function AdSlot({
   );
 }
 
-// Truncate excerpt to ~2 lines with ellipsis (consistent across all article cards)
-function truncateExcerpt(text: string | null, maxLength = 140): string {
+// Strip HTML from excerpt for display; use with line-clamp-3 for max 3 lines
+function stripExcerptHtml(text: string | null): string {
   if (!text || typeof text !== "string") return "";
-  const stripped = text.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-  if (stripped.length <= maxLength) return stripped;
-  const truncated = stripped.slice(0, maxLength);
-  const lastSpace = truncated.lastIndexOf(" ");
-  const cutAt = lastSpace > maxLength * 0.7 ? lastSpace : maxLength;
-  return truncated.slice(0, cutAt).trim() + "...";
+  return text.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 }
 
 // Article Card Component
@@ -82,7 +77,7 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
               <p className="text-base sm:text-lg md:text-xl text-gray-200 mb-2 sm:mb-3">{article.subtitle}</p>
             )}
             {article.excerpt && (
-              <p className="text-sm sm:text-base text-gray-300">{truncateExcerpt(article.excerpt, 120)}</p>
+              <p className="text-sm sm:text-base text-gray-300 line-clamp-3">{stripExcerptHtml(article.excerpt)}</p>
             )}
             <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-400">
               {article.author_name} • {formattedDate}
@@ -122,8 +117,8 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
               {article.title}
             </h3>
             {article.excerpt && (
-              <p className="text-sm text-[color:var(--color-medium)] mb-3 flex-1">
-                {truncateExcerpt(article.excerpt)}
+              <p className="text-sm text-[color:var(--color-medium)] mb-3 flex-1 line-clamp-3">
+                {stripExcerptHtml(article.excerpt)}
               </p>
             )}
             <div className="text-xs text-[color:var(--color-medium)] mt-auto">
@@ -199,8 +194,8 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
             {article.title}
           </h3>
           {article.excerpt && (
-            <p className="text-sm text-[color:var(--color-medium)] mb-2 flex-1">
-              {truncateExcerpt(article.excerpt)}
+            <p className="text-sm text-[color:var(--color-medium)] mb-2 flex-1 line-clamp-3">
+              {stripExcerptHtml(article.excerpt)}
             </p>
           )}
           <div className="text-xs text-[color:var(--color-medium)] mt-auto">
@@ -212,7 +207,7 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
   );
 }
 
-// Section Component
+// Section Component (except Top Stories: when >3 articles, show "View more" collapsible)
 function NewsSection({ 
   title, 
   articles, 
@@ -222,13 +217,23 @@ function NewsSection({
   articles: Article[]; 
   sectionName: string;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLatest = sectionName.toLowerCase() === "latest";
+  const showViewMore = !isLatest && articles.length > 3;
+  const showViewAll = !isLatest && articles.length > 4;
+  const visibleArticles = isLatest
+    ? articles.slice(0, 3)
+    : showViewMore && !expanded
+      ? articles.slice(0, 3)
+      : articles;
+
   return (
-    <section id={sectionName.toLowerCase()} className="mb-8 scroll-mt-24">
+    <section id={sectionName.toLowerCase()} className="mb-8 scroll-mt-[35vh]">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-black text-[color:var(--color-dark)] pb-2 border-b-4 border-[color:var(--color-riviera-blue)]">
+        <h2 className="text-2xl font-black text-[color:var(--color-dark)] pb-2 border-b-4 border-[color:var(--color-riviera-blue)] w-fit">
           {title}
         </h2>
-        {articles.length > 4 && (
+        {showViewAll && (
           <Link 
             href={`/section/${sectionName.toLowerCase()}`}
             className="text-sm font-semibold text-[color:var(--color-riviera-blue)] hover:underline"
@@ -242,11 +247,25 @@ function NewsSection({
           <p className="text-[color:var(--color-medium)]">No articles in this section yet</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {articles.slice(0, 3).map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {visibleArticles.map((article) => (
+              <ArticleCard key={article.id} article={article} />
+            ))}
+          </div>
+          {showViewMore && (
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className="text-sm font-semibold text-[color:var(--color-dark)] py-2 px-4 rounded border-2 border-[color:var(--color-dark)] bg-white hover:bg-gray-50 transition"
+                aria-expanded={expanded}
+              >
+                {expanded ? "View less" : "View more"}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
@@ -330,14 +349,14 @@ export default function Home() {
         .order("view_count", { ascending: false })
         .limit(4),
       
-      // Latest articles (newest first)
+      // Latest articles (newest first; fetch extra for "View more")
       supabase
         .from("articles")
         .select("*")
         .eq("status", "published")
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .limit(3),
+        .limit(15),
       
       // Trending articles (Most Read - past 30 days)
       supabase
@@ -357,7 +376,7 @@ export default function Home() {
         .contains("sections", ["spring-city"])
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .limit(3),
+        .limit(15),
       
       supabase
         .from("articles")
@@ -366,7 +385,7 @@ export default function Home() {
         .contains("sections", ["royersford"])
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .limit(3),
+        .limit(15),
       
       supabase
         .from("articles")
@@ -375,7 +394,7 @@ export default function Home() {
         .contains("sections", ["limerick"])
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .limit(3),
+        .limit(15),
       
       supabase
         .from("articles")
@@ -384,7 +403,7 @@ export default function Home() {
         .contains("sections", ["upper-providence"])
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .limit(3),
+        .limit(15),
       
       supabase
         .from("articles")
@@ -393,7 +412,7 @@ export default function Home() {
         .contains("sections", ["school-district"])
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .limit(3),
+        .limit(15),
       
       supabase
         .from("articles")
@@ -402,7 +421,7 @@ export default function Home() {
         .contains("sections", ["politics"])
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .limit(3),
+        .limit(15),
       
       supabase
         .from("articles")
@@ -411,7 +430,7 @@ export default function Home() {
         .contains("sections", ["business"])
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .limit(3),
+        .limit(15),
       
       supabase
         .from("articles")
@@ -420,7 +439,7 @@ export default function Home() {
         .contains("sections", ["events"])
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .limit(3),
+        .limit(15),
       
       supabase
         .from("articles")
@@ -429,7 +448,7 @@ export default function Home() {
         .contains("sections", ["opinion"])
         .lte("published_at", now)
         .order("published_at", { ascending: false })
-        .limit(3)
+        .limit(15)
     ]);
 
     // Process results
@@ -507,14 +526,16 @@ export default function Home() {
       </Suspense>
       <main className="bg-[color:var(--color-surface)] min-h-screen">
         {/* Breaking News Banner */}
+        {/* Breaking News: strip under menu bar; expires breaking_news_duration hours after article is marked (set in editor, e.g. 48h) */}
         {breakingNews.length > 0 && (
           <div className="bg-[#1e3a5f] text-white py-3 border-b-2 border-[color:var(--color-riviera-blue)]">
             <div className="mx-auto max-w-7xl px-4">
-              <div className="flex items-center gap-3 overflow-hidden">
-                <span className="font-black text-xs tracking-wider bg-red-600 px-2 py-1 rounded flex-shrink-0">BREAKING</span>
-                <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide whitespace-nowrap">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <span className="font-black text-xs tracking-wider bg-red-600 px-2 py-1 rounded flex-shrink-0">BREAKING NEWS</span>
+                <span className="flex-shrink-0 font-semibold">:</span>
+                <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide whitespace-nowrap min-w-0">
                   {breakingNews.map((article, index) => (
-                    <div key={article.id} className="flex items-center gap-3">
+                    <div key={article.id} className="flex items-center gap-3 flex-shrink-0">
                       <Link 
                         href={`/article/${article.slug}`} 
                         className="hover:underline font-semibold transition-colors hover:text-[color:var(--color-riviera-blue)]"
@@ -573,11 +594,13 @@ export default function Home() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* MAIN CONTENT AREA */}
                 <div className="lg:col-span-8 space-y-8">
-                  {/* Top Stories */}
-                  <section id="top-stories" className="scroll-mt-24">
-                    <h2 className="text-2xl font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-4 border-[color:var(--color-riviera-blue)]">
-                      Top Stories
-                    </h2>
+                  {/* Top Stories - same heading/line style as other sections */}
+                  <section id="top-stories" className="scroll-mt-[35vh]">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-2xl font-black text-[color:var(--color-dark)] pb-2 border-b-4 border-[color:var(--color-riviera-blue)] w-fit">
+                        Top Stories
+                      </h2>
+                    </div>
                     {featuredArticles.length === 0 ? (
                       <div className="bg-white rounded-lg p-8 text-center border-2 border-dashed border-gray-300">
                         <p className="text-[color:var(--color-medium)]">
@@ -809,16 +832,11 @@ export default function Home() {
                     />
                   </div>
 
-                  {/* Editor's Picks - Curated Content */}
-                  <div className="bg-gradient-to-br from-blue-50 to-white rounded-lg p-4 shadow-sm border border-blue-100">
-                    <div className="flex items-center gap-2 mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
-                      <svg className="w-5 h-5 text-[color:var(--color-riviera-blue)]" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                      <h3 className="text-lg font-black text-[color:var(--color-dark)]">
+                  {/* Editor's Picks - same styling as Most Read */}
+                  <div className="bg-white rounded-lg p-4 shadow-sm">
+                    <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
                       Editor's Picks
                     </h3>
-                  </div>
                     {editorsPicks.length === 0 ? (
                       <p className="text-sm text-[color:var(--color-medium)] text-center py-4">
                         No editor's picks yet

@@ -187,8 +187,8 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Quick Actions - 2x2 Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        {/* Quick Actions - same width as stats above */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
           {/* Create New Article */}
           <Link
             href="/admin/articles/new"

@@ -58,10 +58,10 @@ export default function AnalyticsPage() {
   const [completionRate, setCompletionRate] = useState(0);
   
   // Ad metrics
-  const [adSlotPerformance, setAdSlotPerformance] = useState<any[]>([]);
+  const [adSlotPerformance, setAdSlotPerformance] = useState<any[]>([]); // All-time by slot
+  const [currentAdsStats, setCurrentAdsStats] = useState<any[]>([]); // Current active ads, stats since published
+  const [adStatsView, setAdStatsView] = useState<'all-time' | 'current'>('all-time'); // which table to show
   const [topAds, setTopAds] = useState<any[]>([]);
-  const [adViewability, setAdViewability] = useState(0);
-  const [avgTimeInViewport, setAvgTimeInViewport] = useState(0);
   
   // Traffic metrics
   const [trafficSources, setTrafficSources] = useState<any[]>([]);
@@ -280,79 +280,116 @@ export default function AnalyticsPage() {
 
       // === AD PERFORMANCE ===
       
-      // Ad performance by slot
-      const { data: allImpressions } = await supabase
+      // All-time performance by ad slot (no date filter – cumulative forever)
+      const { data: allTimeImpressions } = await supabase
         .from('ad_impressions')
-        .select('ad_slot, ad_id, was_viewed, view_duration_seconds, viewport_position')
-        .gte('viewed_at', startDate.toISOString());
+        .select('ad_slot, ad_id');
 
-      const { data: allClicks } = await supabase
+      const { data: allTimeClicks } = await supabase
         .from('ad_clicks')
-        .select('ad_slot, ad_id')
-        .gte('clicked_at', startDate.toISOString());
+        .select('ad_slot, ad_id');
 
-      // Group by slot
-      const slotMap: Record<string, any> = {};
-      allImpressions?.forEach(imp => {
+      const slotMap: Record<string, { slot: string; impressions: number; clicks: number }> = {};
+      allTimeImpressions?.forEach(imp => {
         if (!slotMap[imp.ad_slot]) {
-          slotMap[imp.ad_slot] = {
-            slot: imp.ad_slot,
-            impressions: 0,
-            viewed: 0,
-            clicks: 0,
-            totalViewTime: 0,
-            aboveFold: 0,
-            midPage: 0,
-            belowFold: 0,
-          };
+          slotMap[imp.ad_slot] = { slot: imp.ad_slot, impressions: 0, clicks: 0 };
         }
         slotMap[imp.ad_slot].impressions++;
-        if (imp.was_viewed) slotMap[imp.ad_slot].viewed++;
-        slotMap[imp.ad_slot].totalViewTime += imp.view_duration_seconds || 0;
-        
-        if (imp.viewport_position === 'above-fold') slotMap[imp.ad_slot].aboveFold++;
-        else if (imp.viewport_position === 'mid-page') slotMap[imp.ad_slot].midPage++;
-        else if (imp.viewport_position === 'below-fold') slotMap[imp.ad_slot].belowFold++;
       });
-
-      allClicks?.forEach(click => {
+      allTimeClicks?.forEach(click => {
         if (slotMap[click.ad_slot]) {
           slotMap[click.ad_slot].clicks++;
         }
       });
-
       const slotPerfArray = Object.values(slotMap).map((slot: any) => ({
         ...slot,
         ctr: slot.impressions > 0 ? (slot.clicks / slot.impressions * 100).toFixed(2) : '0.00',
-        viewability: slot.impressions > 0 ? (slot.viewed / slot.impressions * 100).toFixed(2) : '0.00',
-        avgViewTime: slot.viewed > 0 ? Math.round(slot.totalViewTime / slot.viewed) : 0,
       }));
       setAdSlotPerformance(slotPerfArray);
 
-      // Overall ad viewability
-      const totalViewed = allImpressions?.filter(i => i.was_viewed).length || 0;
-      const totalImps = allImpressions?.length || 0;
-      setAdViewability(totalImps > 0 ? (totalViewed / totalImps * 100) : 0);
-
-      // Average time in viewport
-      const totalViewTime = allImpressions?.reduce((sum, i) => sum + (i.view_duration_seconds || 0), 0) || 0;
-      setAvgTimeInViewport(totalViewed > 0 ? Math.round(totalViewTime / totalViewed) : 0);
-
-      // Top performing ads
-      const adMap: Record<string, any> = {};
-      allImpressions?.forEach(imp => {
-        if (!adMap[imp.ad_id]) {
-          adMap[imp.ad_id] = { adId: imp.ad_id, impressions: 0, clicks: 0 };
+      // Current Ad Stats: active ads with stats since published (per ad per slot)
+      const nowIso = now.toISOString();
+      const { data: assignments } = await supabase
+        .from('ad_slot_assignments')
+        .select('ad_id, ad_slot, ads!inner(id, title, start_date, end_date, is_active)');
+      const activeAssignments = (assignments || []).filter(
+        (a: any) => {
+          const ad = a.ads;
+          if (!ad) return false;
+          return ad.is_active !== false &&
+            new Date(ad.start_date) <= now &&
+            new Date(ad.end_date || 0) >= now;
         }
+      );
+      // If no assignments, fallback to legacy: ads with ad_slot set, active and in range
+      let currentAdSlots: { ad_id: string; ad_slot: string; title: string | null; start_date: string }[] = [];
+      if (activeAssignments.length > 0) {
+        currentAdSlots = activeAssignments.map((a: any) => ({
+          ad_id: a.ad_id,
+          ad_slot: a.ad_slot,
+          title: a.ads?.title ?? null,
+          start_date: a.ads?.start_date ?? new Date(0).toISOString(),
+        }));
+      } else {
+        const { data: legacyAds } = await supabase
+          .from('ads')
+          .select('id, title, start_date, ad_slot')
+          .eq('is_active', true)
+          .lte('start_date', nowIso)
+          .gte('end_date', nowIso);
+        legacyAds?.forEach((ad: any) => {
+          currentAdSlots.push({
+            ad_id: ad.id,
+            ad_slot: ad.ad_slot || 'unknown',
+            title: ad.title,
+            start_date: ad.start_date,
+          });
+        });
+      }
+      const currentStats = await Promise.all(
+        currentAdSlots.map(async (row) => {
+          const { count: impCount } = await supabase
+            .from('ad_impressions')
+            .select('*', { count: 'exact', head: true })
+            .eq('ad_id', row.ad_id)
+            .eq('ad_slot', row.ad_slot)
+            .gte('viewed_at', row.start_date);
+          const { count: clickCount } = await supabase
+            .from('ad_clicks')
+            .select('*', { count: 'exact', head: true })
+            .eq('ad_id', row.ad_id)
+            .eq('ad_slot', row.ad_slot)
+            .gte('clicked_at', row.start_date);
+          const impressions = impCount ?? 0;
+          const clicks = clickCount ?? 0;
+          return {
+            name: row.title || 'Untitled',
+            ad_slot: row.ad_slot,
+            impressions,
+            clicks,
+            ctr: impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '0.00',
+          };
+        })
+      );
+      setCurrentAdsStats(currentStats);
+
+      // Top performing ads (time-range filtered, for the sidebar widget)
+      const { data: rangeImpressions } = await supabase
+        .from('ad_impressions')
+        .select('ad_id')
+        .gte('viewed_at', startDate.toISOString());
+      const { data: rangeClicks } = await supabase
+        .from('ad_clicks')
+        .select('ad_id')
+        .gte('clicked_at', startDate.toISOString());
+      const adMap: Record<string, { adId: string; impressions: number; clicks: number }> = {};
+      rangeImpressions?.forEach(imp => {
+        if (!adMap[imp.ad_id]) adMap[imp.ad_id] = { adId: imp.ad_id, impressions: 0, clicks: 0 };
         adMap[imp.ad_id].impressions++;
       });
-
-      allClicks?.forEach(click => {
-        if (adMap[click.ad_id]) {
-          adMap[click.ad_id].clicks++;
-        }
+      rangeClicks?.forEach(click => {
+        if (adMap[click.ad_id]) adMap[click.ad_id].clicks++;
       });
-
       const topAdsArray = Object.values(adMap)
         .map((ad: any) => ({
           ...ad,
@@ -450,10 +487,12 @@ export default function AnalyticsPage() {
         .not('state', 'is', null);
 
       const stateSessionsMap: Record<string, Set<string>> = {};
+      const devCitiesForState = ['Santa Clara', 'San Jose', 'Mountain View', 'Palo Alto', 'Sunnyvale', 'Development'];
       stateData?.forEach(s => {
-        // Exclude development states
-        const isExcluded = ['Unknown', 'Local'].includes(s.state);
-        
+        // Exclude development states and localhost/proxy (California + dev city)
+        const isExcluded =
+          ['Unknown', 'Local'].includes(s.state) ||
+          (s.state === 'California' && s.city && devCitiesForState.includes(s.city));
         if (s.state && !isExcluded) {
           if (!stateSessionsMap[s.state]) {
             stateSessionsMap[s.state] = new Set();
@@ -889,29 +928,9 @@ export default function AnalyticsPage() {
             <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Advertisement Performance</h2>
           </div>
 
-          {/* Ad quick stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-orange-500">
-              <div className="text-2xl font-black text-orange-600 mb-1">
-                {adViewability.toFixed(1)}%
-              </div>
-              <div className="text-sm font-semibold text-gray-600 flex items-center">
-                Ad Viewability Rate
-                <InfoTooltip text="Percentage of ad impressions that were actually visible on screen for at least 1 second at 50%+ visibility. Industry standard for viewability." />
-              </div>
-              <div className="text-xs text-gray-500 mt-1">Ads actually seen by users</div>
-            </div>
-            <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-pink-500">
-              <div className="text-2xl font-black text-pink-600 mb-1">
-                {avgTimeInViewport}s
-              </div>
-              <div className="text-sm font-semibold text-gray-600 flex items-center">
-                Avg Time in Viewport
-                <InfoTooltip text="Average duration ads remain visible on screen. Tracked using Intersection Observer API when ads are 50%+ visible." />
-              </div>
-              <div className="text-xs text-gray-500 mt-1">How long ads are visible</div>
-            </div>
-            <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-green-500">
+          {/* Ad quick stat: revenue only */}
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
+            <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-green-500 max-w-xs">
               <div className="text-2xl font-black text-green-600 mb-1">
                 ${revenueEst.toFixed(2)}
               </div>
@@ -919,46 +938,104 @@ export default function AnalyticsPage() {
                 Est. Revenue (CPM $5)
                 <InfoTooltip text="Estimated advertising revenue calculated at $5 per 1,000 impressions (CPM). Actual rates vary by ad network and demand." />
               </div>
-              <div className="text-xs text-gray-500 mt-1">Based on impressions</div>
+              <div className="text-xs text-gray-500 mt-1">Based on impressions (selected time range)</div>
             </div>
           </div>
 
-          {/* Ad Slot Performance Table */}
+          {/* Performance by ad slot: toggle between All-Time and Current Ad Stats */}
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setAdStatsView('all-time')}
+              className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                adStatsView === 'all-time'
+                  ? 'bg-[color:var(--color-riviera-blue)] text-white'
+                  : 'bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200'
+              }`}
+            >
+              All-Time Performance by Ad Slot
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdStatsView('current')}
+              className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                adStatsView === 'current'
+                  ? 'bg-[color:var(--color-riviera-blue)] text-white'
+                  : 'bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200'
+              }`}
+            >
+              Current Ad Stats
+            </button>
+          </div>
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-lg font-bold text-[color:var(--color-dark)]">Performance by Ad Slot</h3>
-            </div>
-            {adSlotPerformance.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">No ad impression data yet</div>
+            {adStatsView === 'all-time' ? (
+              <>
+                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                  <h3 className="text-lg font-bold text-[color:var(--color-dark)]">All-Time Performance by Ad Slot</h3>
+                  <p className="text-xs text-gray-500 mt-1">Cumulative impressions and clicks per slot (no reset).</p>
+                </div>
+                {adSlotPerformance.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">No ad impression data yet</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Slot</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Impressions</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Clicks</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CTR</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {adSlotPerformance.map((slot) => (
+                          <tr key={slot.slot} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{slot.slot}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{slot.impressions}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{slot.clicks}</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-green-600">{slot.ctr}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Slot</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Impressions</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Viewed</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Clicks</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CTR</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Viewability</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg View Time</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {adSlotPerformance.map((slot) => (
-                      <tr key={slot.slot} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{slot.slot}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{slot.impressions}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{slot.viewed}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{slot.clicks}</td>
-                        <td className="px-4 py-3 text-sm font-semibold text-green-600">{slot.ctr}%</td>
-                        <td className="px-4 py-3 text-sm font-semibold text-blue-600">{slot.viewability}%</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{slot.avgViewTime}s</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                  <h3 className="text-lg font-bold text-[color:var(--color-dark)]">Current Ad Stats</h3>
+                  <p className="text-xs text-gray-500 mt-1">Active ads on the site and their performance since being published.</p>
+                </div>
+                {currentAdsStats.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">No active ads right now</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ad Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ad Slot</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Impressions</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Clicks</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CTR</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {currentAdsStats.map((row, idx) => (
+                          <tr key={`${row.ad_slot}-${row.name}-${idx}`} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.name}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{row.ad_slot}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{row.impressions}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{row.clicks}</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-green-600">{row.ctr}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

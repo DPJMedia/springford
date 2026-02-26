@@ -25,6 +25,13 @@ const SECTION_TITLES: Record<string, string> = {
   "technology": "Technology",
   "opinion": "Opinion",
   "latest": "Latest News",
+  "spring-city": "Spring City",
+  "royersford": "Royersford",
+  "limerick": "Limerick",
+  "upper-providence": "Upper Providence",
+  "school-district": "School District",
+  "politics": "Politics",
+  "events": "Events",
 };
 
 export default function SectionPage({ params }: { params: Promise<{ section: string }> }) {
@@ -85,11 +92,27 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
     });
   };
 
+  const stripExcerptHtml = (text: string | null) => {
+    if (!text || typeof text !== "string") return "";
+    return text.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  };
+
   return (
     <>
       <Header />
       <main className="bg-[color:var(--color-surface)] min-h-screen">
         <div className="mx-auto max-w-7xl px-4 py-8">
+          {/* Go back to homepage */}
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--color-riviera-blue)] hover:underline mb-6"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Go back to homepage
+          </Link>
+
           {/* Section Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-black text-[color:var(--color-dark)] mb-2">
@@ -139,10 +162,10 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
                 <Link
                   key={article.id}
                   href={`/article/${article.slug}`}
-                  className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group"
+                  className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group flex flex-col h-full"
                 >
                   {article.image_url && (
-                    <div className="relative aspect-video overflow-hidden">
+                    <div className="relative aspect-video overflow-hidden flex-shrink-0">
                       {article.is_advertisement && (
                         <span className="absolute top-2 left-2 z-10 inline-flex items-center px-2 py-0.5 rounded bg-gray-800/70 text-white/90 text-[10px] font-medium uppercase tracking-wider">
                           Advertisement
@@ -155,30 +178,18 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
                       />
                     </div>
                   )}
-                  <div className="p-4 relative">
-                    {(article.is_advertisement || article.category) && (
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {article.is_advertisement && (
-                          <span className="inline-block px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-gray-600 bg-gray-100 rounded">
-                            Advertisement
-                          </span>
-                        )}
-                        {article.category && (
-                          <span className="inline-block px-2 py-1 text-xs font-bold text-[color:var(--color-riviera-blue)] bg-blue-50 rounded">
-                            {article.category}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-2 group-hover:text-[color:var(--color-riviera-blue)] transition">
+                  <div className="p-4 flex flex-col flex-1 min-h-0">
+                    <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-2 group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2 min-h-[3.25rem] flex-shrink-0">
                       {article.title}
                     </h3>
-                    {article.excerpt && (
-                      <p className="text-sm text-[color:var(--color-medium)] mb-3 line-clamp-2">
-                        {article.excerpt}
+                    {article.excerpt ? (
+                      <p className="text-sm text-[color:var(--color-medium)] mb-3 line-clamp-3 min-h-[3.75rem] flex-shrink-0">
+                        {stripExcerptHtml(article.excerpt)}
                       </p>
+                    ) : (
+                      <div className="min-h-[3.75rem] mb-3 flex-shrink-0" />
                     )}
-                    <div className="flex items-center justify-between text-xs text-[color:var(--color-medium)]">
+                    <div className="mt-auto flex items-center justify-between text-xs text-[color:var(--color-medium)] flex-shrink-0">
                       <span>{article.author_name || "Staff"}</span>
                       <span>{formattedDate(article.published_at)}</span>
                     </div>

@@ -21,6 +21,14 @@ interface Article {
   image_url?: string | null;
 }
 
+type SortOption =
+  | "date-newest"
+  | "date-oldest"
+  | "title-az"
+  | "title-za"
+  | "views-high"
+  | "views-low";
+
 export default function ArticlesManagementPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,8 +37,13 @@ export default function ArticlesManagementPage() {
   const [editorsPicks, setEditorsPicks] = useState<string[]>([]);
   const [mostReadOverrides, setMostReadOverrides] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("date-newest");
+  const [currentPage, setCurrentPage] = useState(1);
   const router = useRouter();
   const supabase = createClient();
+
+  const ROWS_PER_PAGE = 10;
 
   useEffect(() => {
     checkAdminAndFetchArticles();
@@ -130,6 +143,59 @@ export default function ArticlesManagementPage() {
   const draftCount = articles.filter((a) => a.status === "draft").length;
   const scheduledCount = articles.filter((a) => a.status === "scheduled").length;
   const archivedCount = articles.filter((a) => a.status === "archived").length;
+
+  // Tab-filtered list (same logic as table)
+  const tabFiltered = articles.filter((article) => {
+    if (filter === "all") return article.status !== "archived";
+    if (filter === "archived") return article.status === "archived";
+    return article.status === filter;
+  });
+
+  const searchLower = searchQuery.trim().toLowerCase();
+  const searchFiltered =
+    !searchLower
+      ? tabFiltered
+      : tabFiltered.filter(
+          (a) =>
+            a.title?.toLowerCase().includes(searchLower) ||
+            (a.author_name ?? "").toLowerCase().includes(searchLower)
+        );
+
+  const sortedList = [...searchFiltered].sort((a, b) => {
+    switch (sortBy) {
+      case "date-newest":
+        return (
+          new Date(b.published_at || b.created_at).getTime() -
+          new Date(a.published_at || a.created_at).getTime()
+        );
+      case "date-oldest":
+        return (
+          new Date(a.published_at || a.created_at).getTime() -
+          new Date(b.published_at || b.created_at).getTime()
+        );
+      case "title-az":
+        return (a.title ?? "").localeCompare(b.title ?? "");
+      case "title-za":
+        return (b.title ?? "").localeCompare(a.title ?? "");
+      case "views-high":
+        return b.view_count - a.view_count;
+      case "views-low":
+        return a.view_count - b.view_count;
+      default:
+        return 0;
+    }
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sortedList.length / ROWS_PER_PAGE));
+  const paginatedList = sortedList.slice(
+    (currentPage - 1) * ROWS_PER_PAGE,
+    currentPage * ROWS_PER_PAGE
+  );
+
+  // Reset to page 1 when tab, search, or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, searchQuery, sortBy]);
 
   async function deleteArticle(id: string) {
     if (!confirm("Are you sure you want to delete this article?")) return;
@@ -296,16 +362,6 @@ export default function ArticlesManagementPage() {
               >
                 Archived ({archivedCount})
               </button>
-              <button
-                onClick={() => setFilter("placements")}
-                className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
-                  filter === "placements"
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200"
-                }`}
-              >
-                Article Placements
-              </button>
             </div>
             <Link
               href="/"
@@ -316,143 +372,37 @@ export default function ArticlesManagementPage() {
           </div>
         </div>
 
-        {/* Article Placements View */}
-        {filter === "placements" ? (
-          <div className="space-y-6">
-            {/* Editor's Picks Section */}
-            <div className="bg-white rounded-lg p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <svg className="w-6 h-6 text-[color:var(--color-riviera-blue)]" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-                <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Editor's Picks</h2>
-              </div>
-              <p className="text-sm text-[color:var(--color-medium)] mb-4">
-                Select up to 3 published articles to feature in the Editor's Picks section on the homepage.
-              </p>
-              <div className="space-y-3">
-                {loading ? (
-                  <p className="text-sm text-gray-500">Loading articles...</p>
-                ) : (
-                  [0, 1, 2].map((index) => (
-                    <div key={index} className="flex items-center gap-3">
-                      <span className="text-sm font-semibold text-gray-500 w-8">#{index + 1}</span>
-                      <select
-                        value={editorsPicks[index] || ""}
-                        onChange={(e) => {
-                          const newPicks = [...editorsPicks];
-                          newPicks[index] = e.target.value;
-                          setEditorsPicks(newPicks);
-                        }}
-                        className="flex-1 border border-gray-300 rounded-md px-4 py-2"
-                      >
-                        <option value="">Select an article...</option>
-                        {articles
-                          .filter((a) => a.status === "published")
-                          .map((article) => (
-                            <option key={article.id} value={article.id}>
-                              {article.title}
-                            </option>
-                          ))}
-                      </select>
-                      {editorsPicks[index] && (
-                        <button
-                          onClick={() => {
-                            const newPicks = [...editorsPicks];
-                            newPicks[index] = "";
-                            setEditorsPicks(newPicks);
-                          }}
-                          className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-              <button
-                onClick={async () => {
-                  const filteredPicks = editorsPicks.filter(Boolean);
-                  try {
-                    // Replace all picks in DB
-                    await supabase.from("editors_picks").delete().in("position", [1, 2, 3]);
-                    for (let i = 0; i < filteredPicks.length; i++) {
-                      await supabase.from("editors_picks").insert({
-                        article_id: filteredPicks[i],
-                        position: i + 1,
-                      });
-                    }
-                    alert(`Editor's Picks saved successfully! (${filteredPicks.length} articles selected)`);
-                  } catch (err) {
-                    console.error(err);
-                    alert("Failed to save Editor's Picks. Please try again.");
-                  }
-                }}
-                className="mt-4 px-6 py-2 bg-[color:var(--color-riviera-blue)] text-white rounded-md font-semibold hover:bg-opacity-90 transition"
-              >
-                Save Editor's Picks
-              </button>
-            </div>
-
-            {/* Most Read Section */}
-            <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h2 className="text-xl font-bold text-[color:var(--color-dark)] mb-4">Most Read Articles</h2>
-              <p className="text-sm text-[color:var(--color-medium)] mb-4">
-                Top 5 articles by view count. You can remove articles from this list if needed.
-              </p>
-              {loading ? (
-                <p className="text-sm text-gray-500">Loading articles...</p>
-              ) : articles.filter((a) => a.status === "published" && !mostReadOverrides.includes(a.id)).length === 0 ? (
-                <p className="text-sm text-gray-500">No published articles found.</p>
-              ) : (
-                <div className="space-y-3">
-                  {articles
-                    .filter((a) => a.status === "published" && !mostReadOverrides.includes(a.id))
-                    .sort((a, b) => b.view_count - a.view_count)
-                    .slice(0, 5)
-                    .map((article, index) => (
-                    <div key={article.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl font-black text-gray-300">{index + 1}</span>
-                        <div>
-                          <h4 className="font-bold text-[color:var(--color-dark)]">{article.title}</h4>
-                          <p className="text-xs text-[color:var(--color-medium)]">
-                            {article.view_count.toLocaleString()} views
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Remove "${article.title}" from Most Read?`)) {
-                            const newOverrides = [...mostReadOverrides, article.id];
-                            setMostReadOverrides(newOverrides);
-                            localStorage.setItem("mostReadOverrides", JSON.stringify(newOverrides));
-                          }
-                        }}
-                        className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-md transition"
-                      >
-                        Hide
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {mostReadOverrides.length > 0 && (
-                <button
-                  onClick={() => {
-                    setMostReadOverrides([]);
-                    localStorage.removeItem("mostReadOverrides");
-                    alert("Most Read overrides cleared!");
-                  }}
-                  className="mt-4 px-6 py-2 bg-gray-200 text-[color:var(--color-dark)] rounded-md font-semibold hover:bg-gray-300 transition"
+        {/* Search, sort, and filters — shown when table is shown */}
+        {!loading && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              placeholder="Search by title or author…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 min-w-[200px] max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm text-[color:var(--color-dark)] placeholder:text-gray-500 focus:border-[color:var(--color-riviera-blue)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-riviera-blue)]"
+            />
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-[color:var(--color-dark)]">
+                <span className="text-gray-500">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="border-0 bg-transparent font-medium focus:outline-none focus:ring-0"
                 >
-                  Reset Hidden Articles
-                </button>
-              )}
+                  <option value="date-newest">Date (newest)</option>
+                  <option value="date-oldest">Date (oldest)</option>
+                  <option value="title-az">Title (A–Z)</option>
+                  <option value="title-za">Title (Z–A)</option>
+                  <option value="views-high">Views (high–low)</option>
+                  <option value="views-low">Views (low–high)</option>
+                </select>
+              </div>
             </div>
           </div>
-        ) : loading ? (
+        )}
+
+        {loading ? (
           <div className="text-center py-12">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[color:var(--color-riviera-blue)] border-r-transparent"></div>
           </div>
@@ -467,6 +417,7 @@ export default function ArticlesManagementPage() {
             </Link>
           </div>
         ) : (
+          <>
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -498,13 +449,14 @@ export default function ArticlesManagementPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {articles
-                  .filter((article) => {
-                    if (filter === "all") return article.status !== "archived";
-                    if (filter === "archived") return article.status === "archived";
-                    return article.status === filter;
-                  })
-                  .map((article) => (
+                {sortedList.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-8 text-center text-sm text-[color:var(--color-medium)]">
+                      No articles match your search.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedList.map((article) => (
                   <tr key={article.id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4">
                       <div className="space-y-2">
@@ -548,52 +500,242 @@ export default function ArticlesManagementPage() {
                     <td className="px-6 py-4 text-sm text-[color:var(--color-medium)]">
                       {new Date(article.published_at || article.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm font-medium space-x-4">
-                      {article.status !== "archived" && (
-                        <Link
-                          href={`/admin/articles/edit/${article.id}`}
-                          className="text-[color:var(--color-riviera-blue)] hover:underline"
-                        >
-                          Edit
-                        </Link>
-                      )}
-                      {article.status === "archived" ? (
-                        <>
-                          <button
-                            onClick={() => republishArticle(article.id)}
-                            className="text-green-600 hover:underline"
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-4 text-sm font-medium">
+                        {article.status !== "archived" && (
+                          <Link
+                            href={`/admin/articles/edit/${article.id}`}
+                            className="text-[color:var(--color-riviera-blue)] hover:underline whitespace-nowrap"
                           >
-                            Republish
-                          </button>
-                          <button
-                            onClick={() => deleteArticle(article.id)}
-                            className="text-red-600 hover:underline"
-                          >
-                            Delete
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => archiveArticle(article.id)}
-                            className="text-orange-600 hover:underline"
-                          >
-                            Archive
-                          </button>
-                          <button
-                            onClick={() => deleteArticle(article.id)}
-                            className="text-red-600 hover:underline"
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
+                            Edit
+                          </Link>
+                        )}
+                        {article.status === "archived" ? (
+                          <>
+                            <button
+                              onClick={() => republishArticle(article.id)}
+                              className="text-green-600 hover:underline whitespace-nowrap"
+                            >
+                              Republish
+                            </button>
+                            <button
+                              onClick={() => deleteArticle(article.id)}
+                              className="text-red-600 hover:underline whitespace-nowrap"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => archiveArticle(article.id)}
+                              className="text-orange-600 hover:underline whitespace-nowrap"
+                            >
+                              Archive
+                            </button>
+                            <button
+                              onClick={() => deleteArticle(article.id)}
+                              className="text-red-600 hover:underline whitespace-nowrap"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ))
+                )}
               </tbody>
             </table>
+            {sortedList.length > 0 && totalPages > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 px-6 py-4 bg-gray-50">
+                <p className="text-sm text-[color:var(--color-medium)]">
+                  Page {currentPage} of {totalPages}
+                  <span className="ml-2 text-gray-400">
+                    ({sortedList.length} article{sortedList.length !== 1 ? "s" : ""})
+                  </span>
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-[color:var(--color-dark)] hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition"
+                  >
+                    Previous
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => setCurrentPage(page)}
+                        className={`min-w-[2.25rem] px-2 py-1.5 text-sm font-medium rounded-md border transition ${
+                          currentPage === page
+                            ? "border-[color:var(--color-riviera-blue)] bg-[color:var(--color-riviera-blue)] text-white"
+                            : "border-gray-300 bg-white text-[color:var(--color-dark)] hover:bg-gray-50"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-[color:var(--color-dark)] hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+
+          {filter === "all" && (
+            <div className="mt-8 space-y-6">
+              <div className="bg-white rounded-lg p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <svg className="w-6 h-6 text-[color:var(--color-riviera-blue)]" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Article Placements — Editor's Picks</h2>
+                </div>
+                <p className="text-sm text-[color:var(--color-medium)] mb-4">
+                  Select up to 3 published articles to feature in the Editor's Picks section on the homepage.
+                </p>
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Current Editor's Picks (what appears on the site)</p>
+                  <ul className="text-sm text-[color:var(--color-dark)] space-y-1">
+                    {[0, 1, 2].map((index) => {
+                      const articleId = editorsPicks[index];
+                      const article = articles.find((a) => a.id === articleId);
+                      return (
+                        <li key={index}>
+                          #{index + 1} {article ? article.title : "—"}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+                <div className="space-y-3">
+                  {[0, 1, 2].map((index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-gray-500 w-8">#{index + 1}</span>
+                      <select
+                        value={editorsPicks[index] || ""}
+                        onChange={(e) => {
+                          const newPicks = [...editorsPicks];
+                          newPicks[index] = e.target.value;
+                          setEditorsPicks(newPicks);
+                        }}
+                        className="flex-1 border border-gray-300 rounded-md px-4 py-2"
+                      >
+                        <option value="">Select an article...</option>
+                        {articles
+                          .filter((a) => a.status === "published")
+                          .map((article) => (
+                            <option key={article.id} value={article.id}>
+                              {article.title}
+                            </option>
+                          ))}
+                      </select>
+                      {editorsPicks[index] && (
+                        <button
+                          onClick={() => {
+                            const newPicks = [...editorsPicks];
+                            newPicks[index] = "";
+                            setEditorsPicks(newPicks);
+                          }}
+                          className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={async () => {
+                    const filteredPicks = editorsPicks.filter(Boolean);
+                    try {
+                      await supabase.from("editors_picks").delete().in("position", [1, 2, 3]);
+                      for (let i = 0; i < filteredPicks.length; i++) {
+                        await supabase.from("editors_picks").insert({
+                          article_id: filteredPicks[i],
+                          position: i + 1,
+                        });
+                      }
+                      alert(`Editor's Picks saved successfully! (${filteredPicks.length} articles selected)`);
+                    } catch (err) {
+                      console.error(err);
+                      alert("Failed to save Editor's Picks. Please try again.");
+                    }
+                  }}
+                  className="mt-4 px-6 py-2 bg-[color:var(--color-riviera-blue)] text-white rounded-md font-semibold hover:bg-opacity-90 transition"
+                >
+                  Save Editor's Picks
+                </button>
+              </div>
+
+              <div className="bg-white rounded-lg p-6 shadow-sm">
+                <h2 className="text-xl font-bold text-[color:var(--color-dark)] mb-4">Most Read Articles</h2>
+                <p className="text-sm text-[color:var(--color-medium)] mb-4">
+                  Top 5 articles by view count. You can remove articles from this list if needed.
+                </p>
+                {articles.filter((a) => a.status === "published" && !mostReadOverrides.includes(a.id)).length === 0 ? (
+                  <p className="text-sm text-gray-500">No published articles found.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {articles
+                      .filter((a) => a.status === "published" && !mostReadOverrides.includes(a.id))
+                      .sort((a, b) => b.view_count - a.view_count)
+                      .slice(0, 5)
+                      .map((article, index) => (
+                      <div key={article.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl font-black text-gray-300">{index + 1}</span>
+                          <div>
+                            <h4 className="font-bold text-[color:var(--color-dark)]">{article.title}</h4>
+                            <p className="text-xs text-[color:var(--color-medium)]">
+                              {article.view_count.toLocaleString()} views
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remove "${article.title}" from Most Read?`)) {
+                              const newOverrides = [...mostReadOverrides, article.id];
+                              setMostReadOverrides(newOverrides);
+                              localStorage.setItem("mostReadOverrides", JSON.stringify(newOverrides));
+                            }
+                          }}
+                          className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-md transition"
+                        >
+                          Hide
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {mostReadOverrides.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setMostReadOverrides([]);
+                      localStorage.removeItem("mostReadOverrides");
+                      alert("Most Read overrides cleared!");
+                    }}
+                    className="mt-4 px-6 py-2 bg-gray-200 text-[color:var(--color-dark)] rounded-md font-semibold hover:bg-gray-300 transition"
+                  >
+                    Reset Hidden Articles
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

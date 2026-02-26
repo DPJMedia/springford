@@ -4,13 +4,6 @@ export function Footer() {
       <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <img
-              src="/favicon.ico"
-              alt="Spring-Ford Press"
-              width={28}
-              height={28}
-              className="h-7 w-7 rounded-full object-cover"
-            />
             <span className="masthead font-semibold text-[color:var(--color-dark)] text-sm sm:text-base" style={{ letterSpacing: "-0.02em" }}>
               Spring-Ford Press
             </span>

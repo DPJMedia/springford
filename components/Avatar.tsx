@@ -4,12 +4,13 @@ type AvatarProps = {
   src?: string | null
   name?: string | null
   email?: string | null
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }
 
 export function Avatar({ src, name, email, size = 'md', className = '' }: AvatarProps) {
   const sizeClasses = {
+    xs: 'w-6 h-6 text-xs',
     sm: 'w-8 h-8 text-sm',
     md: 'w-10 h-10 text-base',
     lg: 'w-16 h-16 text-2xl',

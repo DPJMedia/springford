@@ -358,12 +358,22 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
       <div className="max-w-5xl mx-auto px-4">
         {/* Header */}
         <div className="mb-6">
-          <Link
-            href="/admin/articles"
-            className="text-blue-600 hover:underline flex items-center gap-1 mb-4"
-          >
-            ← Back to Articles
-          </Link>
+          <div className="flex items-center justify-between mb-4">
+            <Link
+              href="/admin/articles"
+              className="text-blue-600 hover:underline flex items-center gap-1"
+            >
+              ← Back to Articles
+            </Link>
+            <Link
+              href="/admin/diffuse"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black text-white text-sm font-semibold hover:opacity-90 transition shadow-sm"
+              style={{ fontFamily: 'var(--font-space-grotesk)' }}
+            >
+              <span><span className="text-white">diffuse</span><span className="text-[#ff9628]">.ai</span></span>
+              <span className="text-white">integration</span>
+            </Link>
+          </div>
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-black text-gray-900">Edit Article</h1>
             <span className="text-sm text-gray-500">
