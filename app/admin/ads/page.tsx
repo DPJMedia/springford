@@ -1193,8 +1193,26 @@ export default function AdsManagerPage() {
                   </td>
                   <td className="px-4 py-3 text-sm text-[color:var(--color-medium)]">
                     <div className="text-xs">
-                      <div>Start: {new Date(ad.start_date).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</div>
-                      <div>End: {new Date(ad.end_date).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</div>
+                      <div>
+                        Publish:{" "}
+                        {new Date(ad.start_date).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                      <div>
+                        Expires:{" "}
+                        {new Date(ad.end_date).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
