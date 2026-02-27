@@ -13,6 +13,7 @@ export function Header() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
   const [userName, setUserName] = useState<string>("");
+  const [userUsername, setUserUsername] = useState<string>("");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
@@ -64,7 +65,7 @@ export function Header() {
         // Check if user is admin and get name
         supabase
           .from("user_profiles")
-          .select("is_admin, is_super_admin, full_name, avatar_url, newsletter_subscribed")
+          .select("is_admin, is_super_admin, full_name, username, avatar_url, newsletter_subscribed")
           .eq("id", user.id)
           .single()
           .then(({ data }) => {
@@ -72,6 +73,7 @@ export function Header() {
               setIsAdmin(data.is_admin || data.is_super_admin);
               setNewsletterSubscribed(data.newsletter_subscribed || false);
               setUserName(data.full_name || user.email?.split("@")[0] || "User");
+              setUserUsername(data.username || "");
               setUserAvatar(data.avatar_url);
             }
           });
@@ -86,7 +88,7 @@ export function Header() {
       if (session?.user) {
         supabase
           .from("user_profiles")
-          .select("is_admin, is_super_admin, full_name, avatar_url, newsletter_subscribed")
+          .select("is_admin, is_super_admin, full_name, username, avatar_url, newsletter_subscribed")
           .eq("id", session.user.id)
           .single()
           .then(({ data }) => {
@@ -94,6 +96,7 @@ export function Header() {
               setIsAdmin(data.is_admin || data.is_super_admin);
               setNewsletterSubscribed(data.newsletter_subscribed || false);
               setUserName(data.full_name || session.user.email?.split("@")[0] || "User");
+              setUserUsername(data.username || "");
               setUserAvatar(data.avatar_url);
             }
           });
@@ -101,6 +104,7 @@ export function Header() {
         setIsAdmin(false);
         setNewsletterSubscribed(false);
         setUserName("");
+        setUserUsername("");
         setUserAvatar(null);
       }
     });
@@ -211,11 +215,11 @@ export function Header() {
                   <div className="relative user-menu flex items-center">
                     <button
                       onClick={() => setShowMenu(!showMenu)}
-                      className="inline-flex h-9 items-center gap-1.5 sm:gap-2 rounded-full border border-[color:var(--color-border)] bg-white px-3 sm:px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white hover:bg-gray-100 transition flex-shrink-0"
+                      aria-label="Open user menu"
                     >
-                      <span className="hidden sm:inline truncate max-w-[80px]">{userName}</span>
                       <span className="relative inline-flex flex-shrink-0">
-                        <Avatar src={userAvatar} name={userName} email={user.email} size="xs" />
+                        <Avatar src={userAvatar} name={userName} email={user.email} size="sm" className="w-9 h-9" />
                         {isAdmin && notificationCount > 0 && (
                           <span className="absolute -top-0.5 -right-0.5 inline-flex h-3 w-3 rounded-full bg-red-600 border-2 border-white" aria-label={`${notificationCount} notifications`} />
                         )}
@@ -234,7 +238,18 @@ export function Header() {
                           </div>
                         )}
                         <div className="absolute right-0 top-full mt-2 w-56 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-[55] overflow-hidden">
-                          <div className="py-1 relative">
+                          <div className="relative">
+                            <div className="px-4 py-3 border-b border-gray-100">
+                              <div className="text-sm font-semibold text-[color:var(--color-dark)] truncate">
+                                {userName}
+                              </div>
+                              {userUsername && (
+                                <div className="text-xs text-[color:var(--color-medium)] truncate">
+                                  @{userUsername}
+                                </div>
+                              )}
+                            </div>
+                            <div className="py-1">
                             {isAdmin && (
                               <button
                                 type="button"
@@ -262,6 +277,7 @@ export function Header() {
                               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                               Log out
                             </button>
+                            </div>
                           </div>
                         </div>
                       </>
