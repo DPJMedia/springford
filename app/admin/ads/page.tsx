@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -10,7 +10,10 @@ import type { Ad, AdSetting, AdSlotAssignment } from "@/lib/types/database";
 const AD_SLOTS = [
   // Homepage slots (numbered)
   { value: "homepage-banner-top", label: "Section 1: Banner Below Hero" },
-  { value: "homepage-banner-top-mobile", label: "Section 1.2: Banner Below Hero (Mobile Only)" },
+  { value: "homepage-banner-top-mobile", label: "Mobile Section 1: Below Hero" },
+  { value: "homepage-mobile-above-most-read", label: "Mobile Section 2: Above Most Read" },
+  { value: "homepage-mobile-above-editors-picks", label: "Mobile Section 3: Above Editor’s Picks" },
+  { value: "homepage-mobile-between-editors-picks-footer", label: "Mobile Section 4: Between Editor’s Picks & Footer" },
   { value: "homepage-sidebar-top", label: "Section 2: Sidebar Top (Above Trending)" },
   { value: "homepage-sidebar-middle", label: "Section 3: Sidebar Middle" },
   { value: "homepage-sidebar-bottom", label: "Section 4: Sidebar Bottom" },
@@ -23,6 +26,9 @@ const AD_SLOTS = [
   { value: "article-sidebar-bottom", label: "Article: Sidebar Bottom (Sticky)" },
   { value: "article-inline-1", label: "Article: Inline Ad 1" },
   { value: "article-inline-2", label: "Article: Inline Ad 2" },
+  { value: "article-mobile-inline", label: "Article Mobile Section 1: Between Content Blocks" },
+  { value: "article-mobile-end", label: "Article Mobile Section 2: End of Article" },
+  { value: "article-mobile-below-tags", label: "Article Mobile Section 3: Below Tags" },
 ];
 
 export default function AdsManagerPage() {
@@ -53,13 +59,82 @@ export default function AdsManagerPage() {
     is_active: true,
     fill_section: true, // Default to fill section
     ad_label_color: "", // Hex for "Advertisement" label (empty = default gray)
+    ad_label_position: "bottom-right" as "bottom-right" | "bottom-left" | "top-right" | "top-left",
   });
   // Per-slot fill section settings
   const [slotFillSettings, setSlotFillSettings] = useState<Record<string, boolean>>({});
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [runtimeRequired, setRuntimeRequired] = useState(false);
-  const [previewTab, setPreviewTab] = useState<"homepage" | "article">("homepage");
+  const [previewTab, setPreviewTab] = useState<
+    "homepage-desktop" | "homepage-mobile" | "article-desktop" | "article-mobile"
+  >("homepage-desktop");
+
+  // Modal: set run times for all ads in the selected slot(s) before saving
+  const [showRuntimeModal, setShowRuntimeModal] = useState(false);
+  const [runtimeModalAds, setRuntimeModalAds] = useState<
+    { adId: string | null; title: string; runtime_seconds: number | null }[]
+  >([]);
+
+  // Search, sort, filter for ad list
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"name-az" | "name-za" | "date-newest" | "date-oldest">("date-newest");
+  const [sectionFilter, setSectionFilter] = useState<string>("all");
+  const [deviceFilter, setDeviceFilter] = useState<"all" | "desktop" | "mobile">("all");
+
+  // In-app toast (replaces browser alert/confirm for action feedback)
+  const [toast, setToast] = useState<{ message: string; onUndo?: () => void | Promise<void> } | null>(null);
+  const [toastSecondsLeft, setToastSecondsLeft] = useState(10);
+  const toastIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (!toast) {
+      if (toastIntervalRef.current) {
+        clearInterval(toastIntervalRef.current);
+        toastIntervalRef.current = null;
+      }
+      return;
+    }
+    let seconds = 10;
+    setToastSecondsLeft(10);
+    toastIntervalRef.current = setInterval(() => {
+      seconds -= 1;
+      setToastSecondsLeft(seconds);
+      if (seconds <= 0) {
+        if (toastIntervalRef.current) {
+          clearInterval(toastIntervalRef.current);
+          toastIntervalRef.current = null;
+        }
+        setToast(null);
+      }
+    }, 1000);
+    return () => {
+      if (toastIntervalRef.current) {
+        clearInterval(toastIntervalRef.current);
+        toastIntervalRef.current = null;
+      }
+    };
+  }, [toast]);
+
+  function dismissToast() {
+    if (toastIntervalRef.current) {
+      clearInterval(toastIntervalRef.current);
+      toastIntervalRef.current = null;
+    }
+    setToast(null);
+  }
+
+  function showToast(message: string, onUndo?: () => void | Promise<void>) {
+    setToast({ message, onUndo });
+  }
+
+  // Lock body scroll when any modal (create/edit ad, runtime, settings) is open
+  useEffect(() => {
+    const open = showModal || showRuntimeModal || showSettingsModal;
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showModal, showRuntimeModal, showSettingsModal]);
 
   useEffect(() => {
     checkSuperAdmin();
@@ -173,6 +248,21 @@ export default function AdsManagerPage() {
     checkRuntimeRequirement();
   }, [formData.selectedSlots, editingAd, supabase]);
 
+  // When creating a new ad and user selects slot(s), default display_order to next in those sections
+  useEffect(() => {
+    if (editingAd || formData.selectedSlots.length === 0) return;
+    const adsInSelectedSlots = ads.filter((ad: any) =>
+      (ad.slots || (ad.ad_slot ? [ad.ad_slot] : [])).some((s: string) =>
+        formData.selectedSlots.includes(s)
+      )
+    );
+    const maxOrder = Math.max(0, ...adsInSelectedSlots.map((a: any) => a.display_order ?? 0));
+    const nextOrder = maxOrder + 1;
+    if (nextOrder !== formData.display_order) {
+      setFormData((f) => ({ ...f, display_order: nextOrder }));
+    }
+  }, [formData.selectedSlots, editingAd, ads]);
+
   async function checkSuperAdmin() {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
@@ -188,7 +278,7 @@ export default function AdsManagerPage() {
       .single();
 
     if (!profileData?.is_super_admin) {
-      alert("Only super admins can access this page!");
+      showToast("Only super admins can access this page.");
       router.push("/admin");
       return;
     }
@@ -246,7 +336,7 @@ export default function AdsManagerPage() {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith("image/")) {
-        alert("Please select an image file");
+        showToast("Please select an image file.");
         return;
       }
       setImageFile(file);
@@ -279,9 +369,9 @@ export default function AdsManagerPage() {
         console.error("Upload error:", uploadError);
         // Check if it's an RLS policy error
         if (uploadError.message.includes("row-level security") || uploadError.message.includes("policy")) {
-          alert("Storage permissions error. Please run the storage policies SQL script (supabase-storage-ads-policies.sql) in Supabase SQL Editor. See ADS_SETUP.md for instructions.");
+          showToast("Storage permissions error. Run the storage policies SQL in Supabase. See ADS_SETUP.md.");
         } else {
-          alert("Error uploading image: " + uploadError.message);
+          showToast("Error uploading image: " + uploadError.message);
         }
         return;
       }
@@ -298,7 +388,7 @@ export default function AdsManagerPage() {
       }
     } catch (error: any) {
       console.error("Upload error:", error);
-      alert("Error uploading image: " + (error.message || "Unknown error"));
+      showToast("Error uploading image: " + (error.message || "Unknown error"));
     }
   }
 
@@ -315,9 +405,9 @@ export default function AdsManagerPage() {
       if (uploadError) {
         console.error("Upload error:", uploadError);
         if (uploadError.message.includes("row-level security") || uploadError.message.includes("policy")) {
-          alert("Storage permissions error. Please run the storage policies SQL script (supabase-storage-ads-policies.sql) in Supabase SQL Editor.");
+          showToast("Storage permissions error. Run the storage policies SQL in Supabase.");
         } else {
-          alert("Error uploading image: " + uploadError.message);
+          showToast("Error uploading image: " + uploadError.message);
         }
         return null;
       }
@@ -329,7 +419,7 @@ export default function AdsManagerPage() {
       return publicUrl;
     } catch (error: any) {
       console.error("Upload error:", error);
-      alert("Error uploading image: " + (error.message || "Unknown error"));
+      showToast("Error uploading image: " + (error.message || "Unknown error"));
       return null;
     }
   }
@@ -358,263 +448,358 @@ export default function AdsManagerPage() {
     }
   }
 
+  /** Parse date + time (ET) to ISO string for DB. */
+  function parseETDateTime(dateStr: string, timeStr: string): string {
+    let hours = 0, minutes = 0;
+    const timeMatch = timeStr.match(/(\d+)\s*:\s*(\d+)\s*(AM|PM)/i);
+    if (timeMatch) {
+      hours = parseInt(timeMatch[1]);
+      minutes = parseInt(timeMatch[2]);
+      const ampm = timeMatch[3].toUpperCase();
+      if (ampm === "PM" && hours !== 12) hours += 12;
+      else if (ampm === "AM" && hours === 12) hours = 0;
+    } else {
+      const parts = timeStr.split(":");
+      hours = parseInt(parts[0]) || 0;
+      minutes = parseInt(parts[1]) || 0;
+    }
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const etDateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`;
+    const tempDate = new Date(`${etDateStr}-05:00`);
+    const monthNum = month - 1;
+    if (monthNum >= 2 && monthNum <= 10) tempDate.setHours(tempDate.getHours() + 1);
+    return tempDate.toISOString();
+  }
+
+  /** Performs image upload, saves main ad (create/update) with currentRuntime, then updates other ads' runtime_seconds. */
+  async function doSaveAd(
+    startDateTime: string,
+    endDateTime: string,
+    currentRuntime: number | null,
+    otherAdRuntimes: { adId: string; runtime_seconds: number }[]
+  ): Promise<void> {
+    let finalImageUrl = formData.image_url;
+
+    if (imageFile) {
+      const fileExt = imageFile.name.split(".").pop();
+      const fileName = `ad-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from("ads")
+        .upload(fileName, imageFile, { cacheControl: "3600", upsert: false });
+      if (uploadError) {
+        if (uploadError.message.includes("row-level security") || uploadError.message.includes("policy")) {
+          showToast("Storage permissions error. Run the storage policies SQL in Supabase.");
+        } else {
+          showToast("Error uploading image: " + uploadError.message);
+        }
+        throw new Error(uploadError.message);
+      }
+      const { data: { publicUrl } } = supabase.storage.from("ads").getPublicUrl(fileName);
+      finalImageUrl = publicUrl;
+    } else if (imagePreview && !formData.image_url) {
+      const response = await fetch(imagePreview);
+      const blob = await response.blob();
+      const fileName = `ad-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from("ads")
+        .upload(fileName, blob, { cacheControl: "3600", upsert: false, contentType: "image/jpeg" });
+      if (uploadError) {
+        if (uploadError.message.includes("row-level security") || uploadError.message.includes("policy")) {
+          showToast("Storage permissions error. Run the storage policies SQL in Supabase.");
+        } else {
+          showToast("Error uploading image: " + uploadError.message);
+        }
+        throw new Error(uploadError.message);
+      }
+      const { data: { publicUrl } } = supabase.storage.from("ads").getPublicUrl(fileName);
+      finalImageUrl = publicUrl;
+    }
+
+    if (!finalImageUrl) {
+      showToast("Please provide an image.");
+      throw new Error("No image");
+    }
+
+    if (editingAd) {
+      const { error: updateError } = await supabase
+        .from("ads")
+        .update({
+          title: formData.title || null,
+          image_url: finalImageUrl,
+          link_url: formData.link_url,
+          start_date: startDateTime,
+          end_date: endDateTime,
+          runtime_seconds: currentRuntime,
+          display_order: formData.display_order,
+          is_active: formData.is_active,
+          fill_section: true,
+          ad_label_color: formData.ad_label_color?.trim() || null,
+          ad_label_position: formData.ad_label_position || null,
+        })
+        .eq("id", editingAd.id);
+      if (updateError) throw updateError;
+      await supabase.from("ad_slot_assignments").delete().eq("ad_id", editingAd.id);
+      const assignments = formData.selectedSlots.map((slot) => ({
+        ad_id: editingAd.id,
+        ad_slot: slot,
+        fill_section: true,
+      }));
+      const { error: assignError } = await supabase.from("ad_slot_assignments").insert(assignments);
+      if (assignError) throw assignError;
+    } else {
+      const { data: newAd, error: insertError } = await supabase
+        .from("ads")
+        .insert({
+          title: formData.title || null,
+          image_url: finalImageUrl,
+          link_url: formData.link_url,
+          ad_slot: formData.selectedSlots[0],
+          start_date: startDateTime,
+          end_date: endDateTime,
+          runtime_seconds: currentRuntime,
+          display_order: formData.display_order,
+          is_active: formData.is_active,
+          fill_section: true,
+          ad_label_color: formData.ad_label_color?.trim() || null,
+          ad_label_position: formData.ad_label_position || null,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+      if (insertError) throw insertError;
+      const assignments = formData.selectedSlots.map((slot) => ({
+        ad_id: newAd.id,
+        ad_slot: slot,
+        fill_section: true,
+      }));
+      const { error: assignError } = await supabase.from("ad_slot_assignments").insert(assignments);
+      if (assignError) throw assignError;
+    }
+
+    for (const { adId, runtime_seconds } of otherAdRuntimes) {
+      const { error } = await supabase.from("ads").update({ runtime_seconds }).eq("id", adId);
+      if (error) throw error;
+    }
+  }
+
   async function handleSaveAd() {
     // Check if image is provided
     if (!imageFile && !formData.image_url) {
-      alert("Please provide an image");
+      showToast("Please provide an image.");
       return;
     }
     
     if (!formData.link_url) {
-      alert("Please provide a link URL");
+      showToast("Please provide a link URL.");
       return;
     }
 
     if (formData.selectedSlots.length === 0) {
-      alert("Please select at least one ad slot");
+      showToast("Please select at least one ad slot.");
       return;
     }
 
     if (!formData.start_date || !formData.end_date) {
-      alert("Please set start and end dates");
+      showToast("Please set start and end dates.");
       return;
-    }
-
-    // Convert date/time to Eastern Time (ET) ISO string
-    // User enters time in ET, so we need to create a date in ET timezone
-    function parseETDateTime(dateStr: string, timeStr: string): string {
-      // Parse time string (handle 12-hour format with AM/PM)
-      let hours = 0;
-      let minutes = 0;
-      
-      const timeMatch = timeStr.match(/(\d+)\s*:\s*(\d+)\s*(AM|PM)/i);
-      if (timeMatch) {
-        hours = parseInt(timeMatch[1]);
-        minutes = parseInt(timeMatch[2]);
-        const ampm = timeMatch[3].toUpperCase();
-        
-        if (ampm === 'PM' && hours !== 12) {
-          hours += 12;
-        } else if (ampm === 'AM' && hours === 12) {
-          hours = 0;
-        }
-      } else {
-        // Try 24-hour format
-        const parts = timeStr.split(':');
-        hours = parseInt(parts[0]) || 0;
-        minutes = parseInt(parts[1]) || 0;
-      }
-      
-      // Create a date string in ET format
-      const [year, month, day] = dateStr.split('-').map(Number);
-      const etDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`;
-      
-      // Use Intl.DateTimeFormat to convert ET to UTC properly
-      // Create a date assuming it's in ET, then convert to UTC
-      const tempDate = new Date(`${etDateStr}-05:00`); // Start with EST offset
-      
-      // Check if DST applies (rough check: March to November)
-      const monthNum = month - 1;
-      const isDST = monthNum >= 2 && monthNum <= 10;
-      
-      if (isDST) {
-        // Adjust for EDT (UTC-4)
-        tempDate.setHours(tempDate.getHours() + 1);
-      }
-      
-      return tempDate.toISOString();
     }
 
     const startDateTime = parseETDateTime(formData.start_date, formData.start_time || "00:00 AM");
     const endDateTime = parseETDateTime(formData.end_date, formData.end_time || "11:59 PM");
 
     if (new Date(startDateTime) >= new Date(endDateTime)) {
-      alert("End date/time must be after start date/time");
+      showToast("End date/time must be after start date/time.");
       return;
     }
 
-    if (runtimeRequired && !formData.runtime_seconds) {
-      alert("Please set a runtime for this ad (required when multiple ads share the same slot)");
+    if (runtimeRequired) {
+      // Open modal to set run times for this ad and all others in the slot(s)
+      const adIdsInSlots = new Set<string>();
+      for (const slot of formData.selectedSlots) {
+        const { data: assignments } = await supabase
+          .from("ad_slot_assignments")
+          .select("ad_id")
+          .eq("ad_slot", slot);
+        assignments?.forEach((a: { ad_id: string }) => adIdsInSlots.add(a.ad_id));
+      }
+      if (editingAd) adIdsInSlots.delete(editingAd.id);
+      const otherAdIds = Array.from(adIdsInSlots);
+      const { data: otherAds } = otherAdIds.length
+        ? await supabase.from("ads").select("id, title, runtime_seconds").in("id", otherAdIds)
+        : { data: [] };
+      const currentRow = {
+        adId: null as string | null,
+        title: formData.title || "Untitled Ad",
+        runtime_seconds: formData.runtime_seconds,
+      };
+      const otherRows = (otherAds || []).map((a: any) => ({
+        adId: a.id as string,
+        title: a.title || "Untitled Ad",
+        runtime_seconds: a.runtime_seconds ?? null,
+      }));
+      setRuntimeModalAds([currentRow, ...otherRows]);
+      setShowRuntimeModal(true);
       return;
     }
 
     // Validate display order (1-20)
     if (formData.display_order < 1 || formData.display_order > 20) {
-      alert("Display Order must be between 1 and 20");
+      showToast("Display order must be between 1 and 20.");
       return;
     }
 
     try {
-      // Upload image if we have a file (similar to article upload)
-      let finalImageUrl = formData.image_url;
-      
-      if (imageFile) {
-        const fileExt = imageFile.name.split(".").pop();
-        const fileName = `ad-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("ads")
-          .upload(fileName, imageFile, {
-            cacheControl: "3600",
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          if (uploadError.message.includes("row-level security") || uploadError.message.includes("policy")) {
-            alert("Storage permissions error. Please run the storage policies SQL script (supabase-storage-ads-policies.sql) in Supabase SQL Editor. See ADS_SETUP.md for instructions.");
-          } else {
-            alert("Error uploading image: " + uploadError.message);
-          }
-          return;
-        }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from("ads")
-          .getPublicUrl(fileName);
-
-        finalImageUrl = publicUrl;
-      } else if (imagePreview && !formData.image_url) {
-        // If we have a preview (from editor), convert to blob and upload
-        try {
-          const response = await fetch(imagePreview);
-          const blob = await response.blob();
-          const fileName = `ad-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from("ads")
-            .upload(fileName, blob, {
-              cacheControl: "3600",
-              upsert: false,
-              contentType: "image/jpeg",
-            });
-
-          if (uploadError) {
-            if (uploadError.message.includes("row-level security") || uploadError.message.includes("policy")) {
-              alert("Storage permissions error. Please run the storage policies SQL script.");
-            } else {
-              alert("Error uploading image: " + uploadError.message);
-            }
-            return;
-          }
-
-          const { data: { publicUrl } } = supabase.storage
-            .from("ads")
-            .getPublicUrl(fileName);
-
-          finalImageUrl = publicUrl;
-        } catch (error: any) {
-          alert("Error processing image: " + error.message);
-          return;
-        }
-      }
-
-      if (!finalImageUrl) {
-        alert("Please provide an image");
-        return;
-      }
-
-      if (editingAd) {
-        // Update existing ad
-        const { error: updateError } = await supabase
-          .from("ads")
-          .update({
-            title: formData.title || null,
-            image_url: finalImageUrl,
-            link_url: formData.link_url,
-            start_date: startDateTime,
-            end_date: endDateTime,
-            runtime_seconds: formData.runtime_seconds,
-            display_order: formData.display_order,
-            is_active: formData.is_active,
-            fill_section: formData.fill_section,
-            ad_label_color: formData.ad_label_color?.trim() || null,
-          })
-          .eq("id", editingAd.id);
-
-        if (updateError) throw updateError;
-
-        // Update slot assignments
-        // Delete old assignments
-        await supabase
-          .from("ad_slot_assignments")
-          .delete()
-          .eq("ad_id", editingAd.id);
-
-        // Insert new assignments with per-slot fill settings
-        const assignments = formData.selectedSlots.map((slot) => ({
-          ad_id: editingAd.id,
-          ad_slot: slot,
-          fill_section: slotFillSettings[slot] ?? true,
-        }));
-
-        const { error: assignError } = await supabase
-          .from("ad_slot_assignments")
-          .insert(assignments);
-
-        if (assignError) throw assignError;
-      } else {
-        // Create new ad
-        const { data: newAd, error: insertError} = await supabase
-          .from("ads")
-          .insert({
-            title: formData.title || null,
-            image_url: finalImageUrl,
-            link_url: formData.link_url,
-            ad_slot: formData.selectedSlots[0], // Legacy field
-            start_date: startDateTime,
-            end_date: endDateTime,
-            runtime_seconds: formData.runtime_seconds,
-            display_order: formData.display_order,
-            is_active: formData.is_active,
-            fill_section: formData.fill_section,
-            ad_label_color: formData.ad_label_color?.trim() || null,
-            created_by: user.id,
-          })
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-
-        // Create slot assignments with per-slot fill settings
-        const assignments = formData.selectedSlots.map((slot) => ({
-          ad_id: newAd.id,
-          ad_slot: slot,
-          fill_section: slotFillSettings[slot] ?? true,
-        }));
-
-        const { error: assignError } = await supabase
-          .from("ad_slot_assignments")
-          .insert(assignments);
-
-        if (assignError) throw assignError;
-      }
-
+      await doSaveAd(startDateTime, endDateTime, formData.runtime_seconds, []);
       loadAds();
       handleCloseModal();
-      alert(editingAd ? "Ad updated successfully!" : "Ad created successfully!");
+      showToast(editingAd ? "Ad updated." : "Ad created.");
     } catch (error: any) {
-      alert("Error saving ad: " + error.message);
+      showToast("Error saving ad: " + (error?.message ?? String(error)));
     }
   }
 
-  async function handleDeleteAd(adId: string) {
-    if (!confirm("Are you sure you want to delete this ad?")) return;
-
+  async function handleRuntimeModalConfirm() {
+    const invalid = runtimeModalAds.some((r) => r.runtime_seconds == null || r.runtime_seconds < 1);
+    if (invalid) {
+      showToast("Set a runtime (seconds) of 1 or more for every ad in this slot.");
+      return;
+    }
+    const startDateTime = parseETDateTime(formData.start_date, formData.start_time || "00:00 AM");
+    const endDateTime = parseETDateTime(formData.end_date, formData.end_time || "11:59 PM");
+    const currentRuntime = runtimeModalAds[0]!.runtime_seconds!;
+    const otherAdRuntimes = runtimeModalAds.slice(1).filter((r) => r.adId != null).map((r) => ({ adId: r.adId!, runtime_seconds: r.runtime_seconds! }));
     try {
-      // Delete slot assignments first (cascade should handle this, but being explicit)
-      await supabase.from("ad_slot_assignments").delete().eq("ad_id", adId);
+      await doSaveAd(startDateTime, endDateTime, currentRuntime, otherAdRuntimes);
+      loadAds();
+      handleCloseModal();
+      setShowRuntimeModal(false);
+      showToast(editingAd ? "Ad updated." : "Ad created.");
+    } catch (error: any) {
+      showToast("Error saving ad: " + (error?.message ?? String(error)));
+    }
+  }
 
+  async function handleDeleteAd(ad: any) {
+    const adId = ad.id;
+    const adSnapshot = { ...ad };
+    const { data: assignments } = await supabase
+      .from("ad_slot_assignments")
+      .select("ad_slot, fill_section")
+      .eq("ad_id", adId);
+    try {
+      await supabase.from("ad_slot_assignments").delete().eq("ad_id", adId);
       const { error } = await supabase.from("ads").delete().eq("id", adId);
       if (error) throw error;
+      // If any slot now has only one ad, clear that ad's runtime (rotation no longer applies)
+      const slotsToCheck = (assignments ?? []).map((a: { ad_slot: string }) => a.ad_slot);
+      for (const slot of slotsToCheck) {
+        const { data: remaining } = await supabase
+          .from("ad_slot_assignments")
+          .select("ad_id")
+          .eq("ad_slot", slot);
+        if (remaining?.length === 1) {
+          await supabase.from("ads").update({ runtime_seconds: null }).eq("id", remaining[0].ad_id);
+        }
+      }
       loadAds();
-      alert("Ad deleted successfully!");
+      showToast("Ad deleted.", async () => {
+        const { data: restored, error: insertErr } = await supabase
+          .from("ads")
+          .insert({
+            title: adSnapshot.title,
+            image_url: adSnapshot.image_url,
+            link_url: adSnapshot.link_url,
+            ad_slot: (adSnapshot.slots && adSnapshot.slots[0]) || adSnapshot.ad_slot || "",
+            start_date: adSnapshot.start_date,
+            end_date: adSnapshot.end_date,
+            runtime_seconds: adSnapshot.runtime_seconds,
+            display_order: adSnapshot.display_order,
+            is_active: adSnapshot.is_active,
+            fill_section: adSnapshot.fill_section ?? true,
+            ad_label_color: adSnapshot.ad_label_color ?? null,
+            ad_label_position: adSnapshot.ad_label_position ?? null,
+            created_by: adSnapshot.created_by,
+          })
+          .select("id")
+          .single();
+        if (insertErr || !restored) return;
+        if (assignments?.length) {
+          await supabase.from("ad_slot_assignments").insert(
+            assignments.map((a: any) => ({
+              ad_id: restored.id,
+              ad_slot: a.ad_slot,
+              fill_section: a.fill_section ?? true,
+            }))
+          );
+        }
+        loadAds();
+      });
     } catch (error: any) {
-      alert("Error deleting ad: " + error.message);
+      showToast("Error deleting ad: " + error.message);
+    }
+  }
+
+  async function handleDuplicateAd(ad: any) {
+    if (!user) return;
+    try {
+      // Next display_order = max + 1 so duplicate appears after original in rotation (slot 2, 3, ...)
+      const { data: maxRow } = await supabase
+        .from("ads")
+        .select("display_order")
+        .order("display_order", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextOrder = (maxRow?.display_order ?? 0) + 1;
+
+      const { data: newAd, error: insertError } = await supabase
+        .from("ads")
+        .insert({
+          title: "Copy of " + (ad.title || "Untitled Ad"),
+          image_url: ad.image_url,
+          link_url: ad.link_url,
+          ad_slot: (ad.slots && ad.slots[0]) || ad.ad_slot || "",
+          start_date: ad.start_date,
+          end_date: ad.end_date,
+          runtime_seconds: ad.runtime_seconds,
+          display_order: nextOrder,
+          is_active: ad.is_active,
+          fill_section: ad.fill_section ?? true,
+          ad_label_color: (ad as { ad_label_color?: string | null }).ad_label_color ?? null,
+          ad_label_position: (ad as { ad_label_position?: string | null }).ad_label_position ?? null,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      const { data: assignments } = await supabase
+        .from("ad_slot_assignments")
+        .select("ad_slot, fill_section")
+        .eq("ad_id", ad.id);
+      if (assignments?.length) {
+        await supabase.from("ad_slot_assignments").insert(
+          assignments.map((a) => ({
+            ad_id: newAd.id,
+            ad_slot: a.ad_slot,
+            fill_section: a.fill_section ?? true,
+          }))
+        );
+      }
+      loadAds();
+      const newAdId = newAd.id;
+      showToast("Ad duplicated.", async () => {
+        await supabase.from("ad_slot_assignments").delete().eq("ad_id", newAdId);
+        await supabase.from("ads").delete().eq("id", newAdId);
+        loadAds();
+      });
+    } catch (error: any) {
+      showToast("Error duplicating ad: " + error.message);
     }
   }
 
   async function handleToggleActive(ad: Ad) {
+    const previousActive = ad.is_active;
     try {
       const { error } = await supabase
         .from("ads")
@@ -623,8 +808,12 @@ export default function AdsManagerPage() {
 
       if (error) throw error;
       loadAds();
+      showToast(previousActive ? "Ad disabled." : "Ad enabled.", async () => {
+        await supabase.from("ads").update({ is_active: previousActive }).eq("id", ad.id);
+        loadAds();
+      });
     } catch (error: any) {
-      alert("Error updating ad: " + error.message);
+      showToast("Error updating ad: " + error.message);
     }
   }
 
@@ -640,8 +829,9 @@ export default function AdsManagerPage() {
 
       if (error) throw error;
       loadAdSettings();
+      showToast("Setting updated.");
     } catch (error: any) {
-      alert("Error updating setting: " + error.message);
+      showToast("Error updating setting: " + error.message);
     }
   }
 
@@ -664,6 +854,7 @@ export default function AdsManagerPage() {
         is_active: ad.is_active,
         fill_section: true,
         ad_label_color: (ad as Ad & { ad_label_color?: string | null }).ad_label_color || "",
+        ad_label_position: (ad as Ad & { ad_label_position?: string | null }).ad_label_position || "bottom-right",
       });
       // Load per-slot fill settings
       const fillSettings: Record<string, boolean> = {};
@@ -674,23 +865,32 @@ export default function AdsManagerPage() {
       setImagePreview(ad.image_url);
     } else {
       setEditingAd(null);
+      const { dateStr, timeStr } = getNowInEST();
       const now = new Date();
       const tomorrow = new Date(now);
       tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowFmt = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/New_York",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+      const endDateStr = tomorrowFmt.format(tomorrow).replace(/\//g, "-");
       setFormData({
         title: "",
         image_url: "",
         link_url: "",
         selectedSlots: [],
-        start_date: now.toISOString().split("T")[0],
-        start_time: now.toTimeString().slice(0, 5),
-        end_date: tomorrow.toISOString().split("T")[0],
+        start_date: dateStr,
+        start_time: timeStr,
+        end_date: endDateStr,
         end_time: "23:59",
         runtime_seconds: null,
-        display_order: 0,
+        display_order: 1,
         is_active: true,
         fill_section: true,
         ad_label_color: "",
+        ad_label_position: "bottom-right",
       });
       setSlotFillSettings({});
       setImagePreview(null);
@@ -711,6 +911,26 @@ export default function AdsManagerPage() {
 
   // Get current time in UTC (database stores times in UTC)
   // Compare directly with stored UTC times
+  /** Current date and time in EST for defaulting new ad start */
+  function getNowInEST() {
+    const now = new Date();
+    const dateFmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const dateStr = dateFmt.format(now).replace(/\//g, "-"); // "YYYY-MM-DD"
+    const timeFmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const timeStr = timeFmt.format(now); // "HH:MM"
+    return { dateStr, timeStr };
+  }
+
   function getAdStatus(ad: Ad): "scheduled" | "active" | "expired" {
     if (!ad.is_active) return "expired";
     
@@ -726,6 +946,44 @@ export default function AdsManagerPage() {
   function isAdActive(ad: Ad) {
     return getAdStatus(ad) === "active";
   }
+
+  // Filter and sort ads for the table
+  const adSlots = ads.flatMap((ad: any) => ad.slots || (ad.ad_slot ? [ad.ad_slot] : []));
+  const uniqueSections = Array.from(new Set(adSlots)).sort();
+  const searchLower = searchQuery.trim().toLowerCase();
+  const filteredAds = ads.filter((ad: any) => {
+    const name = (ad.title || "Untitled Ad").toLowerCase();
+    if (searchLower && !name.includes(searchLower)) return false;
+    const slots: string[] = ad.slots || (ad.ad_slot ? [ad.ad_slot] : []);
+    if (sectionFilter !== "all" && !slots.includes(sectionFilter)) return false;
+    if (deviceFilter === "mobile" && !slots.some((s: string) => s.includes("mobile"))) return false;
+    if (deviceFilter === "desktop" && !slots.some((s: string) => !s.includes("mobile"))) return false;
+    return true;
+  });
+  /** Map each slot id to list of ad titles currently in that slot (for preview) */
+  const adsBySlot = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    AD_SLOTS.forEach(({ value }) => {
+      map[value] = [];
+    });
+    ads.forEach((ad: any) => {
+      const slots = ad.slots || (ad.ad_slot ? [ad.ad_slot] : []);
+      const title = ad.title || "Untitled Ad";
+      slots.forEach((s: string) => {
+        if (map[s]) map[s].push(title);
+      });
+    });
+    return map;
+  }, [ads]);
+
+  const sortedAds = [...filteredAds].sort((a: any, b: any) => {
+    if (sortBy === "name-az") return (a.title || "").localeCompare(b.title || "");
+    if (sortBy === "name-za") return (b.title || "").localeCompare(a.title || "");
+    const dateA = new Date(a.created_at).getTime();
+    const dateB = new Date(b.created_at).getTime();
+    if (sortBy === "date-newest") return dateB - dateA;
+    return dateA - dateB;
+  });
 
   if (loading) {
     return (
@@ -800,6 +1058,53 @@ export default function AdsManagerPage() {
           </div>
         </div>
 
+        {/* Search, sort, filter */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            placeholder="Search by ad name…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 min-w-[200px] max-w-md rounded-md border border-gray-300 px-3 py-2 text-sm text-[color:var(--color-dark)] placeholder:text-gray-500 focus:border-[color:var(--color-riviera-blue)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-riviera-blue)]"
+          />
+          <div className="flex items-center gap-2">
+            <select
+              value={sectionFilter}
+              onChange={(e) => setSectionFilter(e.target.value)}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-[color:var(--color-dark)] focus:border-[color:var(--color-riviera-blue)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-riviera-blue)]"
+            >
+              <option value="all">All sections</option>
+              {uniqueSections.map((slot) => (
+                <option key={slot} value={slot}>
+                  {AD_SLOTS.find((s) => s.value === slot)?.label ?? slot}
+                </option>
+              ))}
+            </select>
+            <select
+              value={deviceFilter}
+              onChange={(e) => setDeviceFilter(e.target.value as "all" | "desktop" | "mobile")}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm text-[color:var(--color-dark)] focus:border-[color:var(--color-riviera-blue)] focus:outline-none focus:ring-1 focus:ring-[color:var(--color-riviera-blue)]"
+            >
+              <option value="all">All devices</option>
+              <option value="desktop">Desktop only</option>
+              <option value="mobile">Mobile only</option>
+            </select>
+            <div className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-[color:var(--color-dark)]">
+              <span className="text-gray-500">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="border-0 bg-transparent font-medium focus:outline-none focus:ring-0"
+              >
+                <option value="date-newest">Date (newest)</option>
+                <option value="date-oldest">Date (oldest)</option>
+                <option value="name-az">Name (A–Z)</option>
+                <option value="name-za">Name (Z–A)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         {/* Ads Table */}
         <div className="bg-white rounded-lg border border-[color:var(--color-border)] overflow-hidden">
           <table className="min-w-full">
@@ -807,14 +1112,20 @@ export default function AdsManagerPage() {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Ad</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Slots</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Link</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Schedule</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-[color:var(--color-dark)]">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {ads.map((ad: any) => (
+              {sortedAds.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-[color:var(--color-medium)]">
+                    {ads.length === 0 ? "No ads yet." : "No ads match your search or filters."}
+                  </td>
+                </tr>
+              ) : (
+                sortedAds.map((ad: any) => (
                 <tr key={ad.id} className="border-t border-[color:var(--color-border)]">
                   <td className="px-4 py-3 w-64">
                     <div className="flex items-center gap-3">
@@ -823,12 +1134,20 @@ export default function AdsManagerPage() {
                         alt={ad.title || "Ad"}
                         className="w-16 h-16 object-cover rounded flex-shrink-0"
                       />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium text-[color:var(--color-dark)] truncate">
                           {ad.title || "Untitled Ad"}
                         </div>
+                        <a
+                          href={ad.link_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-[color:var(--color-riviera-blue)] hover:underline truncate block"
+                        >
+                          {ad.link_url}
+                        </a>
                         {ad.runtime_seconds && (
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-gray-500 mt-0.5">
                             Runtime: {ad.runtime_seconds}s
                           </div>
                         )}
@@ -846,16 +1165,6 @@ export default function AdsManagerPage() {
                         </span>
                       ))}
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <a
-                      href={ad.link_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[color:var(--color-riviera-blue)] hover:underline truncate block max-w-xs"
-                    >
-                      {ad.link_url}
-                    </a>
                   </td>
                   <td className="px-4 py-3 text-sm">
                     {(() => {
@@ -884,8 +1193,8 @@ export default function AdsManagerPage() {
                   </td>
                   <td className="px-4 py-3 text-sm text-[color:var(--color-medium)]">
                     <div className="text-xs">
-                      <div>Start: {new Date(ad.start_date).toLocaleString()}</div>
-                      <div>End: {new Date(ad.end_date).toLocaleString()}</div>
+                      <div>Start: {new Date(ad.start_date).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</div>
+                      <div>End: {new Date(ad.end_date).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -898,6 +1207,13 @@ export default function AdsManagerPage() {
                       </button>
                       <span className="text-[color:var(--color-medium)]">|</span>
                       <button
+                        onClick={() => handleDuplicateAd(ad)}
+                        className="text-xs font-semibold text-[color:var(--color-dark)] hover:underline"
+                      >
+                        Duplicate
+                      </button>
+                      <span className="text-[color:var(--color-medium)]">|</span>
+                      <button
                         onClick={() => handleToggleActive(ad)}
                         className={`text-xs font-semibold hover:underline ${
                           ad.is_active ? "text-yellow-600" : "text-green-600"
@@ -907,7 +1223,7 @@ export default function AdsManagerPage() {
                       </button>
                       <span className="text-[color:var(--color-medium)]">|</span>
                       <button
-                        onClick={() => handleDeleteAd(ad.id)}
+                        onClick={() => handleDeleteAd(ad)}
                         className="text-xs font-semibold text-red-600 hover:underline"
                       >
                         Delete
@@ -915,7 +1231,8 @@ export default function AdsManagerPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
 
@@ -1048,7 +1365,7 @@ export default function AdsManagerPage() {
                       Advertisement label color
                     </label>
                     <p className="text-xs text-gray-500 mb-2">
-                      Color of the &quot;Advertisement&quot; text at the bottom of this ad. Leave empty for default gray (good for light backgrounds).
+                      Color of the &quot;Advertisement&quot; text on this ad. Leave empty for default gray (good for light backgrounds).
                     </p>
                     <div className="flex items-center gap-3">
                       <input
@@ -1067,6 +1384,26 @@ export default function AdsManagerPage() {
                     </div>
                   </div>
 
+                  {/* Advertisement label position */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[color:var(--color-dark)] mb-2">
+                      Advertisement label position
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Where the &quot;Advertisement&quot; tag appears on the ad (default: bottom right).
+                    </p>
+                    <select
+                      value={formData.ad_label_position}
+                      onChange={(e) => setFormData({ ...formData, ad_label_position: e.target.value as "bottom-right" | "bottom-left" | "top-right" | "top-left" })}
+                      className="w-full border border-gray-300 rounded-md px-4 py-2"
+                    >
+                      <option value="bottom-right">Bottom right</option>
+                      <option value="bottom-left">Bottom left</option>
+                      <option value="top-right">Top right</option>
+                      <option value="top-left">Top left</option>
+                    </select>
+                  </div>
+
                   {/* Selected Slots Display */}
                   {formData.selectedSlots.length > 0 && (
                     <div>
@@ -1079,34 +1416,15 @@ export default function AdsManagerPage() {
                             key={slot}
                             className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-200"
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-blue-700">
-                                {getSlotLabel(slot)}
-                              </span>
-                              <button
-                                onClick={() => handleSlotClick(slot)}
-                                className="text-blue-700 hover:text-blue-900 font-bold"
-                              >
-                                ×
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                id={`fill-${slot}`}
-                                checked={slotFillSettings[slot] ?? true}
-                                onChange={(e) =>
-                                  setSlotFillSettings({
-                                    ...slotFillSettings,
-                                    [slot]: e.target.checked,
-                                  })
-                                }
-                                className="h-4 w-4 text-[color:var(--color-riviera-blue)]"
-                              />
-                              <label htmlFor={`fill-${slot}`} className="text-xs text-gray-700">
-                                Fill section
-                              </label>
-                            </div>
+                            <span className="text-sm font-semibold text-blue-700">
+                              {getSlotLabel(slot)}
+                            </span>
+                            <button
+                              onClick={() => handleSlotClick(slot)}
+                              className="text-blue-700 hover:text-blue-900 font-bold"
+                            >
+                              ×
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -1227,19 +1545,6 @@ export default function AdsManagerPage() {
                     </div>
                   </div>
 
-                  {/* Active Toggle */}
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="is_active"
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="h-4 w-4 text-[color:var(--color-riviera-blue)]"
-                    />
-                    <label htmlFor="is_active" className="ml-2 text-sm text-[color:var(--color-dark)]">
-                      Active (ad will display when scheduled)
-                    </label>
-                  </div>
                 </div>
 
                 <div className="flex gap-2 mt-6">
@@ -1259,45 +1564,119 @@ export default function AdsManagerPage() {
               </div>
 
               {/* Right Side - Preview */}
-              <div className="w-1/2 bg-gray-50 p-6">
+              <div className="w-1/2 bg-gray-50 p-6 flex flex-col">
                 <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">Preview</h3>
-                <AdPreview
-                  selectedSlots={formData.selectedSlots}
-                  onSlotClick={handleSlotClick}
-                  previewAd={
-                    (formData.image_url || imagePreview)
-                      ? {
-                          image_url: formData.image_url || imagePreview || "",
-                          title: formData.title,
-                        }
-                      : undefined
-                  }
-                  currentTab={previewTab}
-                  onTabChange={setPreviewTab}
-                />
+                <div className="flex-1 min-h-0">
+                  <AdPreview
+                    selectedSlots={formData.selectedSlots}
+                    onSlotClick={handleSlotClick}
+                    previewAd={
+                      (formData.image_url || imagePreview)
+                        ? {
+                            image_url: formData.image_url || imagePreview || "",
+                            title: formData.title,
+                          }
+                        : undefined
+                    }
+                    adsBySlot={adsBySlot}
+                    currentTab={previewTab}
+                    onTabChange={setPreviewTab}
+                  />
+                </div>
+                {formData.selectedSlots.length > 0 && (() => {
+                  const othersInSection = ads.filter(
+                    (a: any) =>
+                      (editingAd ? a.id !== editingAd.id : true) &&
+                      (a.slots || (a.ad_slot ? [a.ad_slot] : [])).some((s: string) =>
+                        formData.selectedSlots.includes(s)
+                      )
+                  );
+                  if (othersInSection.length === 0) return null;
+                  return (
+                    <p className="text-xs text-[color:var(--color-medium)] mt-3 pt-3 border-t border-gray-200">
+                      Also in this section:{" "}
+                      {othersInSection.map((a: any) => a.title || "Untitled Ad").join(", ")}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* Runtime modal: set run times for all ads in the selected slot(s) */}
+      {showRuntimeModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 relative">
+            <h2 className="text-xl font-bold text-[color:var(--color-dark)] mb-2">Set run times for ads in this slot</h2>
+            <p className="text-sm text-[color:var(--color-medium)] mb-4">
+              Multiple ads share this slot. Set how many seconds each ad displays before rotating to the next.
+            </p>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              {runtimeModalAds.map((row, index) => (
+                <div key={row.adId ?? "current"} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[color:var(--color-dark)] truncate">
+                      {row.adId == null ? "(This ad)" : row.title}
+                    </p>
+                    {row.adId != null && (
+                      <p className="text-xs text-[color:var(--color-medium)]">Existing ad in slot</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <input
+                      type="number"
+                      min={1}
+                      value={row.runtime_seconds ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setRuntimeModalAds((prev) =>
+                          prev.map((r, i) => (i === index ? { ...r, runtime_seconds: v ? parseInt(v, 10) : null } : r))
+                        );
+                      }}
+                      className="w-20 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                      placeholder="sec"
+                    />
+                    <span className="text-sm text-[color:var(--color-medium)]">sec</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={handleRuntimeModalConfirm}
+                className="flex-1 px-4 py-2 bg-[color:var(--color-riviera-blue)] text-white rounded-md font-semibold hover:bg-opacity-90"
+              >
+                Confirm & save all
+              </button>
+              <button
+                onClick={() => setShowRuntimeModal(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md font-semibold hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Settings Modal */}
       {showSettingsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full my-8 p-6 relative max-h-[calc(100vh-4rem)] flex flex-col">
             <button
               onClick={() => setShowSettingsModal(false)}
-              className="absolute top-4 right-4 text-[color:var(--color-medium)] hover:text-[color:var(--color-dark)] transition"
+              className="absolute top-4 right-4 z-10 shrink-0 text-[color:var(--color-medium)] hover:text-[color:var(--color-dark)] transition"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
-            <h2 className="text-2xl font-bold text-[color:var(--color-dark)] mb-4">Ad Settings</h2>
+            <h2 className="text-2xl font-bold text-[color:var(--color-dark)] mb-4 shrink-0">Ad Settings</h2>
 
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto min-h-0">
               {adSettings.map((setting) => (
                 <div key={setting.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                   <div>
@@ -1321,7 +1700,7 @@ export default function AdsManagerPage() {
               ))}
             </div>
 
-            <div className="mt-6">
+            <div className="mt-6 shrink-0 pt-2">
               <button
                 onClick={() => setShowSettingsModal(false)}
                 className="w-full px-4 py-2 bg-[color:var(--color-riviera-blue)] text-white rounded-md font-semibold hover:bg-opacity-90"
@@ -1329,6 +1708,46 @@ export default function AdsManagerPage() {
                 Done
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* In-app toast: action completed, 10s timer, Ok / Undo */}
+      {toast && (
+        <div
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-full max-w-sm px-4"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="bg-white rounded-lg shadow-lg border border-gray-300 overflow-hidden">
+            <p className="text-sm text-[color:var(--color-dark)] px-4 pt-3 pb-2">
+              {toast.message}
+            </p>
+            <div className="flex justify-end gap-2 px-4 pb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  toast.onUndo?.();
+                  dismissToast();
+                }}
+                className="text-xs font-semibold text-[color:var(--color-riviera-blue)] hover:underline"
+              >
+                {toast.onUndo ? "Undo" : "Ok"}
+              </button>
+              {toast.onUndo && (
+                <button
+                  type="button"
+                  onClick={dismissToast}
+                  className="text-xs font-semibold text-gray-600 hover:underline"
+                >
+                  Ok
+                </button>
+              )}
+            </div>
+            <div
+              className="h-1 bg-[color:var(--color-riviera-blue)] opacity-30 transition-all duration-300"
+              style={{ width: `${(toastSecondsLeft / 10) * 100}%` }}
+            />
           </div>
         </div>
       )}

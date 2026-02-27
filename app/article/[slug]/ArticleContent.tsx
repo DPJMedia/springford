@@ -466,7 +466,12 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                           {/* First ad after first content block */}
                           {index === 0 && (
                             <div className="my-8 not-prose">
-                              <AdDisplay adSlot="article-inline-1" className="w-full" />
+                              <div className="hidden lg:block">
+                                <AdDisplay adSlot="article-inline-1" className="w-full" />
+                              </div>
+                              <div className="lg:hidden">
+                                <AdDisplay adSlot="article-mobile-inline" className="w-full" />
+                              </div>
                             </div>
                           )}
                         </Fragment>
@@ -474,7 +479,7 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                   </div>
                   {/* Second ad only when there are 2+ blocks; single-block articles show only the first ad */}
                   {article.content_blocks.length > 1 && (
-                    <div className="mt-8 mb-8">
+                    <div className="mt-8 mb-8 hidden lg:block">
                       <AdDisplay adSlot="article-inline-2" className="w-full" />
                     </div>
                   )}
@@ -517,30 +522,45 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                     </ReactMarkdown>
                   </div>
                   {/* Legacy single-body: both ads at bottom */}
-                  <div className="mb-8">
+                  <div className="mb-8 hidden lg:block">
                     <AdDisplay adSlot="article-inline-1" className="w-full" />
                   </div>
-                  <div className="mb-8">
+                  <div className="mb-8 hidden lg:block">
                     <AdDisplay adSlot="article-inline-2" className="w-full" />
+                  </div>
+                  <div className="mb-8 lg:hidden not-prose">
+                    <AdDisplay adSlot="article-mobile-inline" className="w-full" />
                   </div>
                 </>
               )}
 
+              {/* Mobile Section 2: end of article */}
+              <div className="mt-8 mb-8 lg:hidden not-prose">
+                <AdDisplay adSlot="article-mobile-end" className="w-full" />
+              </div>
+
               {/* Tags */}
               {article.tags && article.tags.length > 0 && (
-                <div className="mb-8 pb-8 border-b border-gray-200">
-                  <div className="flex flex-wrap gap-2">
-                    {article.tags.map((tag) => (
-                      <Link
-                        key={tag}
-                        href={`/tag/${encodeURIComponent(tag)}`}
-                        className="px-3 py-1 bg-gray-100 text-[color:var(--color-dark)] text-sm font-medium rounded-full hover:bg-[color:var(--color-riviera-blue)] hover:text-white transition"
-                      >
-                        {tag}
-                      </Link>
-                    ))}
+                <>
+                  <div className="mb-8 pb-8 border-b border-gray-200">
+                    <div className="flex flex-wrap gap-2">
+                      {article.tags.map((tag) => (
+                        <Link
+                          key={tag}
+                          href={`/tag/${encodeURIComponent(tag)}`}
+                          className="px-3 py-1 bg-gray-100 text-[color:var(--color-dark)] text-sm font-medium rounded-full hover:bg-[color:var(--color-riviera-blue)] hover:text-white transition"
+                        >
+                          {tag}
+                        </Link>
+                      ))}
+                    </div>
                   </div>
-                </div>
+
+                  {/* Mobile Section 3: below tags */}
+                  <div className="mb-8 lg:hidden not-prose">
+                    <AdDisplay adSlot="article-mobile-below-tags" className="w-full" />
+                  </div>
+                </>
               )}
 
               {/* Related Articles */}
@@ -580,7 +600,7 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
             </article>
 
             {/* Sidebar - Right Side, 4 columns */}
-            <aside className="lg:col-span-4">
+            <aside className="hidden lg:block lg:col-span-4">
               <div className="space-y-6">
                 {/* TOP SIDEBAR AD - Static, Large, Tall */}
                 <div className="w-full">

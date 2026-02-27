@@ -635,9 +635,9 @@ export default function Home() {
                     sectionName="latest"
                   />
 
-                  {/* Mobile: Section 2 ad (300x300) above Most Read */}
+                  {/* Mobile Section 2: 2:1 ad above Most Read */}
                   <div className="pt-8 lg:hidden">
-                    <AdSlot slot="homepage-sidebar-top" className="w-full" />
+                    <AdSlot slot="homepage-mobile-above-most-read" className="w-full" />
                   </div>
 
                   {/* Most Read - mobile only: appears under Latest News and Section 2 ad */}
@@ -737,11 +737,6 @@ export default function Home() {
                     />
                   </div>
 
-                  {/* Mobile: second 300x300-style ad a few sections down (after School District) */}
-                  <div className="pt-8 lg:hidden">
-                    <AdSlot slot="homepage-sidebar-middle" className="w-full" />
-                  </div>
-
                   {/* Politics */}
                   {politicsArticles.length > 0 && (
                     <NewsSection 
@@ -832,6 +827,11 @@ export default function Home() {
                     />
                   </div>
 
+                  {/* Mobile Section 3: 2:1 ad above Editor’s Picks */}
+                  <div className="relative pt-8 lg:hidden">
+                    <AdSlot slot="homepage-mobile-above-editors-picks" className="w-full" />
+                  </div>
+
                   {/* Editor's Picks - same styling as Most Read */}
                   <div className="bg-white rounded-lg p-4 shadow-sm">
                     <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
@@ -866,6 +866,11 @@ export default function Home() {
                     )}
                   </div>
 
+                  {/* Mobile Section 4: 2:1 ad between Editor’s Picks and Footer */}
+                  <div className="relative pt-8 lg:hidden">
+                    <AdSlot slot="homepage-mobile-between-editors-picks-footer" className="w-full" />
+                  </div>
+
                   {/* AD SECTION 4 - SIDEBAR BOTTOM (desktop only on homepage) */}
                   <div className="relative pt-8 hidden lg:block">
                     <AdSlot 
@@ -877,7 +882,7 @@ export default function Home() {
               </div>
 
               {/* AD SECTION 8 - BOTTOM BANNER */}
-              <section className="mt-8 relative pt-8">
+              <section className="mt-8 relative pt-8 hidden lg:block">
                 <AdSlot 
                   slot="homepage-banner-bottom" 
                   className="w-full"

@@ -226,7 +226,10 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
     // Main-page slots: exact aspect ratios so "Fill section" doesn't crop; mobile-friendly min-heights
     const is970x90Banner =
       adSlot === "homepage-banner-top" || adSlot === "homepage-banner-bottom";
-    const isMobileHeroBanner = adSlot === "homepage-banner-top-mobile"; // 300x150 (2:1), mobile-only
+    const isMobileHeroBanner =
+      adSlot === "homepage-banner-top-mobile" ||
+      adSlot.startsWith("homepage-mobile-") ||
+      adSlot.startsWith("article-mobile-"); // 2:1 mobile-only placements
     const is300x300Sidebar = adSlot === "homepage-sidebar-top";
     const is300x250Sidebar =
       adSlot === "homepage-sidebar-middle" || adSlot === "homepage-sidebar-bottom";
@@ -305,7 +308,15 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
           className={`w-full rounded-lg ${heightClass} ${objectFit}`.trim()}
         />
         <span
-          className={`absolute bottom-1 right-2 text-[10px] font-normal pointer-events-none ${!(ad.ad_label_color && /^#[0-9A-Fa-f]{6}$/.test(ad.ad_label_color)) ? "text-gray-500" : ""}`}
+          className={`absolute text-[10px] font-normal pointer-events-none ${
+            (ad as { ad_label_position?: string | null }).ad_label_position === "top-left"
+              ? "top-1 left-2"
+              : (ad as { ad_label_position?: string | null }).ad_label_position === "top-right"
+                ? "top-1 right-2"
+                : (ad as { ad_label_position?: string | null }).ad_label_position === "bottom-left"
+                  ? "bottom-1 left-2"
+                  : "bottom-1 right-2"
+          } ${!(ad.ad_label_color && /^#[0-9A-Fa-f]{6}$/.test(ad.ad_label_color)) ? "text-gray-500" : ""}`}
           style={ad.ad_label_color && /^#[0-9A-Fa-f]{6}$/.test(ad.ad_label_color) ? { color: ad.ad_label_color } : undefined}
           aria-hidden
         >

@@ -76,6 +76,7 @@ export interface Ad {
   display_order: number; // Order in rotation sequence
   fill_section: boolean; // Whether to fill section with image (object-cover) or keep true size (object-contain)
   ad_label_color: string | null; // Hex color for "Advertisement" label (e.g. #ffffff); null = default gray
+  ad_label_position?: "bottom-right" | "bottom-left" | "top-right" | "top-left" | null; // Position of "Advertisement" tag; null = bottom-right (requires DB column)
   created_at: string;
   updated_at: string;
   created_by: string | null;
