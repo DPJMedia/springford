@@ -281,6 +281,28 @@ export default function AdminPage() {
             </>
           )}
 
+          {/* Newsletter (All Admins) */}
+          <Link
+            href="/admin/newsletter"
+            className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center group-hover:bg-teal-600 transition">
+                <svg className="w-6 h-6 text-teal-600 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-[color:var(--color-dark)] group-hover:text-teal-600 transition">
+                  Newsletter
+                </h3>
+                <p className="text-sm text-[color:var(--color-medium)]">
+                  Create and send newsletter campaigns
+                </p>
+              </div>
+            </div>
+          </Link>
+
           {/* Analytics Dashboard (All Admins) */}
           <Link
             href="/admin/analytics"
@@ -328,7 +350,7 @@ export default function AdminPage() {
           {/* DiffuseAI Integration (All Admins) */}
           <Link
             href="/admin/diffuse"
-            className="relative overflow-hidden bg-[#000000] rounded-xl p-6 shadow-[0_10px_15px_-3px_rgba(255,150,40,0.3)] hover:shadow-[0_20px_25px_-5px_rgba(255,150,40,0.4)] transition-all duration-300 group col-span-1 md:col-span-2 border border-white/10"
+            className="relative overflow-hidden bg-[#000000] rounded-xl p-6 shadow-[0_10px_15px_-3px_rgba(255,150,40,0.3)] hover:shadow-[0_20px_25px_-5px_rgba(255,150,40,0.4)] transition-all duration-300 group border border-white/10"
             style={{ fontFamily: 'var(--font-space-grotesk)' }}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-[#ff9628]/10 via-transparent to-[#c086fa]/10 opacity-50"></div>
@@ -346,10 +368,8 @@ export default function AdminPage() {
                   Import AI-generated articles from DiffuseAI
                 </p>
               </div>
-              <div className="hidden md:block">
-                <div className="px-4 py-2 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-lg text-white text-sm font-semibold group-hover:scale-105 transition-transform">
-                  {hasDiffuseConnection ? 'Open' : 'Connect Diffuse Account'}
-                </div>
+              <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-[#ff9628] opacity-60 group-hover:opacity-100 transition">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
               </div>
             </div>
           </Link>

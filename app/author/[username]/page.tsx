@@ -14,6 +14,7 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
   const [author, setAuthor] = useState<UserProfile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
 
   // Track author page view
@@ -21,6 +22,23 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
     viewType: 'author',
     trackScroll: true,
   });
+
+  useEffect(() => {
+    async function checkAdminStatus() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('is_admin, is_super_admin')
+          .eq('id', user.id)
+          .single();
+        if (profile?.is_admin || profile?.is_super_admin) {
+          setIsAdmin(true);
+        }
+      }
+    }
+    checkAdminStatus();
+  }, [supabase]);
 
   useEffect(() => {
     async function fetchAuthorAndArticles() {
@@ -280,8 +298,12 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
                             )}
                             <div className="text-xs text-[#545454] mt-auto flex items-center gap-2">
                               <span>{formattedDate(article.published_at)}</span>
-                              <span className="text-[#ff9628]">•</span>
-                              <span>{article.view_count} views</span>
+                              {isAdmin && (
+                                <>
+                                  <span className="text-[#ff9628]">•</span>
+                                  <span>{article.view_count} views</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>

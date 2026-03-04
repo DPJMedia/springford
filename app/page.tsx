@@ -294,10 +294,25 @@ export default function Home() {
   const [breakingNews, setBreakingNews] = useState<Article[]>([]);
   const [trendingArticles, setTrendingArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     fetchArticles();
+    async function checkAdminStatus() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('is_admin, is_super_admin')
+          .eq('id', user.id)
+          .single();
+        if (profile?.is_admin || profile?.is_super_admin) {
+          setIsAdmin(true);
+        }
+      }
+    }
+    checkAdminStatus();
   }, []);
 
   async function fetchArticles() {
@@ -557,11 +572,8 @@ export default function Home() {
           {/* Hero Section */}
           <section className="mb-6">
             {loading ? (
-              <div className="h-[500px] bg-white rounded-lg flex items-center justify-center">
-                <div className="text-center">
-                  <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[color:var(--color-riviera-blue)] border-r-transparent mb-4"></div>
-                  <p className="text-[color:var(--color-medium)]">Loading hero article...</p>
-                </div>
+              <div className="h-[500px] rounded-lg overflow-hidden relative bg-gray-200">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
               </div>
             ) : heroArticle ? (
               <ArticleCard article={heroArticle} size="hero" />
@@ -665,9 +677,11 @@ export default function Home() {
                                 <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2">
                                   {article.title}
                                 </h4>
-                                <p className="text-xs text-[color:var(--color-medium)] mt-1">
-                                  {article.view_count.toLocaleString()} views
-                                </p>
+                                {isAdmin && (
+                                  <p className="text-xs text-[color:var(--color-medium)] mt-1">
+                                    {article.view_count.toLocaleString()} views
+                                  </p>
+                                )}
                               </div>
                             </Link>
                           ))}
@@ -809,9 +823,11 @@ export default function Home() {
                                 <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2">
                                   {article.title}
                                 </h4>
-                                <p className="text-xs text-[color:var(--color-medium)] mt-1">
-                                  {article.view_count.toLocaleString()} views
-                                </p>
+                                {isAdmin && (
+                                  <p className="text-xs text-[color:var(--color-medium)] mt-1">
+                                    {article.view_count.toLocaleString()} views
+                                  </p>
+                                )}
                               </div>
                             </Link>
                           ))}

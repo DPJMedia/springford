@@ -128,7 +128,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
               )}
               <div className="p-3">
                 <div className="text-xs text-blue-600 font-semibold uppercase mb-1">
-                  {article.section}
+                  {(article.sections?.filter((s) => s !== 'hero')[0]) || (article.section !== 'hero' ? article.section : null)}
                 </div>
                 <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2 leading-snug">
                   {article.title}

@@ -34,6 +34,7 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
   const [coAuthorAvatar, setCoAuthorAvatar] = useState<string | null>(null);
   const [coAuthorName, setCoAuthorName] = useState<string | null>(null);
   const [coAuthorUsername, setCoAuthorUsername] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
 
   // Analytics tracking
@@ -89,6 +90,23 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
       });
     };
   }, [article.id, sessionId, getCurrentScrollDepth, getTimeSpent]);
+
+  useEffect(() => {
+    async function checkAdminStatus() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('is_admin, is_super_admin')
+          .eq('id', user.id)
+          .single();
+        if (profile?.is_admin || profile?.is_super_admin) {
+          setIsAdmin(true);
+        }
+      }
+    }
+    checkAdminStatus();
+  }, [supabase]);
 
   useEffect(() => {
     // Increment view count
@@ -371,10 +389,14 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                         </>
                       )}
                     </div>
-                    <span>•</span>
-                    <span>{article.view_count} views</span>
-                    <span>•</span>
-                    <span>{article.share_count} shares</span>
+                    {isAdmin && (
+                      <>
+                        <span>•</span>
+                        <span>{article.view_count} views</span>
+                        <span>•</span>
+                        <span>{article.share_count} shares</span>
+                      </>
+                    )}
                     <span>•</span>
                     <ShareButton articleTitle={article.title} articleUrl={articleUrl} articleId={article.id} />
                   </div>

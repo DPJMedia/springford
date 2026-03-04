@@ -1,5 +1,7 @@
 "use client"
 
+import { useState } from 'react'
+
 type AvatarProps = {
   src?: string | null
   name?: string | null
@@ -9,6 +11,7 @@ type AvatarProps = {
 }
 
 export function Avatar({ src, name, email, size = 'md', className = '' }: AvatarProps) {
+  const [imgError, setImgError] = useState(false)
   const sizeClasses = {
     xs: 'w-6 h-6 text-xs',
     sm: 'w-8 h-8 text-sm',
@@ -41,12 +44,14 @@ export function Avatar({ src, name, email, size = 'md', className = '' }: Avatar
     return '?'
   }
 
-  if (src) {
+  if (src && !imgError) {
     return (
       <img
         src={src}
         alt={name || 'Avatar'}
         className={`${sizeClasses[size]} rounded-full object-cover ${className}`}
+        onError={() => setImgError(true)}
+        referrerPolicy="no-referrer"
       />
     )
   }
