@@ -79,7 +79,7 @@ function renderHeader(): string {
   <tr>
     <td align="center" style="padding: 28px 24px 20px; background-color: ${WHITE}; border-bottom: 3px solid ${BLUE};">
       <a href="${SITE_URL}" style="text-decoration: none;">
-        <div style="font-family: 'Playfair Display', Didot, 'Bodoni MT', Georgia, serif; font-size: 30px; font-weight: 700; color: ${DARK}; letter-spacing: -0.02em; line-height: 1.1;">
+        <div class="sfp-site-name" style="font-family: 'Playfair Display', Didot, 'Bodoni MT', Georgia, serif; font-size: 30px; font-weight: 700; color: ${DARK}; letter-spacing: -0.02em; line-height: 1.1;">
           Spring-Ford Press
         </div>
         <div style="font-family: 'Red Hat Display', -apple-system, sans-serif; font-size: 11px; font-weight: 500; color: ${MEDIUM}; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 5px;">
@@ -136,13 +136,13 @@ function renderHeroText(block: NewsletterBlock): string {
   const a = align(block.alignment);
   return `
   <tr>
-    <td style="padding: 40px 40px 32px; background-color: ${WHITE}; text-align: ${a};">
+    <td class="sfp-hero-pad" style="padding: 40px 40px 32px; background-color: ${WHITE}; text-align: ${a};">
       ${block.headline ? `
-      <h1 style="margin: 0 0 12px; font-family: 'Newsreader', Georgia, serif; font-size: 34px; font-weight: 700; color: ${DARK}; line-height: 1.2; letter-spacing: -0.02em; text-align: ${a};">
+      <h1 class="sfp-h1" style="margin: 0 0 12px; font-family: 'Newsreader', Georgia, serif; font-size: 34px; font-weight: 700; color: ${DARK}; line-height: 1.2; letter-spacing: -0.02em; text-align: ${a};">
         ${nl2br(block.headline)}
       </h1>` : ''}
       ${block.subheadline ? `
-      <h2 style="margin: 0 0 16px; font-family: 'Newsreader', Georgia, serif; font-size: 20px; font-weight: 400; font-style: italic; color: ${MEDIUM}; line-height: 1.4; letter-spacing: -0.01em; text-align: ${a};">
+      <h2 class="sfp-subh2" style="margin: 0 0 16px; font-family: 'Newsreader', Georgia, serif; font-size: 20px; font-weight: 400; font-style: italic; color: ${MEDIUM}; line-height: 1.4; letter-spacing: -0.01em; text-align: ${a};">
         ${nl2br(block.subheadline)}
       </h2>` : ''}
       ${block.introText ? `
@@ -164,9 +164,9 @@ function renderText(block: NewsletterBlock): string {
   const a = align(block.alignment);
   return `
   <tr>
-    <td style="padding: 28px 40px; background-color: ${WHITE}; text-align: ${a};">
+    <td class="sfp-text-pad" style="padding: 28px 40px; background-color: ${WHITE}; text-align: ${a};">
       ${block.textTitle ? `
-      <h3 style="margin: 0 0 12px; font-family: 'Newsreader', Georgia, serif; font-size: 22px; font-weight: 700; color: ${DARK}; letter-spacing: -0.01em; line-height: 1.3; text-align: ${a};">
+      <h3 class="sfp-text-h3" style="margin: 0 0 12px; font-family: 'Newsreader', Georgia, serif; font-size: 22px; font-weight: 700; color: ${DARK}; letter-spacing: -0.01em; line-height: 1.3; text-align: ${a};">
         ${esc(block.textTitle)}
       </h3>` : ''}
       ${block.textBody ? `
@@ -233,11 +233,11 @@ function renderArticleFull(block: NewsletterBlock): string {
               style="width: 100%; max-width: 600px; height: auto; display: block; border: 0;" />
           </a>
         </td></tr>` : ''}
-        <tr><td style="padding: 24px 40px 28px;">
+        <tr><td class="sfp-art-pad" style="padding: 24px 40px 28px;">
           <div style="font-family: 'Red Hat Display', sans-serif; font-size: 11px; font-weight: 700; color: ${BLUE}; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px;">
             ${esc(sectionLabel)}
           </div>
-          <h2 style="margin: 0 0 10px; font-family: 'Newsreader', Georgia, serif; font-size: 24px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; color: ${DARK};">
+          <h2 class="sfp-article-h2" style="margin: 0 0 10px; font-family: 'Newsreader', Georgia, serif; font-size: 24px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; color: ${DARK}; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">
             <a href="${esc(articleUrl)}" style="color: ${DARK}; text-decoration: none;">${esc(block.articleTitle)}</a>
           </h2>
           ${block.articleExcerpt ? `
@@ -288,7 +288,7 @@ function renderArticleCard(block: NewsletterBlock): string {
         </td></tr>
         <!-- Title — webkit-line-clamp for iOS Mail; max-height + overflow:hidden as universal fallback -->
         <tr><td style="padding: 6px 16px 0; overflow: hidden; max-height: ${TITLE_MAX};">
-          <h3 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 17px; font-weight: 700; line-height: 1.3; color: ${DARK}; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; max-height: ${TITLE_MAX};">
+          <h3 class="sfp-card-h3" style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 17px; font-weight: 700; line-height: 1.3; color: ${DARK}; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; max-height: ${TITLE_MAX};">
             <a href="${esc(articleUrl)}" style="color: ${DARK}; text-decoration: none;">${esc(block.articleTitle)}</a>
           </h3>
         </td></tr>
@@ -397,6 +397,27 @@ export function buildEmailHtml(
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>${esc(subject)}</title>
   <link href="${FONTS_LINK}" rel="stylesheet">
+  <style>
+    /* ── Mobile responsive font sizes ── */
+    @media only screen and (max-width: 480px) {
+      .sfp-site-name  { font-size: 22px !important; }
+      .sfp-h1         { font-size: 22px !important; line-height: 1.3 !important; }
+      .sfp-subh2      { font-size: 15px !important; }
+      .sfp-article-h2 {
+        font-size: 18px !important;
+        overflow: hidden !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 3 !important;
+        -webkit-box-orient: vertical !important;
+      }
+      .sfp-text-h3    { font-size: 17px !important; }
+      .sfp-card-h3    { font-size: 14px !important; max-height: 73px !important; }
+      .sfp-hero-pad   { padding: 24px 20px 20px !important; }
+      .sfp-text-pad   { padding: 20px 20px !important; }
+      .sfp-art-pad    { padding: 16px 20px 20px !important; }
+      .sfp-outer-pad  { padding: 16px 8px 28px !important; }
+    }
+  </style>
   <!--[if mso]>
   <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
   <![endif]-->
@@ -408,7 +429,7 @@ export function buildEmailHtml(
   </div>` : ''}
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: ${LIGHT_BG};">
     <tr>
-      <td align="center" style="padding: 24px 16px 40px;">
+      <td class="sfp-outer-pad" align="center" style="padding: 24px 16px 40px;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
           style="max-width: 600px; background-color: ${WHITE}; border: 1px solid ${BORDER}; border-radius: 4px; overflow: hidden;">
           ${renderHeader()}
