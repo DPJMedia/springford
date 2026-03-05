@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
 const MIN_LENGTH = 3;
@@ -95,11 +94,9 @@ function SetUsernameContent() {
     <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <Link href="/" className="inline-block">
-            <h1 className="masthead text-3xl font-black text-[color:var(--color-dark)]">
-              Spring-Ford Press
-            </h1>
-          </Link>
+          <h1 className="masthead text-3xl font-black text-[color:var(--color-dark)]">
+            Spring-Ford Press
+          </h1>
         </div>
         <div className="bg-white rounded-lg p-8 shadow-soft ring-1 ring-[color:var(--color-border)]">
           <div className="text-4xl mb-4 text-center">👋</div>
@@ -147,14 +144,6 @@ function SetUsernameContent() {
               {loading ? "Saving…" : checking ? "Checking…" : "Continue"}
             </button>
           </form>
-        </div>
-        <div className="mt-4 text-center">
-          <Link
-            href="/"
-            className="text-sm text-[color:var(--color-medium)] hover:text-[color:var(--color-dark)]"
-          >
-            ← Back to home
-          </Link>
         </div>
       </div>
     </div>
