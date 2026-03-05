@@ -6,8 +6,7 @@ import type { NewsletterBlock, ArticleLayout } from '@/lib/newsletter/buildEmail
 const SENDGRID_API_URL = 'https://api.sendgrid.com/v3/mail/send';
 const SITE_URL = 'https://www.springford.press';
 
-// ⚠️ TEST MODE GUARD — only send to this address until fully approved
-const TEST_MODE = true;
+// Test recipient used only when the "Send Test" button is clicked (testOnly: true)
 const TEST_RECIPIENT = 'dylancobb2525@gmail.com';
 
 export async function POST(request: Request) {
@@ -97,16 +96,19 @@ export async function POST(request: Request) {
     let recipientCount = 0;
     const recipientsType: string = campaign.recipients_type || 'newsletter';
 
-    if (TEST_MODE || testOnly) {
+    if (testOnly) {
+      // "Send Test" button — always goes to the test address only, never marks as sent
       recipients = [{ email: TEST_RECIPIENT }];
       recipientCount = 1;
     } else {
-      // Production: fetch based on recipients_type
+      // Real send — fetch based on recipients_type
       let query = supabase.from('user_profiles').select('email, full_name').not('email', 'is', null);
       if (recipientsType === 'newsletter') {
         query = query.eq('newsletter_subscribed', true);
+      } else if (recipientsType === 'super_admins') {
+        query = query.eq('is_super_admin', true);
       }
-      // 'all_users' sends to every registered user with an email
+      // 'all_users' sends to every registered user with an email (no extra filter)
       const { data: subscribers } = await query;
 
       if (subscribers && subscribers.length > 0) {
@@ -163,12 +165,16 @@ export async function POST(request: Request) {
         .eq('id', campaignId);
     }
 
-    const isTest = TEST_MODE || testOnly;
+    const recipientLabel =
+      recipientsType === 'all_users' ? 'users' :
+      recipientsType === 'super_admins' ? 'super admins' :
+      'subscribers';
+
     return NextResponse.json({
       success: true,
       recipientCount,
-      testMode: isTest,
-      sentTo: isTest ? TEST_RECIPIENT : `${recipientCount} ${recipientsType === 'all_users' ? 'users' : 'subscribers'}`,
+      testMode: testOnly,
+      sentTo: testOnly ? TEST_RECIPIENT : `${recipientCount} ${recipientLabel}`,
     });
   } catch (error: unknown) {
     console.error('Send campaign error:', error);

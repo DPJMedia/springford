@@ -18,11 +18,12 @@ interface Template {
   updated_at: string;
 }
 
-type RecipientsType = "newsletter" | "all_users";
+type RecipientsType = "newsletter" | "all_users" | "super_admins";
 
 const RECIPIENTS_OPTIONS: { value: RecipientsType; label: string; desc: string }[] = [
-  { value: "newsletter", label: "Newsletter Subscribers", desc: "Only users who have opted in to the newsletter" },
-  { value: "all_users",  label: "All Registered Users",  desc: "Every user with an account on the site" },
+  { value: "newsletter",   label: "Newsletter Subscribers", desc: "Only users who have opted in to the newsletter" },
+  { value: "all_users",    label: "All Registered Users",   desc: "Every user with an account on the site" },
+  { value: "super_admins", label: "Super Admins Only",      desc: "Only super admin accounts — useful for internal review before a full send" },
 ];
 
 // ─── Confirm Modal (replaces browser confirm()) ───────────────────────────────
@@ -431,8 +432,8 @@ function CampaignNewInner() {
     setConfirmModal({
       title: isTest ? "Send test email?" : "Send campaign?",
       message: isTest
-        ? "A test email will be sent to dylancobb2525@gmail.com."
-        : `This will send to all ${recipLabel}. In test mode it still goes to the test address only.`,
+        ? "A preview will be sent to dylancobb2525@gmail.com only. The campaign will not be marked as sent."
+        : `This will send to all ${recipLabel}. This cannot be undone.`,
       confirmLabel: isTest ? "Send Test" : "Send Campaign",
       onConfirm: () => { setConfirmModal(null); executeSend(isTest); },
     });
@@ -480,11 +481,6 @@ function CampaignNewInner() {
         </div>
       </div>
 
-      {/* Test mode banner */}
-      <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
-        <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-        <p className="text-xs text-amber-800"><strong>Test Mode:</strong> All sends (including scheduled) go only to <strong>dylancobb2525@gmail.com</strong>.</p>
-      </div>
 
       {/* Send result */}
       {sendResult && (
@@ -661,7 +657,7 @@ function CampaignNewInner() {
                 className="w-full py-3 text-sm font-bold text-white bg-[color:var(--color-riviera-blue)] rounded-xl hover:opacity-90 transition disabled:opacity-40 flex items-center justify-center gap-2">
                 {sending ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" /> Sending…</> : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>Send Campaign</>}
               </button>
-              <p className="text-[10px] text-amber-700 text-center">⚠ All sends currently go to test address only.</p>
+              <p className="text-[10px] text-gray-400 text-center">Use "Super Admins Only" to review before sending to all subscribers.</p>
             </div>
           )}
 
