@@ -276,6 +276,17 @@ export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
 
+  // After articles load, scroll to the hash section if one is in the URL
+  useEffect(() => {
+    if (!loading && window.location.hash) {
+      const id = window.location.hash.slice(1);
+      const el = document.getElementById(id);
+      if (el) {
+        setTimeout(() => el.scrollIntoView({ behavior: "smooth" }), 50);
+      }
+    }
+  }, [loading]);
+
   useEffect(() => {
     fetchArticles();
     async function checkAdminStatus() {

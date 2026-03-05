@@ -142,8 +142,8 @@ export function SearchDropdown({ isOpen, onClose }: SearchDropdownProps) {
 
       {/* ── Results dropdown — floats over page content, never expands the bar ── */}
       {(suggestions.length > 0 || (loading && query.trim().length > 0)) && (
-        <div className="absolute top-full left-0 right-0 z-50 px-3 sm:px-6 lg:px-8 pt-1 xl:flex xl:justify-center">
-          <div className="w-full xl:max-w-2xl bg-white rounded-xl border border-[color:var(--color-border)] shadow-lg overflow-hidden">
+        <div className="absolute top-full left-0 right-0 z-50 px-3 sm:px-6 lg:px-8 pt-1 xl:flex xl:justify-center pointer-events-none">
+          <div className="w-full xl:max-w-2xl bg-white rounded-xl border border-[color:var(--color-border)] shadow-lg overflow-hidden pointer-events-auto">
             {loading && suggestions.length === 0 ? (
               <div className="px-4 py-3 text-sm text-[color:var(--color-medium)]">Searching…</div>
             ) : (
