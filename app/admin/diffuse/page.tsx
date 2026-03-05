@@ -1458,7 +1458,7 @@ export default function DiffuseIntegrationPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <a
-                    href="https://diffuse-ai-blush.vercel.app/dashboard"
+                    href="https://www.diffuse.press"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#ff9628] rounded-xl transition-all duration-300 flex items-center gap-2 backdrop-blur-[20px]"
@@ -1466,7 +1466,7 @@ export default function DiffuseIntegrationPage() {
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
-                    <span className="text-white">Visit diffuse<span className="text-[#ff9628]">.ai</span></span>
+                    <span className="text-white">Visit diffuse<span className="text-[#ff9628]">.press</span></span>
                   </a>
                   <button
                     onClick={handleDisconnect}

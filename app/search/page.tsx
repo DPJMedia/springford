@@ -51,7 +51,7 @@ function SearchContent() {
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Main Content - Search Results */}
-            <div className="lg:col-span-8">
+            <div className="lg:col-span-9">
               <div className="mb-6">
                 <p className="text-sm text-[color:var(--color-medium)] mb-2">
                   {loading
@@ -88,9 +88,17 @@ function SearchContent() {
               </div>
 
               {loading ? (
-                <div className="py-16 text-center">
-                  <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-[color:var(--color-riviera-blue)] border-r-transparent" />
-                  <p className="mt-4 text-[color:var(--color-medium)]">Searching articles...</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="rounded-lg overflow-hidden bg-gray-200 relative">
+                      <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                      <div className="h-40 w-full" />
+                      <div className="p-4 space-y-2">
+                        <div className="h-4 bg-gray-300/60 rounded w-4/5" />
+                        <div className="h-4 bg-gray-300/60 rounded w-2/3" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : articles.length === 0 && q.trim() ? (
                 <div className="py-16 text-center rounded-lg bg-white border-2 border-dashed border-[color:var(--color-border)]">
@@ -98,45 +106,42 @@ function SearchContent() {
                   <p className="mt-2 text-sm text-[color:var(--color-medium)]">Try different keywords or check spelling.</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {articles.map((article) => (
                     <Link
                       key={article.id}
                       href={`/article/${article.slug}`}
-                      className="block group rounded-lg bg-white p-4 sm:p-5 shadow-sm ring-1 ring-[color:var(--color-border)] hover:shadow-md hover:ring-[color:var(--color-riviera-blue)]/50 transition"
+                      className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition group flex flex-col h-full"
                     >
-                      <div className="flex flex-col sm:flex-row gap-4">
-                        {article.image_url && (
-                          <div className="flex-shrink-0 w-full sm:w-40 h-32 sm:h-28 rounded-lg overflow-hidden bg-gray-100">
-                            <img
-                              src={article.image_url}
-                              alt=""
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          </div>
+                      {article.image_url ? (
+                        <div className="relative aspect-video overflow-hidden flex-shrink-0">
+                          <img
+                            src={article.image_url}
+                            alt={article.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        </div>
+                      ) : (
+                        <div className="relative aspect-video overflow-hidden flex-shrink-0 bg-gradient-to-br from-blue-100 via-blue-50 to-gray-100 flex items-center justify-center">
+                          <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="p-4 flex flex-col flex-1 min-h-0">
+                        <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-2 group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2 min-h-[3.25rem] flex-shrink-0">
+                          {article.title}
+                        </h3>
+                        {article.excerpt ? (
+                          <p className="text-sm text-[color:var(--color-medium)] mb-3 line-clamp-3 min-h-[3.75rem] flex-shrink-0">
+                            {article.excerpt.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()}
+                          </p>
+                        ) : (
+                          <div className="min-h-[3.75rem] mb-3 flex-shrink-0" />
                         )}
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-lg text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2">
-                            {article.title}
-                          </h3>
-                          {article.excerpt && (
-                            <p className="mt-2 text-sm text-[color:var(--color-medium)] line-clamp-2">
-                              {article.excerpt}
-                            </p>
-                          )}
-                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--color-medium)]">
-                            {article.category && (
-                              <span className="font-semibold uppercase tracking-wider">{article.category}</span>
-                            )}
-                            {article.category && <span>•</span>}
-                            <time dateTime={article.published_at || ""}>{formattedDate(article.published_at)}</time>
-                            {article.author_name && (
-                              <>
-                                <span>•</span>
-                                <span>{article.author_name}</span>
-                              </>
-                            )}
-                          </div>
+                        <div className="mt-auto flex items-center justify-between text-xs text-[color:var(--color-medium)] flex-shrink-0">
+                          <span>{article.author_name || "Staff"}</span>
+                          <span>{formattedDate(article.published_at)}</span>
                         </div>
                       </div>
                     </Link>
@@ -145,8 +150,8 @@ function SearchContent() {
               )}
             </div>
 
-            {/* Sidebar - 300x300 Ad */}
-            <aside className="lg:col-span-4 space-y-6">
+            {/* Sidebar - Ad */}
+            <aside className="lg:col-span-3 space-y-6">
               <div className="sticky top-24">
                 <p className="text-[10px] text-[color:var(--color-medium)] mb-2 uppercase tracking-wider">Advertisement</p>
                 <AdDisplay adSlot="homepage-sidebar-top" className="w-full aspect-square rounded-lg overflow-hidden" />
@@ -171,8 +176,21 @@ export default function SearchPage() {
     <Suspense fallback={
       <>
         <Header />
-        <main className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center">
-          <div className="animate-spin h-10 w-10 rounded-full border-4 border-[color:var(--color-riviera-blue)] border-r-transparent" />
+        <main className="min-h-screen bg-[color:var(--color-surface)]">
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="rounded-lg overflow-hidden bg-gray-200 relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                  <div className="h-40 w-full" />
+                  <div className="p-4 space-y-2">
+                    <div className="h-4 bg-gray-300/60 rounded w-4/5" />
+                    <div className="h-4 bg-gray-300/60 rounded w-2/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </main>
       </>
     }>

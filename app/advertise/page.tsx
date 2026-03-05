@@ -1,43 +1,13 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import Link from "next/link";
 
-const STORAGE_KEY = "springford_advertise_submitted";
-
 function AdvertisePageContent() {
-  const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-    if (searchParams.get("submitted") === "1") {
-      setSubmitted(true);
-      if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, "true");
-      return;
-    }
-    const stored = typeof window !== "undefined" && window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "true") setSubmitted(true);
-  }, [mounted, searchParams]);
-
-  const handleSubmitSuccess = () => {
-    setSubmitted(true);
-    if (typeof window !== "undefined") window.localStorage.setItem(STORAGE_KEY, "true");
-  };
-
-  const handleFillAnother = () => {
-    setSubmitted(false);
-    if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY);
-  };
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   return (
     <>
@@ -50,13 +20,6 @@ function AdvertisePageContent() {
               <div className="lg:col-span-2 p-6 sm:p-8 lg:p-10 flex flex-col justify-between bg-[color:var(--color-off-white)]">
                 <div>
                   <Link href="/" className="flex items-center gap-2 mb-8">
-                    <img
-                      src="/favicon.ico"
-                      alt="Spring-Ford Press"
-                      width={40}
-                      height={40}
-                      className="h-10 w-10 rounded-full object-cover"
-                    />
                     <span className="masthead font-semibold text-[color:var(--color-dark)] text-lg" style={{ letterSpacing: "-0.02em" }}>
                       Spring-Ford Press
                     </span>
@@ -74,8 +37,8 @@ function AdvertisePageContent() {
                     options deliver visibility where it matters most.
                   </p>
                   <p className="mt-4 text-sm text-[color:var(--color-medium)] leading-relaxed">
-                    We in-house all of our advertising technology and statistics, which are modeled after industry
-                    leaders like Meta, so we can provide the best possible performance for your advertisements.
+                    We track detailed analytics on every ad — impressions, clicks, and engagement — and provide
+                    transparent reporting so you always know how your campaign is performing.
                   </p>
                   <p className="mt-6 text-sm text-[color:var(--color-dark)] font-semibold">
                     Complete the form or email{" "}
@@ -88,24 +51,14 @@ function AdvertisePageContent() {
 
               {/* Right: Form */}
               <div className="lg:col-span-3 p-6 sm:p-8 lg:p-10">
-                {submitted ? (
-                  <div className="py-8 sm:py-12 text-center px-4">
-                    <div className="text-5xl mb-4">✓</div>
-                    <h2 className="text-xl font-bold text-[color:var(--color-dark)] mb-2">
-                      We got your message
-                    </h2>
-                    <p className="text-[color:var(--color-medium)] mb-6">
-                      We&apos;ll get back to you soon.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleFillAnother}
-                      className="rounded-lg border-2 border-[color:var(--color-riviera-blue)] bg-white px-6 py-2.5 text-sm font-semibold text-[color:var(--color-riviera-blue)] hover:bg-[color:var(--color-riviera-blue)] hover:text-white transition"
-                    >
-                      Fill out another form
-                    </button>
+                {submitSuccess && (
+                  <div className="mb-6 flex items-center gap-3 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
+                    <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <p className="text-sm font-semibold text-green-800">Message sent — we&apos;ll be in touch soon!</p>
                   </div>
-                ) : (
+                )}
                   <form
                     action="https://formspree.io/f/mqedqljw"
                     method="POST"
@@ -120,7 +73,7 @@ function AdvertisePageContent() {
                           body: formData,
                           headers: { Accept: "application/json" },
                         });
-                        if (res.ok) handleSubmitSuccess();
+                        if (res.ok) setSubmitSuccess(true);
                         else throw new Error();
                       } catch {
                         form.submit();
@@ -255,7 +208,6 @@ function AdvertisePageContent() {
                       {submitting ? "Submitting..." : "Submit"}
                     </button>
                   </form>
-                )}
               </div>
             </div>
           </div>

@@ -70,7 +70,7 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
             )}
           </div>
           <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8 text-white">
-            <h1 className="text-2xl font-black leading-tight mb-2 sm:mb-3 sm:text-3xl md:text-4xl group-hover:text-blue-400 transition">
+            <h1 className="text-2xl font-black leading-tight mb-2 sm:mb-3 sm:text-3xl md:text-4xl group-hover:text-[color:var(--color-riviera-blue)] transition">
               {article.title}
             </h1>
             {article.subtitle && (
@@ -113,7 +113,7 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
             </div>
           )}
           <div className="p-5 flex-1 flex flex-col min-w-0">
-            <h3 className="font-bold text-xl text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition line-clamp-3 h-[5rem]">
+            <h3 className="font-bold text-xl text-[color:var(--color-dark)] mb-2 group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-3 h-[5rem]">
               {article.title}
             </h3>
             {article.excerpt && (
@@ -148,7 +148,7 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
               {article.is_advertisement && (
                 <span className="text-[9px] font-medium uppercase tracking-wider text-gray-500">Ad</span>
               )}
-              <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2 flex-1 min-w-0">
+              <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2 flex-1 min-w-0">
                 {article.title}
               </h4>
             </div>
@@ -190,7 +190,7 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
           </div>
         )}
         <div className="p-4 flex-1 flex flex-col min-w-0">
-          <h3 className="font-bold text-base text-[color:var(--color-dark)] mb-2 group-hover:text-blue-600 transition line-clamp-2">
+          <h3 className="font-bold text-base text-[color:var(--color-dark)] mb-2 group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2">
             {article.title}
           </h3>
           {article.excerpt && (
@@ -207,7 +207,7 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
   );
 }
 
-// Section Component (except Top Stories: when >3 articles, show "View more" collapsible)
+// Section Component — shows up to 3 articles with a "View All" link to the section page
 function NewsSection({ 
   title, 
   articles, 
@@ -217,15 +217,8 @@ function NewsSection({
   articles: Article[]; 
   sectionName: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const isLatest = sectionName.toLowerCase() === "latest";
-  const showViewMore = !isLatest && articles.length > 3;
-  const showViewAll = !isLatest && articles.length > 4;
-  const visibleArticles = isLatest
-    ? articles.slice(0, 3)
-    : showViewMore && !expanded
-      ? articles.slice(0, 3)
-      : articles;
+  const visibleArticles = isLatest ? articles.slice(0, 6) : articles.slice(0, 3);
 
   return (
     <section id={sectionName.toLowerCase()} className="mb-8 scroll-mt-[35vh]">
@@ -233,7 +226,7 @@ function NewsSection({
         <h2 className="text-2xl font-black text-[color:var(--color-dark)] pb-2 border-b-4 border-[color:var(--color-riviera-blue)] w-fit">
           {title}
         </h2>
-        {showViewAll && (
+        {!isLatest && articles.length > 0 && (
           <Link 
             href={`/section/${sectionName.toLowerCase()}`}
             className="text-sm font-semibold text-[color:var(--color-riviera-blue)] hover:underline"
@@ -247,25 +240,11 @@ function NewsSection({
           <p className="text-[color:var(--color-medium)]">No articles in this section yet</p>
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visibleArticles.map((article) => (
-              <ArticleCard key={article.id} article={article} />
-            ))}
-          </div>
-          {showViewMore && (
-            <div className="mt-3 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setExpanded(!expanded)}
-                className="text-sm font-semibold text-[color:var(--color-dark)] py-2 px-4 rounded border-2 border-[color:var(--color-dark)] bg-white hover:bg-gray-50 transition"
-                aria-expanded={expanded}
-              >
-                {expanded ? "View less" : "View more"}
-              </button>
-            </div>
-          )}
-        </>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {visibleArticles.map((article) => (
+            <ArticleCard key={article.id} article={article} />
+          ))}
+        </div>
       )}
     </section>
   );
@@ -596,9 +575,53 @@ export default function Home() {
           </section>
 
           {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[color:var(--color-riviera-blue)] border-r-transparent"></div>
-              <p className="mt-4 text-[color:var(--color-medium)]">Loading articles...</p>
+            /* ── Shimmer skeleton replacing the spinning wheel ── */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Main column */}
+              <div className="lg:col-span-8 space-y-8">
+                {/* Top Stories skeleton: 2×2 */}
+                <div>
+                  <div className="h-8 w-36 bg-gray-200 rounded mb-4 animate-[shimmer_1.5s_infinite] bg-[length:200%_100%] bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="rounded-lg overflow-hidden bg-gray-200 relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                        <div className="h-48 w-full" />
+                        <div className="p-5 space-y-2">
+                          <div className="h-5 bg-gray-300/60 rounded w-4/5" />
+                          <div className="h-4 bg-gray-300/60 rounded w-full" />
+                          <div className="h-4 bg-gray-300/60 rounded w-3/4" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Latest News skeleton: 3×2 */}
+                <div>
+                  <div className="h-8 w-36 bg-gray-200 rounded mb-4 animate-[shimmer_1.5s_infinite] bg-[length:200%_100%] bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="rounded-lg overflow-hidden bg-gray-200 relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                        <div className="h-40 w-full" />
+                        <div className="p-4 space-y-2">
+                          <div className="h-4 bg-gray-300/60 rounded w-4/5" />
+                          <div className="h-4 bg-gray-300/60 rounded w-2/3" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {/* Sidebar skeleton */}
+              <div className="hidden lg:block lg:col-span-4 space-y-4 pt-[62px]">
+                <div className="rounded-lg bg-gray-200 relative overflow-hidden h-48">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                </div>
+                <div className="rounded-lg bg-gray-200 relative overflow-hidden h-64">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                </div>
+              </div>
             </div>
           ) : (
             <>
@@ -674,14 +697,14 @@ export default function Home() {
                                 {index + 1}
                               </span>
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2">
+                                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2">
                                   {article.title}
                                 </h4>
-                                {isAdmin && (
-                                  <p className="text-xs text-[color:var(--color-medium)] mt-1">
-                                    {article.view_count.toLocaleString()} views
-                                  </p>
-                                )}
+                                <p className="text-xs text-[color:var(--color-medium)] mt-1">
+                                  {article.published_at
+                                    ? new Date(article.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                                    : ""}
+                                </p>
                               </div>
                             </Link>
                           ))}
@@ -789,9 +812,10 @@ export default function Home() {
                 </div>
 
                 {/* SIDEBAR */}
-                <aside className="lg:col-span-4 space-y-6">
-                  {/* AD SECTION 2 - SIDEBAR TOP (desktop only; on mobile shown in main column) */}
-                  <div className="relative pt-8 hidden lg:block">
+                <aside className="lg:col-span-4">
+                  {/* AD SECTION 2 - SIDEBAR TOP (desktop only)
+                      pt-14 pushes the ad down so its top edge aligns with the Top Stories article cards */}
+                  <div className="pt-[61px] hidden lg:block">
                     <AdSlot 
                       slot="homepage-sidebar-top" 
                       className="w-full"
@@ -799,7 +823,7 @@ export default function Home() {
                   </div>
 
                   {/* Most Read - desktop only; on mobile shown under Latest News in main column */}
-                  <div className="hidden lg:block bg-white rounded-lg p-4 shadow-sm">
+                  <div className="mt-8 hidden lg:block bg-white rounded-lg p-4 shadow-sm">
                     <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
                       Most Read
                     </h3>
@@ -809,34 +833,33 @@ export default function Home() {
                       </p>
                     ) : (
                       <div>
-                        {trendingArticles
-                          .map((article, index) => (
-                            <Link
-                              key={article.id}
-                              href={`/article/${article.slug}`}
-                              className="flex gap-3 items-start group py-3 border-b border-gray-200 last:border-0"
-                            >
-                              <span className="text-2xl font-black text-gray-300 flex-shrink-0">
-                                {index + 1}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2">
-                                  {article.title}
-                                </h4>
-                                {isAdmin && (
-                                  <p className="text-xs text-[color:var(--color-medium)] mt-1">
-                                    {article.view_count.toLocaleString()} views
-                                  </p>
-                                )}
-                              </div>
-                            </Link>
-                          ))}
+                        {trendingArticles.map((article, index) => (
+                          <Link
+                            key={article.id}
+                            href={`/article/${article.slug}`}
+                            className="flex gap-3 items-start group py-3 border-b border-gray-200 last:border-0"
+                          >
+                            <span className="text-2xl font-black text-gray-300 flex-shrink-0">
+                              {index + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2">
+                                {article.title}
+                              </h4>
+                              <p className="text-xs text-[color:var(--color-medium)] mt-1">
+                                {article.published_at
+                                  ? new Date(article.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                                  : ""}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
                       </div>
                     )}
                   </div>
 
-                  {/* AD SECTION 3 - SIDEBAR MIDDLE (desktop only; on mobile shown in main column) */}
-                  <div className="relative pt-8 hidden lg:block">
+                  {/* AD SECTION 3 - SIDEBAR MIDDLE (desktop only) */}
+                  <div className="mt-8 hidden lg:block">
                     <AdSlot 
                       slot="homepage-sidebar-middle" 
                       className="w-full"
@@ -849,7 +872,7 @@ export default function Home() {
                   </div>
 
                   {/* Editor's Picks - same styling as Most Read */}
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <div className="mt-8 bg-white rounded-lg p-4 shadow-sm">
                     <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
                       Editor's Picks
                     </h3>
@@ -858,15 +881,18 @@ export default function Home() {
                         No editor's picks yet
                       </p>
                     ) : (
-                      <div className="space-y-3">
-                        {editorsPicks.map((article) => (
+                      <div>
+                        {editorsPicks.map((article, index) => (
                           <Link
                             key={article.id}
                             href={`/article/${article.slug}`}
-                            className="block group"
+                            className="flex gap-3 items-start group py-3 border-b border-gray-200 last:border-0"
                           >
-                            <div className="py-2">
-                              <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2 mb-1">
+                            <span className="text-2xl font-black text-gray-300 flex-shrink-0">
+                              {index + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2 mb-1">
                                 {article.title}
                               </h4>
                               <p className="text-xs text-[color:var(--color-medium)]">
@@ -888,7 +914,7 @@ export default function Home() {
                   </div>
 
                   {/* AD SECTION 4 - SIDEBAR BOTTOM (desktop only on homepage) */}
-                  <div className="relative pt-8 hidden lg:block">
+                  <div className="mt-8 hidden lg:block">
                     <AdSlot 
                       slot="homepage-sidebar-bottom" 
                       className="w-full"

@@ -5,7 +5,8 @@ export type BlockType =
   | 'image'
   | 'button'
   | 'divider'
-  | 'spacer';
+  | 'spacer'
+  | 'advertisement';
 
 export type Alignment = 'left' | 'center' | 'right';
 export type ArticleLayout = 'stack' | '2-col' | '3-col' | '2x2';
@@ -39,6 +40,11 @@ export interface NewsletterBlock {
   buttonColor?: string;
   // spacer
   spacerHeight?: number;
+  // advertisement
+  adId?: string;
+  adImageUrl?: string;
+  adLinkUrl?: string;
+  adTitle?: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -203,11 +209,24 @@ function renderButton(block: NewsletterBlock): string {
   </tr>`;
 }
 
-function renderDivider(): string {
+function renderAdvertisement(block: NewsletterBlock): string {
+  if (!block.adImageUrl) return '';
+  const href = esc(block.adLinkUrl || '#');
+  const alt  = esc(block.adTitle || 'Advertisement');
   return `
-  <tr><td style="padding: 8px 40px; background-color: ${WHITE};">
-    <div style="height: 1px; background-color: ${BORDER};"></div>
-  </td></tr>`;
+  <tr>
+    <td style="padding: 0; line-height: 0; background-color: ${WHITE}; font-size: 0;">
+      <a href="${href}" target="_blank" rel="noopener noreferrer" style="display: block; line-height: 0;">
+        <img src="${esc(block.adImageUrl)}" alt="${alt}" width="600"
+          style="width: 100%; max-width: 600px; height: auto; display: block; border: 0;" />
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 2px 8px 8px; background-color: ${WHITE}; text-align: right;">
+      <span style="font-family: 'Red Hat Display', sans-serif; font-size: 9px; color: #aaaaaa; text-transform: uppercase; letter-spacing: 0.08em;">Advertisement</span>
+    </td>
+  </tr>`;
 }
 
 function renderSpacer(block: NewsletterBlock): string {
@@ -365,12 +384,13 @@ function renderBlocks(blocks: NewsletterBlock[], articleLayout: ArticleLayout): 
     } else {
       flushArticles();
       switch (block.type) {
-        case 'hero_text': rows.push(renderHeroText(block)); break;
-        case 'text':      rows.push(renderText(block)); break;
-        case 'image':     rows.push(renderImage(block)); break;
-        case 'button':    rows.push(renderButton(block)); break;
-        case 'divider':   rows.push(renderDivider()); break;
-        case 'spacer':    rows.push(renderSpacer(block)); break;
+        case 'hero_text':      rows.push(renderHeroText(block)); break;
+        case 'text':           rows.push(renderText(block)); break;
+        case 'image':          rows.push(renderImage(block)); break;
+        case 'button':         rows.push(renderButton(block)); break;
+        case 'divider':        rows.push(renderDivider()); break;
+        case 'spacer':         rows.push(renderSpacer(block)); break;
+        case 'advertisement':  rows.push(renderAdvertisement(block)); break;
       }
     }
   }

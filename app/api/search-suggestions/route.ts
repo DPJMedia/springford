@@ -13,7 +13,13 @@ const SECTIONS = [
   { label: "Opinion", query: "Opinion", slug: "opinion" },
 ];
 
-export type SuggestionItem = { label: string; query: string };
+export type SuggestionItem = {
+  label: string;
+  query: string;
+  type: "section" | "article" | "tag";
+  slug?: string;
+  imageUrl?: string;
+};
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -28,12 +34,12 @@ export async function GET(request: NextRequest) {
 
   // 1. Section matches (label or slug)
   for (const s of SECTIONS) {
-    if (suggestions.length >= 3) break;
+    if (suggestions.length >= 5) break;
     if (s.label.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q.replace(/\s/g, "-"))) {
       const key = `section:${s.query}`;
       if (!seen.has(key)) {
         seen.add(key);
-        suggestions.push({ label: s.label, query: s.query });
+        suggestions.push({ label: s.label, query: s.query, type: "section" });
       }
     }
   }
@@ -42,30 +48,36 @@ export async function GET(request: NextRequest) {
   const now = new Date().toISOString();
   const escaped = q.replace(/%/g, "\\%").replace(/_/g, "\\_");
 
-  // 2. Article title matches (published only)
-  if (suggestions.length < 3) {
+  // 2. Article title matches (published only) — include slug and image_url
+  if (suggestions.length < 5) {
     const { data: articles } = await supabase
       .from("articles")
-      .select("title")
+      .select("title, slug, image_url")
       .eq("status", "published")
       .lte("published_at", now)
       .ilike("title", `%${escaped}%`)
       .order("published_at", { ascending: false })
-      .limit(5);
+      .limit(6);
 
     for (const a of articles || []) {
-      if (suggestions.length >= 3) break;
-      const title = (a as { title: string }).title;
-      const key = `article:${title}`;
+      if (suggestions.length >= 5) break;
+      const article = a as { title: string; slug: string; image_url: string | null };
+      const key = `article:${article.title}`;
       if (!seen.has(key)) {
         seen.add(key);
-        suggestions.push({ label: title, query: title });
+        suggestions.push({
+          label: article.title,
+          query: article.title,
+          type: "article",
+          slug: article.slug,
+          imageUrl: article.image_url ?? undefined,
+        });
       }
     }
   }
 
   // 3. Tags from published articles (distinct tags that contain q)
-  if (suggestions.length < 3) {
+  if (suggestions.length < 5) {
     const { data: tagRows } = await supabase
       .from("articles")
       .select("tags")
@@ -84,14 +96,14 @@ export async function GET(request: NextRequest) {
       }
     }
     for (const tag of tagSet) {
-      if (suggestions.length >= 3) break;
+      if (suggestions.length >= 5) break;
       const key = `tag:${tag}`;
       if (!seen.has(key)) {
         seen.add(key);
-        suggestions.push({ label: tag, query: tag });
+        suggestions.push({ label: tag, query: tag, type: "tag" });
       }
     }
   }
 
-  return NextResponse.json({ suggestions: suggestions.slice(0, 3) });
+  return NextResponse.json({ suggestions: suggestions.slice(0, 5) });
 }

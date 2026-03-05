@@ -21,21 +21,23 @@ function newBlock(type: BlockType): NewsletterBlock {
     case "article":   return { id, type, articleTitle: "", articleExcerpt: "", articleImageUrl: "", articleSlug: "", articleSection: "" };
     case "text":      return { id, type, textTitle: "", textBody: "", alignment: "left" };
     case "image":     return { id, type, imageUrl: "", imageLink: "", imageAlt: "" };
-    case "button":    return { id, type, buttonText: "Read More", buttonLink: "https://www.springford.press", buttonColor: "#2b8aa8", alignment: "center" };
-    case "divider":   return { id, type };
-    case "spacer":    return { id, type, spacerHeight: 24 };
-    default:          return { id, type };
+    case "button":        return { id, type, buttonText: "Read More", buttonLink: "https://www.springford.press", buttonColor: "#2b8aa8", alignment: "center" };
+    case "advertisement": return { id, type, adId: "", adImageUrl: "", adLinkUrl: "", adTitle: "" };
+    case "divider":       return { id, type };
+    case "spacer":        return { id, type, spacerHeight: 24 };
+    default:              return { id, type };
   }
 }
 
 const BLOCK_TYPES: { type: BlockType; label: string; icon: string; desc: string }[] = [
-  { type: "hero_text", label: "Headline", icon: "H",  desc: "Big headline + intro" },
-  { type: "article",   label: "Article",  icon: "📰", desc: "Pick a site article" },
-  { type: "text",      label: "Text",     icon: "T",  desc: "Title + body paragraph" },
-  { type: "image",     label: "Image",    icon: "🖼", desc: "Image with optional link" },
-  { type: "button",    label: "Button",   icon: "→",  desc: "CTA button" },
-  { type: "divider",   label: "Divider",  icon: "—",  desc: "Horizontal rule" },
-  { type: "spacer",    label: "Spacer",   icon: "⬜", desc: "Blank space" },
+  { type: "hero_text",     label: "Headline",    icon: "H",  desc: "Big headline + intro" },
+  { type: "article",       label: "Article",     icon: "📰", desc: "Pick a site article" },
+  { type: "text",          label: "Text",        icon: "T",  desc: "Title + body paragraph" },
+  { type: "image",         label: "Image",       icon: "🖼", desc: "Image with optional link" },
+  { type: "button",        label: "Button",      icon: "→",  desc: "CTA button" },
+  { type: "advertisement", label: "Ad",          icon: "📢", desc: "Site advertisement" },
+  { type: "divider",       label: "Divider",     icon: "—",  desc: "Horizontal rule" },
+  { type: "spacer",        label: "Spacer",      icon: "⬜", desc: "Blank space" },
 ];
 
 const LAYOUT_OPTIONS: { v: ArticleLayout; label: string; icon: React.ReactNode; min: number }[] = [
@@ -251,10 +253,131 @@ function ArticlePickerModal({ onSelect, onClose }: { onSelect: (a: Article) => v
   );
 }
 
+// ─── Ad Picker Modal ──────────────────────────────────────────────────────────
+
+// Slot name patterns that match ~8:1 leaderboard/banner ads
+const LEADERBOARD_PATTERNS = ["content-top", "content-middle", "inline", "homepage-banner-top", "homepage-banner-bottom"];
+// Slot name patterns that match ~2:1 mobile banner ads
+const MOBILE_BANNER_PATTERNS = ["mobile"];
+
+interface AdOption {
+  id: string;
+  title: string | null;
+  image_url: string;
+  link_url: string;
+  ad_slot: string;
+  ratio: "8:1" | "2:1";
+}
+
+function AdPickerModal({ onSelect, onClose }: { onSelect: (ad: AdOption) => void; onClose: () => void }) {
+  const [ads, setAds] = useState<AdOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function fetchAds() {
+      const now = new Date().toISOString();
+      // Fetch all active ads with their slot assignments
+      const { data } = await supabase
+        .from("ad_slot_assignments")
+        .select("ad_slot, ads!inner(id, title, image_url, link_url, is_active, start_date, end_date)")
+        .not("ads.image_url", "is", null);
+
+      if (!data) { setLoading(false); return; }
+
+      const seen = new Set<string>();
+      const results: AdOption[] = [];
+
+      for (const row of data) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ad = (row as any).ads as { id: string; title: string | null; image_url: string; link_url: string; is_active: boolean; start_date: string; end_date: string };
+        if (!ad || !ad.is_active) continue;
+        if (new Date(ad.start_date) > new Date(now) || new Date(ad.end_date) < new Date(now)) continue;
+        if (seen.has(ad.id + row.ad_slot)) continue;
+
+        const slot: string = row.ad_slot || "";
+        const isLeaderboard = LEADERBOARD_PATTERNS.some((p) => slot.includes(p));
+        const isMobile = !isLeaderboard && MOBILE_BANNER_PATTERNS.some((p) => slot.includes(p));
+
+        if (isLeaderboard || isMobile) {
+          seen.add(ad.id + row.ad_slot);
+          results.push({ id: ad.id, title: ad.title, image_url: ad.image_url, link_url: ad.link_url, ad_slot: slot, ratio: isLeaderboard ? "8:1" : "2:1" });
+        }
+      }
+
+      setAds(results);
+      setLoading(false);
+    }
+    fetchAds();
+  }, [supabase]);
+
+  const leaderboards = ads.filter((a) => a.ratio === "8:1");
+  const mobileBanners = ads.filter((a) => a.ratio === "2:1");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-[color:var(--color-dark)]">Pick an Advertisement</h2>
+            <p className="text-xs text-[color:var(--color-medium)] mt-0.5">Showing active 8:1 and 2:1 banner ads only.</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 transition">✕</button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--color-riviera-blue)] border-r-transparent" /></div>
+          ) : ads.length === 0 ? (
+            <p className="text-center text-[color:var(--color-medium)] py-8 text-sm">No active banner ads found (8:1 or 2:1 slots).</p>
+          ) : (
+            <div className="space-y-5">
+              {leaderboards.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">8:1 Leaderboard Banners</p>
+                  <div className="space-y-2">
+                    {leaderboards.map((ad) => (
+                      <button key={ad.id + ad.ad_slot} onClick={() => onSelect(ad)}
+                        className="w-full text-left flex flex-col gap-2 p-3 rounded-xl hover:bg-blue-50 border border-gray-200 hover:border-[color:var(--color-riviera-blue)] transition group">
+                        <img src={ad.image_url} alt={ad.title || "Ad"} className="w-full object-cover rounded" style={{ aspectRatio: "8/1", objectFit: "cover" }} />
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold bg-blue-100 text-[color:var(--color-riviera-blue)] px-1.5 py-0.5 rounded">8:1</span>
+                          <p className="text-xs font-semibold text-[color:var(--color-dark)] truncate group-hover:text-[color:var(--color-riviera-blue)] transition">{ad.title || ad.id.slice(0, 8)}</p>
+                          <p className="text-[10px] text-gray-400 truncate ml-auto">{ad.ad_slot}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {mobileBanners.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">2:1 Mobile Banners</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {mobileBanners.map((ad) => (
+                      <button key={ad.id + ad.ad_slot} onClick={() => onSelect(ad)}
+                        className="text-left flex flex-col gap-2 p-3 rounded-xl hover:bg-blue-50 border border-gray-200 hover:border-[color:var(--color-riviera-blue)] transition group">
+                        <img src={ad.image_url} alt={ad.title || "Ad"} className="w-full object-cover rounded" style={{ aspectRatio: "2/1", objectFit: "cover" }} />
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded flex-shrink-0">2:1</span>
+                          <p className="text-xs font-semibold text-[color:var(--color-dark)] truncate group-hover:text-[color:var(--color-riviera-blue)] transition">{ad.title || ad.id.slice(0, 8)}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Block Editor Panel ───────────────────────────────────────────────────────
 
-function BlockEditor({ block, onChange, onPickArticle }: {
-  block: NewsletterBlock; onChange: (u: Partial<NewsletterBlock>) => void; onPickArticle: () => void;
+function BlockEditor({ block, onChange, onPickArticle, onPickAd }: {
+  block: NewsletterBlock; onChange: (u: Partial<NewsletterBlock>) => void; onPickArticle: () => void; onPickAd: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -374,6 +497,30 @@ function BlockEditor({ block, onChange, onPickArticle }: {
     <div className={field}><label className={lbl}>Height (px)</label><input type="number" className={inp} value={block.spacerHeight ?? 24} min={8} max={120} onChange={(e) => onChange({ spacerHeight: parseInt(e.target.value) || 24 })} /></div>
   );
 
+  if (block.type === "advertisement") return (
+    <div>
+      <div className={field}>
+        <button onClick={onPickAd}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 border-2 border-dashed border-[color:var(--color-riviera-blue)] text-[color:var(--color-riviera-blue)] rounded-xl font-semibold text-sm hover:bg-blue-100 transition">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          {block.adId ? "Change Ad" : "Pick Ad from Site"}
+        </button>
+      </div>
+      {block.adImageUrl ? (
+        <div className="mb-4 p-2 bg-gray-50 rounded-xl border border-gray-200">
+          <img src={block.adImageUrl} alt={block.adTitle || "Ad"} className="w-full rounded object-cover" style={{ maxHeight: "80px", objectFit: "cover" }} />
+          <p className="text-xs text-[color:var(--color-medium)] mt-1.5 truncate">{block.adTitle || block.adId}</p>
+          <p className="text-[10px] text-gray-400 truncate">{block.adLinkUrl}</p>
+        </div>
+      ) : (
+        <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center">
+          <p className="text-xs text-gray-400">No ad selected yet</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">Only active 8:1 and 2:1 banner ads are shown.</p>
+        </div>
+      )}
+    </div>
+  );
+
   return <p className="text-sm text-[color:var(--color-medium)]">No settings for this block.</p>;
 }
 
@@ -391,10 +538,11 @@ function BlockCard({ block, index, total, selected, onSelect, onMoveUp, onMoveDo
       case "article":   return block.articleTitle || "(no article selected)";
       case "text":      return block.textTitle || (block.textBody || "").replace(/<[^>]+>/g, "").slice(0, 60) || "(empty)";
       case "image":     return block.imageUrl ? "Image: " + block.imageUrl.split("/").pop() : "(no image)";
-      case "button":    return `"${block.buttonText || "Button"}" → ${block.buttonLink || "(no link)"}`;
-      case "divider":   return "──────────────";
-      case "spacer":    return `${block.spacerHeight || 24}px space`;
-      default:          return block.type;
+      case "button":        return `"${block.buttonText || "Button"}" → ${block.buttonLink || "(no link)"}`;
+      case "advertisement": return block.adTitle || (block.adId ? `Ad: ${block.adId.slice(0, 12)}` : "(no ad selected)");
+      case "divider":       return "──────────────";
+      case "spacer":        return `${block.spacerHeight || 24}px space`;
+      default:              return block.type;
     }
   }
   return (
@@ -448,6 +596,7 @@ function TemplateEditorInner() {
   const [articleLayout, setArticleLayout] = useState<ArticleLayout>("stack");
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [showArticlePicker, setShowArticlePicker] = useState(false);
+  const [showAdPicker, setShowAdPicker] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -539,6 +688,12 @@ function TemplateEditorInner() {
     const nb = [...blocks]; const [m] = nb.splice(from, 1); nb.splice(dropIdx, 0, m);
     setBlocks(nb); dragIndexRef.current = null; scheduleSave(templateName, nb, articleLayout);
   }
+  function handleAdPick(ad: { id: string; title: string | null; image_url: string; link_url: string }) {
+    if (!selectedBlockId) return;
+    updateBlock(selectedBlockId, { adId: ad.id, adImageUrl: ad.image_url, adLinkUrl: ad.link_url, adTitle: ad.title || undefined });
+    setShowAdPicker(false);
+  }
+
   function handleArticlePick(article: Article) {
     if (!selectedBlockId) return;
     const section = (article.sections?.filter((s) => s !== "hero")[0] || article.section || "");
@@ -647,7 +802,7 @@ function TemplateEditorInner() {
                 <button onClick={() => setSelectedBlockId(null)} className="w-6 h-6 text-gray-400 hover:text-gray-600 transition">✕</button>
               </div>
               <div className="flex-1 overflow-y-auto p-5">
-                <BlockEditor block={selectedBlock} onChange={(c) => updateBlock(selectedBlock.id, c)} onPickArticle={() => setShowArticlePicker(true)} />
+                <BlockEditor block={selectedBlock} onChange={(c) => updateBlock(selectedBlock.id, c)} onPickArticle={() => setShowArticlePicker(true)} onPickAd={() => setShowAdPicker(true)} />
               </div>
             </>
           ) : (
@@ -687,6 +842,7 @@ function TemplateEditorInner() {
       </div>
 
       {showArticlePicker && <ArticlePickerModal onSelect={handleArticlePick} onClose={() => setShowArticlePicker(false)} />}
+      {showAdPicker && <AdPickerModal onSelect={handleAdPick} onClose={() => setShowAdPicker(false)} />}
       {showPreview && <PreviewModal html={previewHtml} onClose={() => setShowPreview(false)} />}
       {showNamePrompt && <NamePromptModal defaultName={templateName === "New Template" ? "" : templateName} onConfirm={handleNameConfirm} onCancel={() => setShowNamePrompt(false)} />}
     </div>

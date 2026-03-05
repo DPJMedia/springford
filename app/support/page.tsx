@@ -76,7 +76,7 @@ function SupportPageContent() {
       <Header />
       <main className="min-h-screen bg-[color:var(--color-surface)]">
         <div className="mx-auto max-w-xl px-4 py-10 sm:py-12">
-          <h1 className="masthead text-2xl font-black tracking-tight text-[color:var(--color-dark)] text-center sm:text-3xl">
+          <h1 className="masthead text-2xl font-semibold tracking-tight text-[color:var(--color-dark)] text-center sm:text-3xl" style={{ letterSpacing: "-0.02em" }}>
             Support Spring-Ford Press
           </h1>
           <p className="mt-3 text-sm text-[color:var(--color-medium)] text-center">

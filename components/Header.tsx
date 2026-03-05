@@ -22,7 +22,6 @@ export function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileNotifications, setShowMobileNotifications] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
-  const searchButtonRef = useRef<HTMLButtonElement>(null);
   const mobileUserMenuRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
@@ -148,27 +147,22 @@ export function Header() {
   }, [showMobileUserMenu]);
 
   return (
-    <header className="sticky top-0 z-20 bg-white">
+    <header className="sticky top-0 z-20 bg-white relative">
       {/* Full two-row header sticks together (LA Times style) */}
       <div className="border-b border-[color:var(--color-border)] bg-white backdrop-blur">
         <div className="mx-auto grid w-full max-w-none grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2 sm:px-6 lg:px-8">
-          {/* Left: Search (all breakpoints); dropdown opens to the right so it doesn't get cut off */}
+          {/* Left: Search button (all breakpoints) */}
           <div className="flex min-w-0 items-center justify-start gap-2">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <button
-                  ref={searchButtonRef}
-                  onClick={() => setShowSearch(!showSearch)}
-                  className="p-2 rounded-full hover:bg-gray-100 transition text-[color:var(--color-dark)]"
-                  aria-label="Search"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
-                <SearchDropdown isOpen={showSearch} onClose={() => setShowSearch(false)} anchorRef={searchButtonRef} />
-              </div>
-            </div>
+            <button
+              onClick={() => { setShowMobileNav(false); setShowSearch(!showSearch); }}
+              data-search-toggle="true"
+              className="p-2 rounded-full hover:bg-gray-100 transition text-[color:var(--color-dark)]"
+              aria-label="Search"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
           </div>
 
           {/* Center: Logo - dead center; on mobile only, nudge up so aligned with search/hamburger buttons */}
@@ -321,6 +315,9 @@ export function Header() {
           </nav>
         </div>
       </div>
+
+      {/* Inline search bar — drops below section strip (desktop) or below menu bar (mobile) */}
+      <SearchDropdown isOpen={showSearch} onClose={() => setShowSearch(false)} />
 
       {/* Hamburger dropdown - user account at top, then sections, Advertise, Support, Subscribe (shown below 1280px) */}
       {showMobileNav && (
