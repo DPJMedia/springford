@@ -229,6 +229,15 @@ function renderAdvertisement(block: NewsletterBlock): string {
   </tr>`;
 }
 
+function renderDivider(): string {
+  return `
+  <tr>
+    <td style="padding: 8px 24px;">
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+    </td>
+  </tr>`;
+}
+
 function renderSpacer(block: NewsletterBlock): string {
   const h = block.spacerHeight || 24;
   return `
