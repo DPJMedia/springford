@@ -4,7 +4,8 @@ import { useState, useEffect, use } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import type { Article } from "@/lib/types/database";
+import type { Article, ArticleVisibility } from "@/lib/types/database";
+import { ArticleVisibilitySelector } from "@/components/ArticleVisibilitySelector";
 import { BlockEditor, ContentBlock } from "@/components/BlockEditor";
 import { SectionSelector } from "@/components/SectionSelector";
 import { CategorySelector } from "@/components/CategorySelector";
@@ -40,6 +41,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   const [breakingNewsDuration, setBreakingNewsDuration] = useState(24);
   const [allowComments, setAllowComments] = useState(true);
   const [isAdvertisement, setIsAdvertisement] = useState(false);
+  const [visibility, setVisibility] = useState<ArticleVisibility>("public");
   const [scheduledFor, setScheduledFor] = useState("");
   
   const [loading, setLoading] = useState(true);
@@ -151,6 +153,10 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
       setIsFeatured(data.is_featured);
       setIsBreaking(data.is_breaking);
       setIsAdvertisement(data.is_advertisement ?? false);
+      const vis = data.visibility;
+      setVisibility(
+        vis === "newsletter_subscribers" || vis === "admin_only" ? vis : "public"
+      );
       setBreakingNewsDuration(data.breaking_news_duration || 24);
       setAllowComments(data.allow_comments);
       
@@ -315,6 +321,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           breaking_news_set_at: isBreaking && !article?.is_breaking ? new Date().toISOString() : (isBreaking ? article?.breaking_news_set_at : null),
           allow_comments: allowComments,
           is_advertisement: isAdvertisement,
+          visibility,
           meta_title: metaTitle || null,
           meta_description: metaDescription || null,
           author_name: poweredByDiffuse 
@@ -510,6 +517,12 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
           </div>
+
+          <ArticleVisibilitySelector
+            value={visibility}
+            onChange={setVisibility}
+            disabled={saving}
+          />
 
           {/* Featured Image */}
           <div className="bg-white rounded-lg p-6 shadow-sm">

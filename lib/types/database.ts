@@ -1,5 +1,8 @@
 export type ArticleStatus = 'draft' | 'scheduled' | 'published' | 'archived';
 
+/** Who can view the article on the public site when status is published */
+export type ArticleVisibility = 'public' | 'newsletter_subscribers' | 'admin_only';
+
 export type ArticleSection = 'hero' | 'world' | 'local' | 'sports' | 'business' | 'politics' | 'technology' | 'entertainment' | 'opinion' | 'general';
 
 export interface ContentBlock {
@@ -61,6 +64,8 @@ export interface Article {
   allow_comments: boolean;
   is_advertisement: boolean;
   updated_by: string | null;
+  /** public: everyone; newsletter_subscribers: logged-in + newsletter_subscribed; admin_only: admin/super_admin */
+  visibility: ArticleVisibility;
 }
 
 export interface Ad {

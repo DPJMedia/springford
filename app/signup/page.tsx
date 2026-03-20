@@ -172,7 +172,7 @@ function SignupPageContent() {
             <p className="text-sm text-[color:var(--color-medium)] leading-relaxed">
               Please click the confirmation link in your email to activate your account.
               {returnTo === "/subscribe"
-                ? " You'll be taken right back to claim your free 3 months once confirmed."
+                ? " You'll be taken right back to claim your free year once confirmed — no credit card required."
                 : " You'll be redirected back to the site once confirmed."}
             </p>
             <div className="mt-6 pt-6 border-t border-[color:var(--color-border)]">

@@ -1247,6 +1247,7 @@ export default function DiffuseIntegrationPage() {
         is_featured: false,
         is_breaking: false,
         is_advertisement: false,
+        visibility: "public" as const,
         allow_comments: true,
         view_count: 0,
         share_count: 0,

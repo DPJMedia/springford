@@ -50,6 +50,7 @@ const mockArticle: Article = {
   allow_comments: false,
   is_advertisement: false,
   updated_by: null,
+  visibility: "public",
 };
 
 export function AdPreview({

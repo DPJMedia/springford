@@ -614,7 +614,7 @@ export default function ProfilePage() {
                       Plan
                     </label>
                     <p className="text-sm font-semibold text-[color:var(--color-dark)]">
-                      Free tier — 3 months free
+                      Free tier — first year free (early subscriber offer)
                     </p>
                     <p className="text-xs text-[color:var(--color-medium)] mt-0.5">
                       You are not being charged.

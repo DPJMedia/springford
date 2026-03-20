@@ -11,6 +11,8 @@ import { Tooltip } from "@/components/Tooltip";
 import { DateTimePicker } from "@/components/DateTimePicker";
 import { AuthorSelector } from "@/components/AuthorSelector";
 import { TagSelector } from "@/components/TagSelector";
+import type { ArticleVisibility } from "@/lib/types/database";
+import { ArticleVisibilitySelector } from "@/components/ArticleVisibilitySelector";
 
 export default function NewArticlePage() {
   const [title, setTitle] = useState("");
@@ -38,6 +40,7 @@ export default function NewArticlePage() {
   const [breakingNewsDuration, setBreakingNewsDuration] = useState(24); // Default 24 hours
   const [allowComments, setAllowComments] = useState(true);
   const [isAdvertisement, setIsAdvertisement] = useState(false);
+  const [visibility, setVisibility] = useState<ArticleVisibility>("public");
   const [scheduledFor, setScheduledFor] = useState("");
   
   const [loading, setLoading] = useState(false);
@@ -392,6 +395,12 @@ export default function NewArticlePage() {
               </div>
             </div>
           </div>
+
+          <ArticleVisibilitySelector
+            value={visibility}
+            onChange={setVisibility}
+            disabled={loading}
+          />
 
           {/* Featured Image */}
           <div className="bg-white rounded-lg p-6 shadow-sm">

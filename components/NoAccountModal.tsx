@@ -36,7 +36,7 @@ export function NoAccountModal({ isOpen, onClose, returnTo = "/subscribe" }: Pro
           Looks like you don&apos;t have an account
         </h2>
         <p className="text-sm text-[color:var(--color-medium)] mb-6">
-          Follow the simple process to create one. Once you&apos;re signed up, you&apos;ll be brought right back here to claim your free 3 months.
+          Follow the simple process to create one. Once you&apos;re signed up, you&apos;ll be brought right back here to claim your free year — no credit card required.
         </p>
 
         <div className="flex gap-3">

@@ -9,6 +9,7 @@ import { NewsletterPopupBanner } from "@/components/NewsletterPopupBanner";
 import { AdDisplay } from "@/components/AdDisplay";
 import type { Article } from "@/lib/types/database";
 import Link from "next/link";
+import { ArticleAudienceBookmark } from "@/components/ArticleAudienceBookmark";
 import { usePageTracking } from "@/lib/analytics/usePageTracking";
 
 // Ad slot wrapper component
@@ -94,11 +95,14 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
         <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition h-full flex flex-col min-w-0">
           {article.image_url ? (
             <div className="relative h-48 overflow-hidden flex-shrink-0">
-              {article.is_advertisement && (
-                <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800/70 text-white/90 text-[10px] font-medium uppercase tracking-wider">
-                  Advertisement
-                </span>
-              )}
+              <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
+                <ArticleAudienceBookmark visibility={article.visibility} />
+                {article.is_advertisement && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800/70 text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                    Advertisement
+                  </span>
+                )}
+              </div>
               <img
                 src={article.image_url}
                 alt={article.title}
@@ -107,6 +111,9 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
             </div>
           ) : (
             <div className="relative h-48 overflow-hidden flex-shrink-0 bg-gradient-to-br from-blue-100 via-blue-50 to-gray-100 flex items-center justify-center">
+              <div className="absolute top-2 left-2 z-10">
+                <ArticleAudienceBookmark visibility={article.visibility} />
+              </div>
               <svg className="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
               </svg>
@@ -135,7 +142,10 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
       <Link href={`/article/${article.slug}`} className="block group py-3 border-b border-gray-200 last:border-0 relative">
         <div className="flex gap-3">
           {article.image_url && (
-            <div className="flex-shrink-0 w-20 h-20 overflow-hidden rounded">
+            <div className="relative flex-shrink-0 w-20 h-20 overflow-hidden rounded">
+              <div className="absolute top-0.5 left-0.5 z-10 scale-90 origin-top-left">
+                <ArticleAudienceBookmark visibility={article.visibility} />
+              </div>
               <img
                 src={article.image_url}
                 alt={article.title}
@@ -144,7 +154,10 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              {!article.image_url && (
+                <ArticleAudienceBookmark visibility={article.visibility} />
+              )}
               {article.is_advertisement && (
                 <span className="text-[9px] font-medium uppercase tracking-wider text-gray-500">Ad</span>
               )}
@@ -166,11 +179,14 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
       <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition h-full flex flex-col">
         {article.image_url ? (
           <div className="relative h-40 overflow-hidden flex-shrink-0">
-            {article.is_advertisement && (
-              <span className="absolute top-2 left-2 z-10 inline-flex items-center px-2 py-0.5 rounded bg-gray-800/70 text-white/90 text-[10px] font-medium uppercase tracking-wider">
-                Advertisement
-              </span>
-            )}
+            <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
+              <ArticleAudienceBookmark visibility={article.visibility} />
+              {article.is_advertisement && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-800/70 text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                  Advertisement
+                </span>
+              )}
+            </div>
             <img
               src={article.image_url}
               alt={article.title}
@@ -179,11 +195,14 @@ function ArticleCard({ article, size = "default" }: { article: Article; size?: "
           </div>
         ) : (
           <div className="relative h-40 overflow-hidden flex-shrink-0 bg-gradient-to-br from-blue-100 via-blue-50 to-gray-100 flex items-center justify-center">
-            {article.is_advertisement && (
-              <span className="absolute top-2 left-2 z-10 inline-flex items-center px-2 py-0.5 rounded bg-gray-600/80 text-white/90 text-[10px] font-medium uppercase tracking-wider">
-                Advertisement
-              </span>
-            )}
+            <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
+              <ArticleAudienceBookmark visibility={article.visibility} />
+              {article.is_advertisement && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-600/80 text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                  Advertisement
+                </span>
+              )}
+            </div>
             <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
             </svg>
@@ -903,9 +922,12 @@ export default function Home() {
                               {index + 1}
                             </span>
                             <div className="flex-1 min-w-0">
-                              <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2 mb-1">
-                                {article.title}
-                              </h4>
+                              <div className="mb-1 flex flex-wrap items-center gap-2">
+                                <ArticleAudienceBookmark visibility={(article as Article).visibility} />
+                                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2 flex-1 min-w-0">
+                                  {article.title}
+                                </h4>
+                              </div>
                               <p className="text-xs text-[color:var(--color-medium)]">
                                 {new Date(article.published_at || "").toLocaleDateString("en-US", {
                                   month: "short",

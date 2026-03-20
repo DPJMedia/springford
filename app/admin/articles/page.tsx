@@ -19,6 +19,7 @@ interface Article {
   view_count: number;
   share_count: number;
   image_url?: string | null;
+  visibility?: string | null;
 }
 
 type SortOption =
@@ -126,7 +127,7 @@ export default function ArticlesManagementPage() {
     // Always fetch all articles so tab counts are accurate; we filter for display in the UI
     const { data, error } = await supabase
       .from("articles")
-      .select("id, title, section, status, published_at, scheduled_for, created_at, author_name, view_count, share_count")
+      .select("id, title, section, status, published_at, scheduled_for, created_at, author_name, view_count, share_count, visibility")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -244,6 +245,13 @@ export default function ArticlesManagementPage() {
       setArticles(articles.map((a) => (a.id === id ? { ...a, status: "published", published_at: new Date().toISOString() } : a)));
       alert("Article republished successfully!");
     }
+  }
+
+  function audienceLabel(visibility: string | null | undefined) {
+    const v = visibility ?? "public";
+    if (v === "newsletter_subscribers") return { text: "Subscribers", color: "bg-sky-100 text-sky-900" };
+    if (v === "admin_only") return { text: "Admin only", color: "bg-orange-100 text-orange-900" };
+    return { text: "Public", color: "bg-gray-100 text-gray-800" };
   }
 
   function getStatusDisplay(article: Article) {
@@ -451,7 +459,7 @@ export default function ArticlesManagementPage() {
               <tbody className="divide-y divide-gray-200">
                 {sortedList.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center text-sm text-[color:var(--color-medium)]">
+                    <td colSpan={9} className="px-6 py-8 text-center text-sm text-[color:var(--color-medium)]">
                       No articles match your search.
                     </td>
                   </tr>
@@ -475,6 +483,18 @@ export default function ArticlesManagementPage() {
                       <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">
                         {article.section}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {(() => {
+                        const aud = audienceLabel(article.visibility);
+                        return (
+                          <span
+                            className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${aud.color}`}
+                          >
+                            {aud.text}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4">
                       {(() => {

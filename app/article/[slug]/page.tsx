@@ -2,6 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 import { ArticleContent } from "./ArticleContent";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import {
+  canReadFullArticleContent,
+  normalizeVisibility,
+} from "@/lib/articles/visibilityAccess";
 
 const FALLBACK_LOGO_URL = "https://springford.press/springford-press-logo.svg";
 
@@ -93,5 +97,39 @@ export default async function ArticlePage({
     redirect("/");
   }
 
-  return <ArticleContent initialArticle={article} slug={slug} />;
+  const visibility = normalizeVisibility(article.visibility);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let newsletterSubscribed = false;
+  let isAdminUser = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("newsletter_subscribed, is_admin, is_super_admin")
+      .eq("id", user.id)
+      .single();
+    newsletterSubscribed = profile?.newsletter_subscribed ?? false;
+    isAdminUser = !!(profile?.is_admin || profile?.is_super_admin);
+  }
+
+  const canReadFull = canReadFullArticleContent(visibility, {
+    newsletterSubscribed,
+    isAdmin: isAdminUser,
+  });
+
+  /** Subscriber-only: show paywall when not subscribed. Subscribers (and full access) get normal body below. */
+  const subscriberArticlePaywall =
+    visibility === "newsletter_subscribers" && !canReadFull;
+
+  const articleForClient = article;
+
+  return (
+    <ArticleContent
+      initialArticle={articleForClient}
+      slug={slug}
+      subscriberArticlePaywall={subscriberArticlePaywall}
+    />
+  );
 }

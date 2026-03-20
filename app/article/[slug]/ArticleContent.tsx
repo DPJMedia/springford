@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, Fragment } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -19,13 +20,22 @@ import {
   calculateScrollDepth,
 } from "@/lib/analytics/tracker";
 import { usePageTracking } from "@/lib/analytics/usePageTracking";
+import { ArticleAudienceBookmark } from "@/components/ArticleAudienceBookmark";
+import { SubscriberArticlePaywall } from "@/components/SubscriberArticlePaywall";
 
 type ArticleContentProps = {
   initialArticle: Article;
   slug: string;
+  /** Non-subscribers on subscriber-only articles */
+  subscriberArticlePaywall?: boolean;
 };
 
-export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
+export function ArticleContent({
+  initialArticle,
+  slug,
+  subscriberArticlePaywall = false,
+}: ArticleContentProps) {
+  const router = useRouter();
   const [article, setArticle] = useState<Article>(initialArticle);
   const [relatedArticles, setRelatedArticles] = useState<Article[]>([]);
   const [authorAvatar, setAuthorAvatar] = useState<string | null>(null);
@@ -107,6 +117,32 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
     }
     checkAdminStatus();
   }, [supabase]);
+
+  useEffect(() => {
+    if (!subscriberArticlePaywall) return;
+    async function checkAccess() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: p } = await supabase
+        .from("user_profiles")
+        .select("newsletter_subscribed")
+        .eq("id", user.id)
+        .single();
+      if (p?.newsletter_subscribed) router.refresh();
+    }
+    void checkAccess();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => void checkAccess());
+    const onFocus = () => void checkAccess();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [subscriberArticlePaywall, router, supabase]);
 
   useEffect(() => {
     // Increment view count
@@ -325,12 +361,18 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
                     BREAKING NEWS
                   </span>
                 )}
-                {showSectionAboveTitle && (
-                  <div className="text-sm font-semibold text-blue-600 mb-2 uppercase tracking-wide">
-                    {displaySectionLabel.toUpperCase()}
-                    {article.category && displaySectionLabel.toLowerCase() !== (article.category || "").toLowerCase() && ` • ${(article.category || "").replace(/-/g, " ").toUpperCase()}`}
-                  </div>
-                )}
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  {showSectionAboveTitle && (
+                    <div className="text-sm font-semibold text-blue-600 uppercase tracking-wide">
+                      {displaySectionLabel.toUpperCase()}
+                      {article.category &&
+                        displaySectionLabel.toLowerCase() !==
+                          (article.category || "").toLowerCase() &&
+                        ` • ${(article.category || "").replace(/-/g, " ").toUpperCase()}`}
+                    </div>
+                  )}
+                  <ArticleAudienceBookmark visibility={article.visibility} variant="inline" />
+                </div>
                 <h1 className="text-4xl md:text-5xl font-black text-[color:var(--color-dark)] mb-4 leading-tight">
                   {article.title}
                 </h1>
@@ -427,7 +469,12 @@ export function ArticleContent({ initialArticle, slug }: ArticleContentProps) {
               )}
 
               {/* Article Content — first ad between block 1 and 2, second ad at bottom */}
-              {article.content_blocks && Array.isArray(article.content_blocks) && article.content_blocks.length > 0 ? (
+              {subscriberArticlePaywall ? (
+                <SubscriberArticlePaywall
+                  content={article.content}
+                  contentBlocks={article.content_blocks}
+                />
+              ) : article.content_blocks && Array.isArray(article.content_blocks) && article.content_blocks.length > 0 ? (
                 <>
                   <div className="prose prose-lg max-w-none">
                     {article.content_blocks
