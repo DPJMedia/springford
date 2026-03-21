@@ -3,6 +3,10 @@ import Stripe from "stripe";
 import { verifySupportCancelToken } from "@/lib/support/cancelToken";
 import { sendSupportCancelConfirmationEmail } from "@/lib/support/sendSupportCancelConfirmationEmail";
 import { cancelSupportSubscription } from "@/lib/support/stripeCancelSupportSubscription";
+import {
+  clearStripeSubscriptionFromProfile,
+  syncStripeSubscriptionToProfile,
+} from "@/lib/support/stripeSubscriptionProfile";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -35,14 +39,29 @@ export async function GET(request: NextRequest) {
       sub.status === "incomplete_expired" ||
       sub.status === "unpaid"
     ) {
+      await syncStripeSubscriptionToProfile(sub);
       await sendSupportCancelConfirmationEmail(data.em);
       return NextResponse.redirect(
         new URL("/profile?tab=support&supportCanceled=1", SITE_URL)
       );
     }
 
-    await cancelSupportSubscription(data.sub);
-    await sendSupportCancelConfirmationEmail(data.em);
+    const outcome = await cancelSupportSubscription(data.sub);
+    try {
+      const subAfter = await stripe.subscriptions.retrieve(data.sub);
+      await syncStripeSubscriptionToProfile(subAfter);
+    } catch (e) {
+      const err = e as { code?: string; statusCode?: number };
+      if (err.code === "resource_missing" || err.statusCode === 404) {
+        await clearStripeSubscriptionFromProfile(data.sub);
+      } else {
+        console.warn("Could not retrieve subscription after email cancel to sync profile:", e);
+      }
+    }
+
+    if (outcome === "updated") {
+      await sendSupportCancelConfirmationEmail(data.em);
+    }
 
     return NextResponse.redirect(
       new URL("/profile?tab=support&supportCanceled=1", SITE_URL)

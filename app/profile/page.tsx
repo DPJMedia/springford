@@ -243,10 +243,20 @@ export default function ProfilePage() {
     }
   }
 
-  const hasActiveSupportSub =
+  /** Active Stripe subscription row (includes “cancel at period end” until it fully ends). */
+  const hasRecurringSupportCard =
     !!profile?.stripe_support_subscription_id &&
     (profile.support_subscription_status === "active" ||
       profile.support_subscription_status === "trialing");
+
+  const isScheduledToEnd =
+    profile?.support_subscription_cancel_at_period_end === true;
+
+  const supportPeriodEnd = profile?.support_subscription_current_period_end ?? null;
+  const supportCancelAt = profile?.support_subscription_cancel_at ?? null;
+  /** Limited-term plan: commitment end differs from current Stripe period end */
+  const hasDistinctCommitmentEnd =
+    Boolean(supportCancelAt && supportPeriodEnd && supportCancelAt !== supportPeriodEnd);
 
   async function handleCancelSupportSubscription() {
     if (!confirm("Stop renewing after the current period? You won’t be charged again.")) return;
@@ -637,10 +647,20 @@ export default function ProfilePage() {
               Manage your recurring contribution to Spring-Ford Press. One-time donations are not listed here.
             </p>
 
-            {hasActiveSupportSub ? (
+            {hasRecurringSupportCard ? (
               <div className="space-y-4 rounded-lg border border-[color:var(--color-border)] bg-gray-50 p-4">
+                {isScheduledToEnd && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                    <p className="text-sm font-semibold text-amber-900">Cancellation scheduled</p>
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      You won’t be charged again after the “no further charges” date below. This page will clear once the subscription fully ends in Stripe.
+                    </p>
+                  </div>
+                )}
                 <div>
-                  <p className="text-xs font-medium text-[color:var(--color-medium)]">Amount</p>
+                  <p className="text-xs font-medium text-[color:var(--color-medium)]">
+                    {isScheduledToEnd ? "Your plan amount" : "Amount"}
+                  </p>
                   <p className="text-lg font-bold text-[color:var(--color-dark)]">
                     {profile.support_subscription_amount_cents != null
                       ? new Intl.NumberFormat("en-US", {
@@ -654,28 +674,26 @@ export default function ProfilePage() {
                     </span>
                   </p>
                 </div>
-                {profile.support_subscription_current_period_end && (
+                {profile.support_subscription_started_at && (
                   <div>
                     <p className="text-xs font-medium text-[color:var(--color-medium)]">
-                      Current period ends
+                      Support started
                     </p>
                     <p className="text-sm text-[color:var(--color-dark)]">
-                      {new Date(profile.support_subscription_current_period_end).toLocaleDateString(
+                      {new Date(profile.support_subscription_started_at).toLocaleDateString(
                         undefined,
                         { month: "long", day: "numeric", year: "numeric" }
                       )}
                     </p>
                   </div>
                 )}
-                {profile.support_subscription_cancel_at && (
+                {!isScheduledToEnd && supportPeriodEnd && (
                   <div>
                     <p className="text-xs font-medium text-[color:var(--color-medium)]">
-                      {profile.support_subscription_status === "active"
-                        ? "Subscription ends"
-                        : "Ended"}
+                      Current billing period ends
                     </p>
                     <p className="text-sm text-[color:var(--color-dark)]">
-                      {new Date(profile.support_subscription_cancel_at).toLocaleDateString(undefined, {
+                      {new Date(supportPeriodEnd).toLocaleDateString(undefined, {
                         month: "long",
                         day: "numeric",
                         year: "numeric",
@@ -683,19 +701,48 @@ export default function ProfilePage() {
                     </p>
                   </div>
                 )}
-                <div className="pt-2 border-t border-[color:var(--color-border)]">
-                  <p className="text-xs text-[color:var(--color-medium)] mb-3">
-                    Cancel stops future charges after the end of your current billing period (or immediately if required by our payment provider). You’ll receive a confirmation email.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleCancelSupportSubscription}
-                    disabled={supportCanceling}
-                    className="text-sm font-semibold text-red-600 hover:text-red-700 underline disabled:opacity-50"
-                  >
-                    {supportCanceling ? "Processing…" : "Cancel recurring support"}
-                  </button>
-                </div>
+                {!isScheduledToEnd && hasDistinctCommitmentEnd && supportCancelAt && (
+                  <div>
+                    <p className="text-xs font-medium text-[color:var(--color-medium)]">
+                      Subscription commitment ends
+                    </p>
+                    <p className="text-sm text-[color:var(--color-dark)]">
+                      {new Date(supportCancelAt).toLocaleDateString(undefined, {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                )}
+                {isScheduledToEnd && (supportCancelAt || supportPeriodEnd) && (
+                  <div>
+                    <p className="text-xs font-medium text-[color:var(--color-medium)]">
+                      No further charges after
+                    </p>
+                    <p className="text-sm text-[color:var(--color-dark)]">
+                      {new Date(supportCancelAt || supportPeriodEnd || "").toLocaleDateString(
+                        undefined,
+                        { month: "long", day: "numeric", year: "numeric" }
+                      )}
+                    </p>
+                  </div>
+                )}
+                {!isScheduledToEnd && (
+                  <div className="pt-2 border-t border-[color:var(--color-border)]">
+                    <p className="text-xs text-[color:var(--color-medium)] mb-3">
+                      Cancel stops future charges after the end of your current billing period (or immediately if required by our payment provider). You’ll receive a confirmation email.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCancelSupportSubscription}
+                      disabled={supportCanceling}
+                      className="text-sm font-semibold text-red-600 hover:text-red-700 underline disabled:opacity-50"
+                    >
+                      {supportCanceling ? "Processing…" : "Cancel recurring support"}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">

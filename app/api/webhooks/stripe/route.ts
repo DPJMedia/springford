@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  clearStripeSubscriptionFromProfile,
+  syncStripeSubscriptionToProfile,
+} from "@/lib/support/stripeSubscriptionProfile";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
@@ -99,85 +102,6 @@ function buildThankYouEmailHtml(
 </html>`;
 }
 
-async function syncSubscriptionToProfile(sub: Stripe.Subscription) {
-  const supabaseUserId =
-    sub.metadata?.supabase_user_id ||
-    (sub as unknown as { metadata?: { supabase_user_id?: string } }).metadata
-      ?.supabase_user_id;
-  if (!supabaseUserId) {
-    console.warn("Subscription missing supabase_user_id metadata", sub.id);
-    return;
-  }
-
-  const item = sub.items.data[0];
-  const interval = item?.price?.recurring?.interval ?? null;
-  const amountCents = item?.price?.unit_amount ?? null;
-
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch (e) {
-    console.error("Admin client unavailable:", e);
-    return;
-  }
-
-  const periodEnd = (sub as Stripe.Subscription & { current_period_end?: number })
-    .current_period_end;
-  const cancelAtUnix = (sub as Stripe.Subscription & { cancel_at?: number | null }).cancel_at;
-
-  const planMeta =
-    typeof sub.metadata?.plan === "string" ? sub.metadata.plan : null;
-
-  const { error } = await admin
-    .from("user_profiles")
-    .update({
-      stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer?.id,
-      stripe_support_subscription_id: sub.id,
-      support_subscription_status: sub.status,
-      support_subscription_interval: interval,
-      support_subscription_plan: planMeta,
-      support_subscription_amount_cents: amountCents,
-      support_subscription_current_period_end: periodEnd
-        ? new Date(periodEnd * 1000).toISOString()
-        : null,
-      support_subscription_cancel_at: cancelAtUnix
-        ? new Date(cancelAtUnix * 1000).toISOString()
-        : null,
-    })
-    .eq("id", supabaseUserId);
-
-  if (error) {
-    console.error("Failed to sync subscription to profile:", error);
-  }
-}
-
-async function clearSubscriptionFromProfile(subscriptionId: string) {
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch (e) {
-    console.error("Admin client unavailable:", e);
-    return;
-  }
-
-  const { error } = await admin
-    .from("user_profiles")
-    .update({
-      stripe_support_subscription_id: null,
-      support_subscription_status: "canceled",
-      support_subscription_cancel_at: null,
-      support_subscription_plan: null,
-      support_subscription_interval: null,
-      support_subscription_amount_cents: null,
-      support_subscription_current_period_end: null,
-    })
-    .eq("stripe_support_subscription_id", subscriptionId);
-
-  if (error) {
-    console.error("Failed to clear subscription from profile:", error);
-  }
-}
-
 export async function POST(request: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
@@ -201,17 +125,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (event.type === "customer.subscription.deleted") {
-    await clearSubscriptionFromProfile((event.data.object as Stripe.Subscription).id);
+    await clearStripeSubscriptionFromProfile((event.data.object as Stripe.Subscription).id);
     return NextResponse.json({ received: true });
   }
 
   if (event.type === "customer.subscription.updated") {
-    const sub = event.data.object as Stripe.Subscription;
-    if (sub.status === "canceled" || sub.status === "unpaid" || sub.status === "incomplete_expired") {
-      await clearSubscriptionFromProfile(sub.id);
-    } else {
-      await syncSubscriptionToProfile(sub);
-    }
+    await syncStripeSubscriptionToProfile(event.data.object as Stripe.Subscription);
     return NextResponse.json({ received: true });
   }
 
@@ -269,7 +188,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      await syncSubscriptionToProfile(fullSub);
+      await syncStripeSubscriptionToProfile(fullSub);
 
       const inv = fullSub.latest_invoice;
       if (inv && typeof inv === "object" && "hosted_invoice_url" in inv && inv.hosted_invoice_url) {

@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
+import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { sendSupportCancelConfirmationEmail } from "@/lib/support/sendSupportCancelConfirmationEmail";
 import { cancelSupportSubscription } from "@/lib/support/stripeCancelSupportSubscription";
+import {
+  clearStripeSubscriptionFromProfile,
+  syncStripeSubscriptionToProfile,
+} from "@/lib/support/stripeSubscriptionProfile";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 /**
  * Cancels recurring support (end of current period, or immediate if Stripe requires).
+ * Immediately syncs profile from Stripe so the UI updates without waiting for webhooks.
  */
 export async function POST() {
   try {
@@ -41,7 +49,21 @@ export async function POST() {
       return NextResponse.json({ error: "Subscription is already ended" }, { status: 400 });
     }
 
-    const outcome = await cancelSupportSubscription(profile.stripe_support_subscription_id);
+    const subId = profile.stripe_support_subscription_id;
+    const outcome = await cancelSupportSubscription(subId);
+
+    try {
+      const subAfter = await stripe.subscriptions.retrieve(subId);
+      await syncStripeSubscriptionToProfile(subAfter);
+    } catch (e) {
+      const err = e as { code?: string; statusCode?: number };
+      if (err.code === "resource_missing" || err.statusCode === 404) {
+        await clearStripeSubscriptionFromProfile(subId);
+      } else {
+        console.warn("Could not retrieve subscription after cancel to sync profile:", e);
+      }
+    }
+
     if (outcome === "updated") {
       await sendSupportCancelConfirmationEmail(user.email);
     }

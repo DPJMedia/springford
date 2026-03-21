@@ -35,6 +35,10 @@ export interface UserProfile {
   support_subscription_amount_cents?: number | null;
   support_subscription_current_period_end?: string | null;
   support_subscription_cancel_at?: string | null;
+  /** True when user canceled; still active until cancel_at / period end */
+  support_subscription_cancel_at_period_end?: boolean | null;
+  /** When the Stripe subscription object was created */
+  support_subscription_started_at?: string | null;
   /** From Stripe subscription metadata: monthly_ongoing | monthly_limited | annual */
   support_subscription_plan?: string | null;
   created_at: string;
