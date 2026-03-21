@@ -88,6 +88,9 @@ function validatePasswordRequirements(password: string) {
   return hasMinLength && hasSpecialOrNumber;
 }
 
+const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
+const USERNAME_MIN = 3;
+
 function SignupPageContent() {
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/subscribe";
@@ -125,6 +128,29 @@ function SignupPageContent() {
       return;
     }
 
+    const trimmedUsername = username.trim();
+    if (trimmedUsername.length < USERNAME_MIN) {
+      setError(`Username must be at least ${USERNAME_MIN} characters`);
+      setLoading(false);
+      return;
+    }
+    if (!USERNAME_REGEX.test(trimmedUsername)) {
+      setError("Username can only contain letters, numbers, and underscores");
+      setLoading(false);
+      return;
+    }
+
+    const { data: taken } = await supabase
+      .from("user_profiles")
+      .select("id")
+      .eq("username", trimmedUsername)
+      .maybeSingle();
+    if (taken) {
+      setError("This username is already taken");
+      setLoading(false);
+      return;
+    }
+
     // Proceed with signup
     const emailRedirectTo = buildCallbackUrl({ returnTo });
     const { data, error } = await supabase.auth.signUp({
@@ -132,8 +158,8 @@ function SignupPageContent() {
       password,
       options: {
         data: {
-          full_name: fullName,
-          username: username,
+          full_name: fullName.trim(),
+          username: trimmedUsername,
         },
         emailRedirectTo,
       },
@@ -142,8 +168,15 @@ function SignupPageContent() {
     if (error) {
       setError(error.message);
       setLoading(false);
-    } else if (data?.session) {
-      // User is logged in (email confirmation disabled) – redirect to returnTo with welcome
+    } else if (data?.session && data.user) {
+      await supabase
+        .from("user_profiles")
+        .update({
+          username: trimmedUsername,
+          full_name: fullName.trim() || null,
+        })
+        .eq("id", data.user.id);
+
       const url = new URL(returnTo, window.location.origin);
       url.searchParams.set("welcome", "1");
       router.replace(url.pathname + url.search);
@@ -274,6 +307,9 @@ function SignupPageContent() {
                 className="w-full rounded-md border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-riviera-blue)]"
                 placeholder="johndoe"
               />
+              <p className="text-xs text-[color:var(--color-medium)] mt-1">
+                Letters, numbers, and underscores only. At least 3 characters.
+              </p>
             </div>
 
             <div>

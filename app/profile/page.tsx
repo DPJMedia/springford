@@ -5,6 +5,11 @@ import { CancelNewsletterModal } from "@/components/CancelNewsletterModal";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  getAvatarInitials,
+  isDiffuseAIUser,
+  normalizeAvatarUrl,
+} from "@/lib/user/display";
 
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
@@ -72,7 +77,7 @@ export default function ProfilePage() {
     setProfile(profileData);
     setEditedName(profileData?.full_name || "");
     setEditedUsername(profileData?.username || "");
-    setAvatarPreview(profileData?.avatar_url || null);
+    setAvatarPreview(normalizeAvatarUrl(profileData?.avatar_url));
     setLoading(false);
   }
 
@@ -85,13 +90,12 @@ export default function ProfilePage() {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
 
-      // Delete old avatar if exists
-      if (profile?.avatar_url) {
-        // Extract filename from URL
-        const urlParts = profile.avatar_url.split('/');
+      const existingUrl = normalizeAvatarUrl(profile?.avatar_url);
+      if (existingUrl) {
+        const urlParts = existingUrl.split("/");
         const oldFileName = urlParts[urlParts.length - 1];
         if (oldFileName) {
-          await supabase.storage.from('avatars').remove([oldFileName]);
+          await supabase.storage.from("avatars").remove([oldFileName]);
         }
       }
 
@@ -155,14 +159,14 @@ export default function ProfilePage() {
       .select('id')
       .eq('username', username.trim())
       .neq('id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    if (error) {
       console.error('Error checking username:', error);
       return false;
     }
 
-    return !data; // Available if no data returned
+    return !data;
   }
 
   async function saveName() {
@@ -300,20 +304,6 @@ export default function ProfilePage() {
     }
   }
 
-  function getInitials(name: string | null, email: string | null): string {
-    if (name) {
-      const parts = name.split(' ');
-      if (parts.length >= 2) {
-        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-      }
-      return name[0].toUpperCase();
-    }
-    if (email) {
-      return email[0].toUpperCase();
-    }
-    return '?';
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center">
@@ -404,7 +394,9 @@ export default function ProfilePage() {
                 />
               ) : (
                 <div className="w-24 h-24 rounded-full bg-[color:var(--color-riviera-blue)] flex items-center justify-center text-white text-2xl font-bold border-2 border-[color:var(--color-border)]">
-                  {getInitials(profile.full_name, user.email)}
+                  {getAvatarInitials(profile.full_name, user.email, {
+                    isDiffuseAI: isDiffuseAIUser(profile.full_name, user.email),
+                  })}
                 </div>
               )}
               <button

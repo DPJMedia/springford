@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import { Avatar } from "./Avatar";
+import { normalizeAvatarUrl } from "@/lib/user/display";
 import { NotificationBell } from "./NotificationBell";
 import { SearchDropdown } from "./SearchDropdown";
 
@@ -67,14 +68,24 @@ export function Header() {
           .select("is_admin, is_super_admin, full_name, username, avatar_url, newsletter_subscribed")
           .eq("id", user.id)
           .single()
-          .then(({ data }) => {
-            if (data) {
-              setIsAdmin(data.is_admin || data.is_super_admin);
-              setNewsletterSubscribed(data.newsletter_subscribed || false);
-              setUserName(data.full_name || user.email?.split("@")[0] || "User");
-              setUserUsername(data.username || "");
-              setUserAvatar(data.avatar_url);
+          .then(async ({ data: row }) => {
+            if (!row) return;
+            let profile = row;
+            const meta = user.user_metadata || {};
+            const metaU =
+              typeof meta.username === "string" ? meta.username.trim() : "";
+            if (metaU && !String(profile.username || "").trim()) {
+              await supabase
+                .from("user_profiles")
+                .update({ username: metaU })
+                .eq("id", user.id);
+              profile = { ...profile, username: metaU };
             }
+            setIsAdmin(profile.is_admin || profile.is_super_admin);
+            setNewsletterSubscribed(profile.newsletter_subscribed || false);
+            setUserName(profile.full_name || user.email?.split("@")[0] || "User");
+            setUserUsername(profile.username || "");
+            setUserAvatar(normalizeAvatarUrl(profile.avatar_url));
           });
       }
     });
@@ -90,14 +101,24 @@ export function Header() {
           .select("is_admin, is_super_admin, full_name, username, avatar_url, newsletter_subscribed")
           .eq("id", session.user.id)
           .single()
-          .then(({ data }) => {
-            if (data) {
-              setIsAdmin(data.is_admin || data.is_super_admin);
-              setNewsletterSubscribed(data.newsletter_subscribed || false);
-              setUserName(data.full_name || session.user.email?.split("@")[0] || "User");
-              setUserUsername(data.username || "");
-              setUserAvatar(data.avatar_url);
+          .then(async ({ data: row }) => {
+            if (!row) return;
+            let profile = row;
+            const meta = session.user.user_metadata || {};
+            const metaU =
+              typeof meta.username === "string" ? meta.username.trim() : "";
+            if (metaU && !String(profile.username || "").trim()) {
+              await supabase
+                .from("user_profiles")
+                .update({ username: metaU })
+                .eq("id", session.user.id);
+              profile = { ...profile, username: metaU };
             }
+            setIsAdmin(profile.is_admin || profile.is_super_admin);
+            setNewsletterSubscribed(profile.newsletter_subscribed || false);
+            setUserName(profile.full_name || session.user.email?.split("@")[0] || "User");
+            setUserUsername(profile.username || "");
+            setUserAvatar(normalizeAvatarUrl(profile.avatar_url));
           });
       } else {
         setIsAdmin(false);

@@ -1,70 +1,56 @@
-"use client"
+"use client";
 
-import { useState } from 'react'
+import { useState } from "react";
+import {
+  getAvatarInitials,
+  isDiffuseAIUser,
+  normalizeAvatarUrl,
+} from "@/lib/user/display";
 
 type AvatarProps = {
-  src?: string | null
-  name?: string | null
-  email?: string | null
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
-  className?: string
-}
+  src?: string | null;
+  name?: string | null;
+  email?: string | null;
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
+  className?: string;
+};
 
-export function Avatar({ src, name, email, size = 'md', className = '' }: AvatarProps) {
-  const [imgError, setImgError] = useState(false)
+export function Avatar({ src, name, email, size = "md", className = "" }: AvatarProps) {
+  const [imgError, setImgError] = useState(false);
   const sizeClasses = {
-    xs: 'w-6 h-6 text-xs',
-    sm: 'w-8 h-8 text-sm',
-    md: 'w-10 h-10 text-base',
-    lg: 'w-16 h-16 text-2xl',
-    xl: 'w-32 h-32 text-4xl',
-  }
+    xs: "w-6 h-6 text-xs",
+    sm: "w-8 h-8 text-sm",
+    md: "w-10 h-10 text-base",
+    lg: "w-16 h-16 text-2xl",
+    xl: "w-32 h-32 text-4xl",
+  };
 
-  // Check if this is DiffuseAI
-  const isDiffuseAI = name?.toLowerCase().includes('diffuse.ai') || 
-                      name?.toLowerCase().includes('powered by diffuse') ||
-                      email?.toLowerCase().includes('diffuse');
+  const safeSrc = normalizeAvatarUrl(src);
+  const isDiffuseAI = isDiffuseAIUser(name, email);
 
-  function getInitials(name: string | null | undefined, email: string | null | undefined): string {
-    // Special case for DiffuseAI
-    if (isDiffuseAI) {
-      return 'AI'
-    }
-    
-    if (name) {
-      const parts = name.split(' ')
-      if (parts.length >= 2) {
-        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-      }
-      return name[0].toUpperCase()
-    }
-    if (email) {
-      return email[0].toUpperCase()
-    }
-    return '?'
-  }
+  const initials = getAvatarInitials(name, email, { isDiffuseAI });
 
-  if (src && !imgError) {
+  if (safeSrc && !imgError) {
     return (
       <img
-        src={src}
-        alt={name || 'Avatar'}
+        src={safeSrc}
+        alt={name || "Avatar"}
         className={`${sizeClasses[size]} rounded-full object-cover ${className}`}
         onError={() => setImgError(true)}
         referrerPolicy="no-referrer"
       />
-    )
+    );
   }
 
-  // Use orange background for DiffuseAI, default blue for others
-  const bgColor = isDiffuseAI ? 'bg-gradient-to-br from-[#ff9628] to-[#ff7300]' : 'bg-[color:var(--color-riviera-blue)]';
+  const bgColor = isDiffuseAI
+    ? "bg-gradient-to-br from-[#ff9628] to-[#ff7300]"
+    : "bg-[color:var(--color-riviera-blue)]";
 
   return (
-    <div className={`${sizeClasses[size]} rounded-full ${bgColor} flex items-center justify-center text-white font-black ${className}`}>
-      {getInitials(name, email)}
+    <div
+      className={`${sizeClasses[size]} rounded-full ${bgColor} flex items-center justify-center text-white font-black ${className}`}
+    >
+      {initials}
     </div>
-  )
+  );
 }
-
-
-

@@ -38,44 +38,80 @@ export async function GET(request: Request) {
     if (!error && data.session && data.user) {
       const user = data.user
       const meta = user.user_metadata || {}
-      const provider = (user.app_metadata?.provider as string) ?? user.identities?.[0]?.provider
+      const provider =
+        (user.app_metadata?.provider as string) ?? user.identities?.[0]?.provider ?? "email"
 
-      // Google sign-in: sync name, avatar, and ensure profile exists; redirect to set username if missing
-      if (provider === 'google') {
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("id, username, full_name")
+        .eq("id", user.id)
+        .single()
+
+      const updates: Record<string, unknown> = {}
+
+      const metaUsername =
+        typeof meta.username === "string" ? meta.username.trim() : ""
+      if (
+        metaUsername &&
+        (!profile?.username || String(profile.username).trim() === "")
+      ) {
+        updates.username = metaUsername
+      }
+
+      if (provider === "google") {
         const fullName = meta.full_name ?? meta.name ?? null
         const avatarUrl = meta.avatar_url ?? meta.picture ?? null
-
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('id, username')
-          .eq('id', user.id)
-          .single()
-
-        const updates: Record<string, unknown> = {}
         if (fullName) updates.full_name = fullName
         if (avatarUrl) updates.avatar_url = avatarUrl
-        if (Object.keys(updates).length > 0) {
-          await supabase
-            .from('user_profiles')
-            .update(updates)
-            .eq('id', user.id)
+      } else {
+        const fn = meta.full_name ?? meta.name
+        if (
+          typeof fn === "string" &&
+          fn.trim() &&
+          (!profile?.full_name || String(profile.full_name).trim() === "")
+        ) {
+          updates.full_name = fn.trim()
         }
+      }
 
-        const needsUsername = !profile?.username || profile.username.trim() === ''
-        if (needsUsername) {
-          const setUsernamePath = '/auth/set-username'
-          const returnToParam = returnTo ? `returnTo=${encodeURIComponent(returnTo)}` : ''
-          const nextParam = searchParams.get('next') && !returnTo ? `next=${encodeURIComponent(searchParams.get('next')!)}` : ''
-          const qs = [returnToParam, nextParam].filter(Boolean).join('&')
-          const redirectUrlSetUsername = `${origin}${setUsernamePath}${qs ? `?${qs}` : ''}`
-          const response = NextResponse.redirect(redirectUrlSetUsername)
-          const sessionCookies = [
-            { name: 'sb-access-token', value: data.session.access_token, options: { path: '/', maxAge: 60 * 60 * 24 * 7 } },
-            { name: 'sb-refresh-token', value: data.session.refresh_token, options: { path: '/', maxAge: 60 * 60 * 24 * 7 } },
-          ]
-          sessionCookies.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
-          return response
-        }
+      if (Object.keys(updates).length > 0) {
+        await supabase.from("user_profiles").update(updates).eq("id", user.id)
+      }
+
+      const { data: profileAfter } = await supabase
+        .from("user_profiles")
+        .select("username")
+        .eq("id", user.id)
+        .single()
+
+      const needsUsername =
+        !profileAfter?.username || String(profileAfter.username).trim() === ""
+      if (needsUsername) {
+        const setUsernamePath = "/auth/set-username"
+        const returnToParam = returnTo ? `returnTo=${encodeURIComponent(returnTo)}` : ""
+        const nextParam =
+          searchParams.get("next") && !returnTo
+            ? `next=${encodeURIComponent(searchParams.get("next")!)}`
+            : ""
+        const qs = [returnToParam, nextParam].filter(Boolean).join("&")
+        const redirectUrlSetUsername = `${origin}${setUsernamePath}${qs ? `?${qs}` : ""}`
+        const response = NextResponse.redirect(redirectUrlSetUsername)
+        const sessionCookies = [
+          {
+            name: "sb-access-token",
+            value: data.session.access_token,
+            options: { path: "/", maxAge: 60 * 60 * 24 * 7 },
+          },
+          {
+            name: "sb-refresh-token",
+            value: data.session.refresh_token,
+            options: { path: "/", maxAge: 60 * 60 * 24 * 7 },
+          },
+        ]
+        sessionCookies.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options)
+        )
+        return response
       }
 
       // Handle newsletter subscription preference

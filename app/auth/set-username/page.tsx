@@ -34,12 +34,14 @@ function SetUsernameContent() {
 
   async function checkAvailability(value: string): Promise<boolean> {
     if (!value || value.length < MIN_LENGTH) return true;
+    if (!userId) return true;
     const { data } = await supabase
       .from("user_profiles")
       .select("id")
       .eq("username", value.trim())
+      .neq("id", userId)
       .maybeSingle();
-    return !data; // available if no row has this username
+    return !data;
   }
 
   async function handleSubmit(e: React.FormEvent) {

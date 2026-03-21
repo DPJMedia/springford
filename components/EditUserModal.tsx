@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar } from './Avatar'
 import type { UserProfile } from '@/lib/types/database'
+import { normalizeAvatarUrl } from '@/lib/user/display'
 
 type EditUserModalProps = {
   user: UserProfile
@@ -19,7 +20,9 @@ export function EditUserModal({ user, isOpen, onClose, onUpdate }: EditUserModal
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(
+    normalizeAvatarUrl(user.avatar_url)
+  )
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -33,7 +36,7 @@ export function EditUserModal({ user, isOpen, onClose, onUpdate }: EditUserModal
       .select('id')
       .eq('username', username.trim())
       .neq('id', user.id)
-      .single()
+      .maybeSingle()
 
     return !data
   }
