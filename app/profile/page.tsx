@@ -40,6 +40,20 @@ export default function ProfilePage() {
     checkUser();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") === "support") {
+      setActiveTab("support");
+    }
+    if (params.get("supportCanceled") === "1") {
+      setActiveTab("support");
+      setSuccess("Your recurring support has been canceled. A confirmation email has been sent.");
+      setTimeout(() => setSuccess(null), 8000);
+      window.history.replaceState({}, "", "/profile");
+    }
+  }, []);
+
   async function checkUser() {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     
@@ -243,8 +257,16 @@ export default function ProfilePage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not cancel");
       await checkUser();
-      setSuccess("Recurring support will end after your current billing period. Thank you for your support.");
-      setTimeout(() => setSuccess(null), 6000);
+      if (data.noop) {
+        setSuccess(
+          "No change needed — this subscription was already ending or canceled."
+        );
+      } else {
+        setSuccess(
+          "Recurring support will end after your current billing period. A confirmation email has been sent."
+        );
+      }
+      setTimeout(() => setSuccess(null), 8000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to cancel");
     } finally {
@@ -662,29 +684,17 @@ export default function ProfilePage() {
                   </div>
                 )}
                 <div className="pt-2 border-t border-[color:var(--color-border)]">
-                  {profile.support_subscription_plan === "monthly_limited" ? (
-                    <p className="text-xs text-[color:var(--color-medium)]">
-                      This is a fixed-term plan. It will end automatically on the date above; early cancellation isn’t available from your profile. For help,{" "}
-                      <Link href="/contact" className="text-[color:var(--color-riviera-blue)] underline">
-                        contact us
-                      </Link>
-                      .
-                    </p>
-                  ) : (
-                    <>
-                      <p className="text-xs text-[color:var(--color-medium)] mb-3">
-                        Cancel stops future charges after the end of your current billing period. You’ll keep access through that date.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleCancelSupportSubscription}
-                        disabled={supportCanceling}
-                        className="text-sm font-semibold text-red-600 hover:text-red-700 underline disabled:opacity-50"
-                      >
-                        {supportCanceling ? "Processing…" : "Cancel recurring support"}
-                      </button>
-                    </>
-                  )}
+                  <p className="text-xs text-[color:var(--color-medium)] mb-3">
+                    Cancel stops future charges after the end of your current billing period (or immediately if required by our payment provider). You’ll receive a confirmation email.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleCancelSupportSubscription}
+                    disabled={supportCanceling}
+                    className="text-sm font-semibold text-red-600 hover:text-red-700 underline disabled:opacity-50"
+                  >
+                    {supportCanceling ? "Processing…" : "Cancel recurring support"}
+                  </button>
                 </div>
               </div>
             ) : (

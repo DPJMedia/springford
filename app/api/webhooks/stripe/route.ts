@@ -22,6 +22,8 @@ function buildThankYouEmailHtml(
     isRecurring: boolean;
     intervalLabel?: string;
     cancelAtLabel?: string | null;
+    /** Signed one-click cancel URL (recurring thank-you emails only) */
+    cancelViaEmailUrl?: string | null;
   }
 ): string {
   const recurringNote = opts.isRecurring
@@ -70,6 +72,14 @@ function buildThankYouEmailHtml(
               <p style="margin: 0; font-size: 15px; color: #333333;">
                 — The Spring-Ford Press team
               </p>
+              ${
+                opts.cancelViaEmailUrl
+                  ? `
+              <p style="margin: 28px 0 0; padding-top: 20px; border-top: 1px solid #e8e8e8; font-size: 11px; line-height: 1.55; color: #888888;">
+                Need to cancel this recurring contribution? <a href="${opts.cancelViaEmailUrl}" style="color: #888888; text-decoration: underline;">Cancel from this email</a> (link valid 90 days). You can also cancel anytime from your Spring-Ford Press profile under Support.
+              </p>`
+                  : ""
+              }
             </td>
           </tr>
         </table>
@@ -227,6 +237,7 @@ export async function POST(request: NextRequest) {
   let receiptUrl: string | null = null;
   let intervalLabel: string | undefined;
   let cancelAtLabel: string | null = null;
+  let cancelViaEmailUrl: string | null = null;
 
   if (isSubscription && session.subscription) {
     try {
@@ -277,6 +288,17 @@ export async function POST(request: NextRequest) {
           year: "numeric",
         });
       }
+
+      const uid = fullSub.metadata?.supabase_user_id;
+      if (uid && customerEmail) {
+        try {
+          const { createSupportCancelToken } = await import("@/lib/support/cancelToken");
+          const tok = createSupportCancelToken(fullSub.id, uid, customerEmail);
+          cancelViaEmailUrl = `${SITE_URL}/api/support/cancel-from-email?token=${encodeURIComponent(tok)}`;
+        } catch (e) {
+          console.warn("Could not build email cancel link (set SUPPORT_CANCEL_TOKEN_SECRET or STRIPE_WEBHOOK_SECRET):", e);
+        }
+      }
     } catch (e) {
       console.warn("Could not retrieve subscription / receipt:", e);
     }
@@ -320,10 +342,11 @@ export async function POST(request: NextRequest) {
     isRecurring: isSubscription,
     intervalLabel,
     cancelAtLabel,
+    cancelViaEmailUrl,
   });
 
   const plainRecurring = isSubscription
-    ? `\n\nThis is a recurring contribution. Your Stripe receipt shows recurring billing.${intervalLabel ? ` (${intervalLabel})` : ""}${cancelAtLabel ? ` Scheduled end: ${cancelAtLabel}.` : ""} Manage or cancel from your profile.`
+    ? `\n\nThis is a recurring contribution. Your Stripe receipt shows recurring billing.${intervalLabel ? ` (${intervalLabel})` : ""}${cancelAtLabel ? ` Scheduled end: ${cancelAtLabel}.` : ""} Manage or cancel from your profile.${cancelViaEmailUrl ? `\n\nCancel from email: ${cancelViaEmailUrl}` : ""}`
     : "";
 
   const plainText = `Thank you for your contribution to Spring-Ford Press.\n\nAmount: ${amountDollars}${plainRecurring}\n\n${receiptUrl ? `View your receipt: ${receiptUrl}\n\n` : ""}— The Spring-Ford Press team\n\nSpring-Ford Press: ${SITE_URL}\nTerms of Service: ${TOS_URL}\nPrivacy Policy: ${PRIVACY_URL}\nContact Us: ${CONTACT_URL}`;

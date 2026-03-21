@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+import { sendSupportCancelConfirmationEmail } from "@/lib/support/sendSupportCancelConfirmationEmail";
+import { cancelSupportSubscription } from "@/lib/support/stripeCancelSupportSubscription";
 
 /**
- * Cancels recurring support at the end of the current billing period (no further charges).
+ * Cancels recurring support (end of current period, or immediate if Stripe requires).
  */
 export async function POST() {
   try {
@@ -18,7 +17,7 @@ export async function POST() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!user?.email) {
       return NextResponse.json({ error: "Sign in required" }, { status: 401 });
     }
 
@@ -42,11 +41,12 @@ export async function POST() {
       return NextResponse.json({ error: "Subscription is already ended" }, { status: 400 });
     }
 
-    await stripe.subscriptions.update(profile.stripe_support_subscription_id, {
-      cancel_at_period_end: true,
-    });
+    const outcome = await cancelSupportSubscription(profile.stripe_support_subscription_id);
+    if (outcome === "updated") {
+      await sendSupportCancelConfirmationEmail(user.email);
+    }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, noop: outcome === "noop" });
   } catch (err) {
     console.error("Cancel subscription error:", err);
     return NextResponse.json(

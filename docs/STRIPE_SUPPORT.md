@@ -14,8 +14,9 @@
 
 3. **Environment variables** (see `README.md`):
    - `STRIPE_SECRET_KEY`
-   - `STRIPE_WEBHOOK_SECRET` (from the webhook endpoint)
+   - `STRIPE_WEBHOOK_SECRET` (from the webhook endpoint; also used to sign cancel-from-email links if `SUPPORT_CANCEL_TOKEN_SECRET` is not set)
    - `SUPABASE_SERVICE_ROLE_KEY` — required so webhooks can update `user_profiles` with subscription data.
+   - Optional: `SUPPORT_CANCEL_TOKEN_SECRET` — dedicated secret for HMAC cancel links in emails.
 
 4. **Database** — run migration `20260322000000_support_subscriptions.sql` on your Supabase project (adds Stripe subscription columns to `user_profiles`).
 
