@@ -13,12 +13,6 @@ export type RecurringPlan =
   | "monthly_limited"
   | "annual";
 
-function addMonths(d: Date, months: number): Date {
-  const out = new Date(d.getTime());
-  out.setMonth(out.getMonth() + months);
-  return out;
-}
-
 export async function POST(request: NextRequest) {
   try {
     if (!process.env.STRIPE_SECRET_KEY) {
@@ -110,6 +104,8 @@ export async function POST(request: NextRequest) {
       },
     };
 
+    // Note: Stripe Checkout does not accept subscription_data.cancel_at — fixed-term
+    // monthly plans get cancel_at applied in the webhook after the subscription exists.
     const subscriptionData: Stripe.Checkout.SessionCreateParams.SubscriptionData = {
       metadata: {
         ...metadata,
@@ -117,16 +113,6 @@ export async function POST(request: NextRequest) {
         ...(durationMonths ? { duration_months: String(durationMonths) } : {}),
       },
     };
-
-    let subscriptionPayload: Stripe.Checkout.SessionCreateParams["subscription_data"] =
-      subscriptionData;
-    if (plan === "monthly_limited" && durationMonths) {
-      const cancelAt = addMonths(new Date(), durationMonths);
-      subscriptionPayload = {
-        ...subscriptionData,
-        cancel_at: Math.floor(cancelAt.getTime() / 1000),
-      } as Stripe.Checkout.SessionCreateParams["subscription_data"];
-    }
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -137,11 +123,15 @@ export async function POST(request: NextRequest) {
           price_data: recurringBlock,
         },
       ],
-      subscription_data: subscriptionPayload,
+      subscription_data: subscriptionData,
       success_url: `${origin}/support?success=true&recurring=1`,
       cancel_url: `${origin}/support?canceled=true`,
       allow_promotion_codes: true,
-      metadata,
+      metadata: {
+        ...metadata,
+        plan,
+        ...(durationMonths ? { duration_months: String(durationMonths) } : {}),
+      },
     });
 
     return NextResponse.json({ url: session.url });

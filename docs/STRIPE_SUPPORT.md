@@ -22,7 +22,7 @@
 ## Behavior
 
 - **One-time:** Checkout `mode: payment` (unchanged).
-- **Recurring:** Checkout `mode: subscription` with monthly or annual billing; optional fixed term (N months) uses Stripe `cancel_at`.
+- **Recurring:** Checkout `mode: subscription` with monthly or annual billing. Fixed-term (N months) sets `cancel_at` on the subscription **in the webhook** after checkout (Stripe Checkout does not accept `subscription_data.cancel_at`).
 - Thank-you emails mention recurring when applicable; receipt links use Stripe’s hosted invoice for subscriptions when available.
 - Users can **cancel recurring** from **Profile → Support** (cancels at end of current billing period).
 

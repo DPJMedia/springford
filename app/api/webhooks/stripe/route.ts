@@ -9,6 +9,12 @@ const TOS_URL = SITE_URL.replace(/\/$/, "") + "/terms-of-service";
 const PRIVACY_URL = SITE_URL.replace(/\/$/, "") + "/privacy-policy";
 const CONTACT_URL = SITE_URL.replace(/\/$/, "") + "/contact";
 
+function addMonths(d: Date, months: number): Date {
+  const out = new Date(d.getTime());
+  out.setMonth(out.getMonth() + months);
+  return out;
+}
+
 function buildThankYouEmailHtml(
   amountDollars: string,
   receiptUrl: string | null,
@@ -228,9 +234,30 @@ export async function POST(request: NextRequest) {
         typeof session.subscription === "string"
           ? session.subscription
           : session.subscription.id;
-      const fullSub = await stripe.subscriptions.retrieve(subId, {
+      let fullSub = await stripe.subscriptions.retrieve(subId, {
         expand: ["latest_invoice", "latest_invoice.payment_intent"],
       });
+
+      // Checkout does not allow subscription_data.cancel_at; apply fixed term here.
+      if (
+        fullSub.metadata?.plan === "monthly_limited" &&
+        fullSub.metadata?.duration_months
+      ) {
+        const months = parseInt(fullSub.metadata.duration_months, 10);
+        if (!Number.isNaN(months) && months >= 1 && months <= 36) {
+          const cancelAt = addMonths(new Date(), months);
+          const cancelAtUnix = Math.floor(cancelAt.getTime() / 1000);
+          try {
+            await stripe.subscriptions.update(subId, { cancel_at: cancelAtUnix });
+            fullSub = await stripe.subscriptions.retrieve(subId, {
+              expand: ["latest_invoice", "latest_invoice.payment_intent"],
+            });
+          } catch (e) {
+            console.error("Failed to set subscription cancel_at:", e);
+          }
+        }
+      }
+
       await syncSubscriptionToProfile(fullSub);
 
       const inv = fullSub.latest_invoice;
