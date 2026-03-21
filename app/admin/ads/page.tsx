@@ -11,7 +11,7 @@ const AD_SLOTS = [
   // Homepage slots (numbered)
   { value: "homepage-banner-top", label: "Section 1: Banner Below Hero" },
   { value: "homepage-banner-top-mobile", label: "Mobile Section 1: Below Hero" },
-  { value: "homepage-mobile-above-most-read", label: "Mobile Section 2: Above Most Read" },
+  { value: "homepage-mobile-above-most-read", label: "Mobile Section 2: Above Trending Now" },
   { value: "homepage-mobile-above-editors-picks", label: "Mobile Section 3: Above Editor’s Picks" },
   { value: "homepage-mobile-between-editors-picks-footer", label: "Mobile Section 4: Between Editor’s Picks & Footer" },
   { value: "homepage-sidebar-top", label: "Section 2: Sidebar Top (Above Trending)" },

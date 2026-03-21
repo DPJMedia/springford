@@ -334,7 +334,8 @@ export default function Home() {
       breakingResult,
       featuredResult,
       latestResult,
-      trendingResult,
+      trendingWithin5Result,
+      trendingFallbackResult,
       springCityResult,
       royersfordResult,
       limerickResult,
@@ -365,12 +366,13 @@ export default function Home() {
         .order("published_at", { ascending: false })
         .limit(10),
       
-      // Featured articles (Top Stories by views)
+      // Featured articles (Top Stories by views; only articles < 10 days old)
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .lte("published_at", now)
+        .gte("published_at", new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString())
         .order("view_count", { ascending: false })
         .limit(4),
       
@@ -383,14 +385,23 @@ export default function Home() {
         .order("published_at", { ascending: false })
         .limit(15),
       
-      // Trending articles (Most Read - past 30 days)
+      // Trending Now: within 5 days by views
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .lte("published_at", now)
-        .gte("published_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .gte("published_at", new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString())
         .order("view_count", { ascending: false })
+        .limit(5),
+      // Trending Now fallback: 5–10 days, closest to 5-day line (for filling slots)
+      supabase
+        .from("articles")
+        .select(ARTICLE_LIST_COLUMNS)
+        .eq("status", "published")
+        .lt("published_at", new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString())
+        .gte("published_at", new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString())
+        .order("published_at", { ascending: false })
         .limit(5),
       
       // Section queries (all in parallel)
@@ -525,9 +536,15 @@ export default function Home() {
       setLatestArticles(latestResult.data as any);
     }
 
-    if (trendingResult.data) {
-      setTrendingArticles(trendingResult.data as any);
-    }
+    // Trending Now: up to 5 from within 5 days by views; fill with closest to 5-day window if needed
+    const within5 = trendingWithin5Result.data || [];
+    const fallback = trendingFallbackResult.data || [];
+    const needed = Math.max(0, 5 - within5.length);
+    const trendingMerged =
+      needed > 0 && fallback.length > 0
+        ? [...within5, ...fallback.slice(0, needed)]
+        : within5;
+    setTrendingArticles(trendingMerged as any);
 
     // Set section articles
     if (springCityResult.data) setSpringCityArticles(springCityResult.data as any);
@@ -670,7 +687,7 @@ export default function Home() {
                     {featuredArticles.length === 0 ? (
                       <div className="bg-white rounded-lg p-8 text-center border-2 border-dashed border-gray-300">
                         <p className="text-[color:var(--color-medium)]">
-                          No featured stories yet. Mark articles as "Featured" to display them here.
+                          No top stories from the past 10 days.
                         </p>
                       </div>
                     ) : (
@@ -701,16 +718,16 @@ export default function Home() {
                     sectionName="latest"
                   />
 
-                  {/* Mobile Section 2: 2:1 ad above Most Read */}
+                  {/* Mobile Section 2: 2:1 ad above Trending Now */}
                   <div className="pt-8 lg:hidden">
                     <AdSlot slot="homepage-mobile-above-most-read" className="w-full" />
                   </div>
 
-                  {/* Most Read - mobile only: appears under Latest News and Section 2 ad */}
+                  {/* Trending Now - mobile only: appears under Latest News and Section 2 ad */}
                   <div className="lg:hidden">
                     <div className="bg-white rounded-lg p-4 shadow-sm">
                       <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
-                        Most Read
+                        Trending Now
                       </h3>
                       {trendingArticles.length === 0 ? (
                         <p className="text-sm text-[color:var(--color-medium)] text-center py-4">
@@ -853,10 +870,10 @@ export default function Home() {
                     />
                   </div>
 
-                  {/* Most Read - desktop only; on mobile shown under Latest News in main column */}
+                  {/* Trending Now - desktop only; on mobile shown under Latest News in main column */}
                   <div className="mt-8 hidden lg:block bg-white rounded-lg p-4 shadow-sm">
                     <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
-                      Most Read
+                      Trending Now
                     </h3>
                     {trendingArticles.length === 0 ? (
                       <p className="text-sm text-[color:var(--color-medium)] text-center py-4">

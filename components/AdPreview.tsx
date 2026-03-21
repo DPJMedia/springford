@@ -260,8 +260,8 @@ function HomepagePreview({
           {renderAdSlot("homepage-sidebar-middle", 3, "Sidebar Middle", "1200×1000 (1.2:1)", "h-48")}
 
           <div className="bg-gray-50 p-4 rounded">
-            <h3 className="text-sm font-bold mb-2">Most Read</h3>
-            <p className="text-xs text-gray-500">Most read articles...</p>
+            <h3 className="text-sm font-bold mb-2">Editor's Picks</h3>
+            <p className="text-xs text-gray-500">Editor's picks...</p>
           </div>
 
           {/* AD SECTION 4: Sidebar Bottom */}
@@ -357,10 +357,10 @@ function HomepageMobilePreview({
         <p className="text-xs text-gray-500">Stories…</p>
       </div>
 
-      {renderMobileSlot("homepage-mobile-above-most-read", 2, "Above Most Read")}
+      {renderMobileSlot("homepage-mobile-above-most-read", 2, "Above Trending Now")}
 
       <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <h3 className="text-sm font-bold text-gray-700 mb-2">Most Read</h3>
+        <h3 className="text-sm font-bold text-gray-700 mb-2">Trending Now</h3>
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-3 bg-gray-200 rounded w-5/6" />
