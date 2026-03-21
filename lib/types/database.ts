@@ -26,6 +26,17 @@ export interface UserProfile {
   is_super_admin: boolean;
   newsletter_subscribed: boolean;
   newsletter_subscribed_at: string | null;
+  /** Stripe Customer id when user has started a support subscription checkout */
+  stripe_customer_id?: string | null;
+  /** Active recurring support subscription */
+  stripe_support_subscription_id?: string | null;
+  support_subscription_status?: string | null;
+  support_subscription_interval?: string | null;
+  support_subscription_amount_cents?: number | null;
+  support_subscription_current_period_end?: string | null;
+  support_subscription_cancel_at?: string | null;
+  /** From Stripe subscription metadata: monthly_ongoing | monthly_limited | annual */
+  support_subscription_plan?: string | null;
   created_at: string;
   updated_at: string;
 }

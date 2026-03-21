@@ -91,9 +91,13 @@ NEXT_PUBLIC_SITE_URL=https://www.springford.press
 
 # Stripe (Support / one-time contributions)
 STRIPE_SECRET_KEY=sk_live_...
-# Required for donation thank-you emails. Create a webhook in Stripe Dashboard → Developers → Webhooks
-# Endpoint URL: https://your-domain.com/api/webhooks/stripe — Events: checkout.session.completed, checkout.session.async_payment_succeeded
+# Required for donation thank-you emails + recurring support sync. Create a webhook in Stripe Dashboard → Developers → Webhooks
+# Endpoint URL: https://your-domain.com/api/webhooks/stripe — Events:
+#   checkout.session.completed, checkout.session.async_payment_succeeded,
+#   customer.subscription.updated, customer.subscription.deleted
 STRIPE_WEBHOOK_SECRET=whsec_...
+# Required for writing subscription fields to user_profiles from webhooks (server-only)
+SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
 ### Step 3: Database Setup

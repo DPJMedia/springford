@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
@@ -8,7 +9,23 @@ const TOS_URL = SITE_URL.replace(/\/$/, "") + "/terms-of-service";
 const PRIVACY_URL = SITE_URL.replace(/\/$/, "") + "/privacy-policy";
 const CONTACT_URL = SITE_URL.replace(/\/$/, "") + "/contact";
 
-function buildThankYouEmailHtml(amountDollars: string, receiptUrl: string | null): string {
+function buildThankYouEmailHtml(
+  amountDollars: string,
+  receiptUrl: string | null,
+  opts: {
+    isRecurring: boolean;
+    intervalLabel?: string;
+    cancelAtLabel?: string | null;
+  }
+): string {
+  const recurringNote = opts.isRecurring
+    ? `
+    <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.65; color: #1a1a1a; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif;">
+      <strong>This is a recurring contribution.</strong> Your receipt from Stripe reflects recurring billing${opts.intervalLabel ? ` (${opts.intervalLabel})` : ""}.
+      ${opts.cancelAtLabel ? `Your current commitment ends around <strong>${opts.cancelAtLabel}</strong> unless you change or cancel it from your profile.` : "You can manage or cancel anytime from your Spring-Ford Press profile."}
+    </p>`
+    : "";
+
   const receiptSection = receiptUrl
     ? `
     <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.65; color: #1a1a1a; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif;">
@@ -40,8 +57,9 @@ function buildThankYouEmailHtml(amountDollars: string, receiptUrl: string | null
               <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333333;">
                 Your support helps us keep independent, neighborhood-first reporting in the Spring-Ford area.
               </p>
-              <p style="margin: 0 0 8px; font-size: 15px; color: #666666;">Amount contributed:</p>
+              <p style="margin: 0 0 8px; font-size: 15px; color: #666666;">Amount${opts.isRecurring ? " (first billing period)" : ""}:</p>
               <p style="margin: 0 0 24px; font-size: 28px; font-weight: 700; color: #1a1a1a;">${amountDollars}</p>
+              ${recurringNote}
               ${receiptSection}
               <p style="margin: 0; font-size: 15px; color: #333333;">
                 — The Spring-Ford Press team
@@ -63,6 +81,85 @@ function buildThankYouEmailHtml(amountDollars: string, receiptUrl: string | null
   </table>
 </body>
 </html>`;
+}
+
+async function syncSubscriptionToProfile(sub: Stripe.Subscription) {
+  const supabaseUserId =
+    sub.metadata?.supabase_user_id ||
+    (sub as unknown as { metadata?: { supabase_user_id?: string } }).metadata
+      ?.supabase_user_id;
+  if (!supabaseUserId) {
+    console.warn("Subscription missing supabase_user_id metadata", sub.id);
+    return;
+  }
+
+  const item = sub.items.data[0];
+  const interval = item?.price?.recurring?.interval ?? null;
+  const amountCents = item?.price?.unit_amount ?? null;
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    console.error("Admin client unavailable:", e);
+    return;
+  }
+
+  const periodEnd = (sub as Stripe.Subscription & { current_period_end?: number })
+    .current_period_end;
+  const cancelAtUnix = (sub as Stripe.Subscription & { cancel_at?: number | null }).cancel_at;
+
+  const planMeta =
+    typeof sub.metadata?.plan === "string" ? sub.metadata.plan : null;
+
+  const { error } = await admin
+    .from("user_profiles")
+    .update({
+      stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer?.id,
+      stripe_support_subscription_id: sub.id,
+      support_subscription_status: sub.status,
+      support_subscription_interval: interval,
+      support_subscription_plan: planMeta,
+      support_subscription_amount_cents: amountCents,
+      support_subscription_current_period_end: periodEnd
+        ? new Date(periodEnd * 1000).toISOString()
+        : null,
+      support_subscription_cancel_at: cancelAtUnix
+        ? new Date(cancelAtUnix * 1000).toISOString()
+        : null,
+    })
+    .eq("id", supabaseUserId);
+
+  if (error) {
+    console.error("Failed to sync subscription to profile:", error);
+  }
+}
+
+async function clearSubscriptionFromProfile(subscriptionId: string) {
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    console.error("Admin client unavailable:", e);
+    return;
+  }
+
+  const { error } = await admin
+    .from("user_profiles")
+    .update({
+      stripe_support_subscription_id: null,
+      support_subscription_status: "canceled",
+      support_subscription_cancel_at: null,
+      support_subscription_plan: null,
+      support_subscription_interval: null,
+      support_subscription_amount_cents: null,
+      support_subscription_current_period_end: null,
+    })
+    .eq("stripe_support_subscription_id", subscriptionId);
+
+  if (error) {
+    console.error("Failed to clear subscription from profile:", error);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -87,6 +184,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  if (event.type === "customer.subscription.deleted") {
+    await clearSubscriptionFromProfile((event.data.object as Stripe.Subscription).id);
+    return NextResponse.json({ received: true });
+  }
+
+  if (event.type === "customer.subscription.updated") {
+    const sub = event.data.object as Stripe.Subscription;
+    if (sub.status === "canceled" || sub.status === "unpaid" || sub.status === "incomplete_expired") {
+      await clearSubscriptionFromProfile(sub.id);
+    } else {
+      await syncSubscriptionToProfile(sub);
+    }
+    return NextResponse.json({ received: true });
+  }
+
   if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") {
     return NextResponse.json({ received: true });
   }
@@ -99,13 +211,57 @@ export async function POST(request: NextRequest) {
   const sessionId = session.id;
   const customerEmail = session.customer_email || session.customer_details?.email;
   const amountTotal = session.amount_total ?? 0;
-  const amountDollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amountTotal / 100);
+  const amountDollars = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amountTotal / 100);
+
+  const isSubscription = session.mode === "subscription";
 
   let receiptUrl: string | null = null;
-  if (session.payment_intent) {
+  let intervalLabel: string | undefined;
+  let cancelAtLabel: string | null = null;
+
+  if (isSubscription && session.subscription) {
     try {
-      const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent.id;
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ["latest_charge"] });
+      const subId =
+        typeof session.subscription === "string"
+          ? session.subscription
+          : session.subscription.id;
+      const fullSub = await stripe.subscriptions.retrieve(subId, {
+        expand: ["latest_invoice", "latest_invoice.payment_intent"],
+      });
+      await syncSubscriptionToProfile(fullSub);
+
+      const inv = fullSub.latest_invoice;
+      if (inv && typeof inv === "object" && "hosted_invoice_url" in inv && inv.hosted_invoice_url) {
+        receiptUrl = inv.hosted_invoice_url as string;
+      }
+
+      const item = fullSub.items.data[0];
+      const interval = item?.price?.recurring?.interval;
+      if (interval === "month") intervalLabel = "monthly";
+      else if (interval === "year") intervalLabel = "annual";
+
+      if (fullSub.cancel_at) {
+        cancelAtLabel = new Date(fullSub.cancel_at * 1000).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+    } catch (e) {
+      console.warn("Could not retrieve subscription / receipt:", e);
+    }
+  } else if (session.payment_intent) {
+    try {
+      const paymentIntentId =
+        typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session.payment_intent.id;
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ["latest_charge"],
+      });
       const charge = paymentIntent.latest_charge;
       if (charge && typeof charge === "object" && "receipt_url" in charge && charge.receipt_url) {
         receiptUrl = charge.receipt_url as string;
@@ -129,8 +285,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  const html = buildThankYouEmailHtml(amountDollars, receiptUrl);
-  const plainText = `Thank you for your contribution to Spring-Ford Press.\n\nAmount: ${amountDollars}\n\n${receiptUrl ? `View your receipt: ${receiptUrl}\n\n` : ""}— The Spring-Ford Press team\n\nSpring-Ford Press: ${SITE_URL}\nTerms of Service: ${TOS_URL}\nPrivacy Policy: ${PRIVACY_URL}\nContact Us: ${CONTACT_URL}`;
+  const subject = isSubscription
+    ? "Thank you — your recurring support is set up"
+    : "Thank you for supporting Spring-Ford Press";
+
+  const html = buildThankYouEmailHtml(amountDollars, receiptUrl, {
+    isRecurring: isSubscription,
+    intervalLabel,
+    cancelAtLabel,
+  });
+
+  const plainRecurring = isSubscription
+    ? `\n\nThis is a recurring contribution. Your Stripe receipt shows recurring billing.${intervalLabel ? ` (${intervalLabel})` : ""}${cancelAtLabel ? ` Scheduled end: ${cancelAtLabel}.` : ""} Manage or cancel from your profile.`
+    : "";
+
+  const plainText = `Thank you for your contribution to Spring-Ford Press.\n\nAmount: ${amountDollars}${plainRecurring}\n\n${receiptUrl ? `View your receipt: ${receiptUrl}\n\n` : ""}— The Spring-Ford Press team\n\nSpring-Ford Press: ${SITE_URL}\nTerms of Service: ${TOS_URL}\nPrivacy Policy: ${PRIVACY_URL}\nContact Us: ${CONTACT_URL}`;
 
   try {
     const res = await fetch(SENDGRID_API_URL, {
@@ -140,7 +309,7 @@ export async function POST(request: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        personalizations: [{ to: [{ email: customerEmail }], subject: "Thank you for supporting Spring-Ford Press" }],
+        personalizations: [{ to: [{ email: customerEmail }], subject }],
         from: { email: fromEmail, name: fromName },
         content: [
           { type: "text/plain", value: plainText },

@@ -28,9 +28,10 @@ export default function ProfilePage() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Newsletter tab and cancel
-  const [activeTab, setActiveTab] = useState<"profile" | "newsletter">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "newsletter" | "support">("profile");
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [supportCanceling, setSupportCanceling] = useState(false);
   
   const router = useRouter();
   const supabase = createClient();
@@ -228,6 +229,29 @@ export default function ProfilePage() {
     }
   }
 
+  const hasActiveSupportSub =
+    !!profile?.stripe_support_subscription_id &&
+    (profile.support_subscription_status === "active" ||
+      profile.support_subscription_status === "trialing");
+
+  async function handleCancelSupportSubscription() {
+    if (!confirm("Stop renewing after the current period? You won’t be charged again.")) return;
+    setSupportCanceling(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/support/cancel-subscription", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not cancel");
+      await checkUser();
+      setSuccess("Recurring support will end after your current billing period. Thank you for your support.");
+      setTimeout(() => setSuccess(null), 6000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to cancel");
+    } finally {
+      setSupportCanceling(false);
+    }
+  }
+
   async function handleCancelNewsletter() {
     setCancelling(true);
     try {
@@ -320,6 +344,17 @@ export default function ProfilePage() {
             }`}
           >
             Newsletter
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("support")}
+            className={`px-4 py-3 text-sm font-semibold transition border-b-2 -mb-px ${
+              activeTab === "support"
+                ? "border-[color:var(--color-dark)] text-[color:var(--color-dark)]"
+                : "border-transparent text-[color:var(--color-medium)] hover:text-[color:var(--color-dark)]"
+            }`}
+          >
+            Support
           </button>
         </div>
 
@@ -571,6 +606,101 @@ export default function ProfilePage() {
             </div>
           </div>
           </>
+          ) : activeTab === "support" ? (
+          <div className="space-y-6">
+            <h2 className="text-lg font-semibold text-[color:var(--color-dark)]">
+              Recurring support
+            </h2>
+            <p className="text-sm text-[color:var(--color-medium)]">
+              Manage your recurring contribution to Spring-Ford Press. One-time donations are not listed here.
+            </p>
+
+            {hasActiveSupportSub ? (
+              <div className="space-y-4 rounded-lg border border-[color:var(--color-border)] bg-gray-50 p-4">
+                <div>
+                  <p className="text-xs font-medium text-[color:var(--color-medium)]">Amount</p>
+                  <p className="text-lg font-bold text-[color:var(--color-dark)]">
+                    {profile.support_subscription_amount_cents != null
+                      ? new Intl.NumberFormat("en-US", {
+                          style: "currency",
+                          currency: "USD",
+                        }).format(profile.support_subscription_amount_cents / 100)
+                      : "—"}
+                    <span className="text-sm font-normal text-[color:var(--color-medium)]">
+                      {" "}
+                      / {profile.support_subscription_interval === "year" ? "year" : "month"}
+                    </span>
+                  </p>
+                </div>
+                {profile.support_subscription_current_period_end && (
+                  <div>
+                    <p className="text-xs font-medium text-[color:var(--color-medium)]">
+                      Current period ends
+                    </p>
+                    <p className="text-sm text-[color:var(--color-dark)]">
+                      {new Date(profile.support_subscription_current_period_end).toLocaleDateString(
+                        undefined,
+                        { month: "long", day: "numeric", year: "numeric" }
+                      )}
+                    </p>
+                  </div>
+                )}
+                {profile.support_subscription_cancel_at && (
+                  <div>
+                    <p className="text-xs font-medium text-[color:var(--color-medium)]">
+                      {profile.support_subscription_status === "active"
+                        ? "Subscription ends"
+                        : "Ended"}
+                    </p>
+                    <p className="text-sm text-[color:var(--color-dark)]">
+                      {new Date(profile.support_subscription_cancel_at).toLocaleDateString(undefined, {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-[color:var(--color-border)]">
+                  {profile.support_subscription_plan === "monthly_limited" ? (
+                    <p className="text-xs text-[color:var(--color-medium)]">
+                      This is a fixed-term plan. It will end automatically on the date above; early cancellation isn’t available from your profile. For help,{" "}
+                      <Link href="/contact" className="text-[color:var(--color-riviera-blue)] underline">
+                        contact us
+                      </Link>
+                      .
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-[color:var(--color-medium)] mb-3">
+                        Cancel stops future charges after the end of your current billing period. You’ll keep access through that date.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleCancelSupportSubscription}
+                        disabled={supportCanceling}
+                        className="text-sm font-semibold text-red-600 hover:text-red-700 underline disabled:opacity-50"
+                      >
+                        {supportCanceling ? "Processing…" : "Cancel recurring support"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-[color:var(--color-medium)]">
+                  You don’t have an active recurring support subscription.
+                </p>
+                <Link
+                  href="/support"
+                  className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-opacity-90"
+                >
+                  Set up support
+                </Link>
+              </div>
+            )}
+          </div>
           ) : (
           /* Newsletter tab */
           <div className="space-y-6">
