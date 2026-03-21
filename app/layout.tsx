@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   description:
     "Spring-Ford Press – local news for Spring-Ford, Limerick, Royersford, Spring City, Upper Providence, and Montgomery & Chester County, Pennsylvania.",
   keywords: SITE_KEYWORDS,
-  metadataBase: new URL("https://springford.press"),
+  metadataBase: new URL("https://www.springford.press"),
   robots: {
     index: true,
     follow: true,
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     title: "Spring-Ford Press",
     description:
       "Local news for Spring-Ford, Limerick, Royersford, Upper Providence, and Montgomery & Chester County.",
-    url: "https://springford.press",
+    url: "https://www.springford.press",
     siteName: "Spring-Ford Press",
     locale: "en_US",
     type: "website",

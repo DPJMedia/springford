@@ -1,5 +1,5 @@
-/** Canonical site URL — used for sitemaps, JSON-LD, metadata */
-export const SITE_URL = "https://springford.press";
+/** Canonical site URL — must match production (Vercel redirects apex → www). */
+export const SITE_URL = "https://www.springford.press";
 
 export const SITE_NAME = "Spring-Ford Press";
 

@@ -7,8 +7,9 @@ import {
   canReadFullArticleContent,
   normalizeVisibility,
 } from "@/lib/articles/visibilityAccess";
+import { SITE_URL } from "@/lib/seo/site";
 
-const FALLBACK_LOGO_URL = "https://springford.press/springford-press-logo.svg";
+const FALLBACK_LOGO_URL = `${SITE_URL}/springford-press-logo.svg`;
 
 export async function generateMetadata({
   params,
@@ -51,7 +52,7 @@ export async function generateMetadata({
     imageUrl = `https://springford.press${FALLBACK_LOGO_URL}`;
   }
   
-  const articleUrl = `https://springford.press/article/${article.slug}`;
+  const articleUrl = `${SITE_URL}/article/${article.slug}`;
   const publishedTime = article.published_at
     ? new Date(article.published_at).toISOString()
     : undefined;

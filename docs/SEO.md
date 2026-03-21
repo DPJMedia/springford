@@ -11,9 +11,8 @@ Technical pieces in this repo:
 ## What you must do in Google tools
 
 1. **Google Search Console**
-   - Add and verify `springford.press`.
-   - Submit **`https://springford.press/sitemap.xml`** (Sitemaps).
-   - Use **URL Inspection** on a few article URLs and “Request indexing” if needed.
+   - Add and verify your property. Production redirects **apex → www**, so prefer the **`https://www.springford.press`** URL-prefix property (or a domain property) and submit **`https://www.springford.press/sitemap.xml`**.
+   - Use **URL Inspection** with **www** URLs (e.g. `https://www.springford.press/` and article URLs) and “Request indexing” if needed.
    - Check **Coverage / Pages** over the next weeks for crawl errors.
 
 2. **Sitelinks (the “dropdown” links under your main result)**
