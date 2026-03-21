@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { ArticleJsonLd } from "@/components/seo/ArticleJsonLd";
 import { ArticleContent } from "./ArticleContent";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -19,7 +20,9 @@ export async function generateMetadata({
 
   const { data: article } = await supabase
     .from("articles")
-    .select("title, meta_title, meta_description, excerpt, image_url, slug")
+    .select(
+      "title, meta_title, meta_description, excerpt, image_url, slug, published_at, updated_at"
+    )
     .eq("slug", slug)
     .eq("status", "published")
     .single();
@@ -49,6 +52,12 @@ export async function generateMetadata({
   }
   
   const articleUrl = `https://springford.press/article/${article.slug}`;
+  const publishedTime = article.published_at
+    ? new Date(article.published_at).toISOString()
+    : undefined;
+  const modifiedTime = article.updated_at
+    ? new Date(article.updated_at).toISOString()
+    : publishedTime;
 
   return {
     title: `${title} | Spring-Ford Press`,
@@ -68,6 +77,8 @@ export async function generateMetadata({
       ],
       locale: "en_US",
       type: "article",
+      publishedTime,
+      modifiedTime,
     },
     twitter: {
       card: "summary_large_image",
@@ -126,10 +137,13 @@ export default async function ArticlePage({
   const articleForClient = article;
 
   return (
-    <ArticleContent
-      initialArticle={articleForClient}
-      slug={slug}
-      subscriberArticlePaywall={subscriberArticlePaywall}
-    />
+    <>
+      <ArticleJsonLd article={article} />
+      <ArticleContent
+        initialArticle={articleForClient}
+        slug={slug}
+        subscriberArticlePaywall={subscriberArticlePaywall}
+      />
+    </>
   );
 }

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Newsreader, Playfair_Display, Red_Hat_Display, Space_Grotesk } from "next/font/google";
+import { OrganizationJsonLd } from "@/components/seo/OrganizationJsonLd";
+import { SITE_KEYWORDS } from "@/lib/seo/site";
 import "./globals.css";
 
 const redHatDisplay = Red_Hat_Display({
@@ -34,12 +36,21 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "Spring-Ford Press",
   description:
-    "Spring-Ford Press – modern, clean news experience with neighborhood-focused coverage.",
+    "Spring-Ford Press – local news for Spring-Ford, Limerick, Royersford, Spring City, Upper Providence, and Montgomery & Chester County, Pennsylvania.",
+  keywords: SITE_KEYWORDS,
   metadataBase: new URL("https://springford.press"),
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
   openGraph: {
     title: "Spring-Ford Press",
     description:
-      "Modern, clean news experience with neighborhood-focused coverage.",
+      "Local news for Spring-Ford, Limerick, Royersford, Upper Providence, and Montgomery & Chester County.",
     url: "https://springford.press",
     siteName: "Spring-Ford Press",
     locale: "en_US",
@@ -49,7 +60,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Spring-Ford Press",
     description:
-      "Modern, clean news experience with neighborhood-focused coverage.",
+      "Local news for Spring-Ford, Limerick, Royersford, Upper Providence, and Montgomery & Chester County.",
   },
 };
 
@@ -63,6 +74,7 @@ export default function RootLayout({
       <body
         className={`${redHatDisplay.variable} ${newsreader.variable} ${playfair.variable} ${spaceGrotesk.variable} antialiased bg-[color:var(--color-surface)] text-[color:var(--color-text)]`}
       >
+        <OrganizationJsonLd />
         {children}
       </body>
     </html>
