@@ -4,102 +4,19 @@ import {
   clearStripeSubscriptionFromProfile,
   syncStripeSubscriptionToProfile,
 } from "@/lib/support/stripeSubscriptionProfile";
+import { buildThankYouEmailHtml } from "@/lib/emails/supportThankYou";
+import {
+  buildStandardEmailFooterPlain,
+  getEmailFooterUrls,
+} from "@/lib/emails/emailFooter";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.springford.press";
-const TOS_URL = SITE_URL.replace(/\/$/, "") + "/terms-of-service";
-const PRIVACY_URL = SITE_URL.replace(/\/$/, "") + "/privacy-policy";
-const CONTACT_URL = SITE_URL.replace(/\/$/, "") + "/contact";
 
 function addMonths(d: Date, months: number): Date {
   const out = new Date(d.getTime());
   out.setMonth(out.getMonth() + months);
   return out;
-}
-
-function buildThankYouEmailHtml(
-  amountDollars: string,
-  receiptUrl: string | null,
-  opts: {
-    isRecurring: boolean;
-    intervalLabel?: string;
-    cancelAtLabel?: string | null;
-    /** Signed one-click cancel URL (recurring thank-you emails only) */
-    cancelViaEmailUrl?: string | null;
-  }
-): string {
-  const recurringNote = opts.isRecurring
-    ? `
-    <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.65; color: #1a1a1a; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif;">
-      <strong>This is a recurring contribution.</strong> Your receipt from Stripe reflects recurring billing${opts.intervalLabel ? ` (${opts.intervalLabel})` : ""}.
-      ${opts.cancelAtLabel ? `Your current commitment ends around <strong>${opts.cancelAtLabel}</strong> unless you change or cancel it from your profile.` : "You can manage or cancel anytime from your Spring-Ford Press profile."}
-    </p>`
-    : "";
-
-  const receiptSection = receiptUrl
-    ? `
-    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.65; color: #1a1a1a; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif;">
-      <strong>Your payment receipt</strong> is available to view or print at any time:
-    </p>
-    <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.65; color: #1a1a1a; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif;">
-      <a href="${receiptUrl}" style="color: #2b8aa8; font-weight: 600; text-decoration: underline;">View your receipt →</a>
-    </p>`
-    : `
-    <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.65; color: #1a1a1a; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif;">
-      A receipt for your payment has been sent by our payment processor.
-    </p>`;
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Thank you for your support</title>
-</head>
-<body style="margin:0; padding:0; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif; background-color: #e8e8e8;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #e8e8e8;">
-    <tr>
-      <td align="center" style="padding: 32px 20px;">
-        <table role="presentation" cellspacing="0" cellpadding="0" style="max-width: 560px; background: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px;">
-          <tr>
-            <td style="padding: 40px 32px;">
-              <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700; color: #1a1a1a;">Thank you for your contribution</h1>
-              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333333;">
-                Your support helps us keep independent, neighborhood-first reporting in the Spring-Ford area.
-              </p>
-              <p style="margin: 0 0 8px; font-size: 15px; color: #666666;">Amount${opts.isRecurring ? " (first billing period)" : ""}:</p>
-              <p style="margin: 0 0 24px; font-size: 28px; font-weight: 700; color: #1a1a1a;">${amountDollars}</p>
-              ${recurringNote}
-              ${receiptSection}
-              <p style="margin: 0; font-size: 15px; color: #333333;">
-                — The Spring-Ford Press team
-              </p>
-              ${
-                opts.cancelViaEmailUrl
-                  ? `
-              <p style="margin: 28px 0 0; padding-top: 20px; border-top: 1px solid #e8e8e8; font-size: 11px; line-height: 1.55; color: #888888;">
-                Need to cancel this recurring contribution? <a href="${opts.cancelViaEmailUrl}" style="color: #888888; text-decoration: underline;">Cancel from this email</a> (link valid 90 days). You can also cancel anytime from your Spring-Ford Press profile under Support.
-              </p>`
-                  : ""
-              }
-            </td>
-          </tr>
-        </table>
-        <p style="margin: 24px 0 0; font-size: 13px; color: #666666; text-align: center;">
-          <a href="${SITE_URL}" style="color: #2b8aa8; text-decoration: underline;">Spring-Ford Press</a>
-          &nbsp;|&nbsp;
-          <a href="${TOS_URL}" style="color: #2b8aa8; text-decoration: underline;">Terms of Service</a>
-          &nbsp;|&nbsp;
-          <a href="${PRIVACY_URL}" style="color: #2b8aa8; text-decoration: underline;">Privacy Policy</a>
-          &nbsp;|&nbsp;
-          <a href="${CONTACT_URL}" style="color: #2b8aa8; text-decoration: underline;">Contact Us</a>
-        </p>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
 }
 
 export async function POST(request: NextRequest) {
@@ -213,7 +130,7 @@ export async function POST(request: NextRequest) {
         try {
           const { createSupportCancelToken } = await import("@/lib/support/cancelToken");
           const tok = createSupportCancelToken(fullSub.id, uid, customerEmail);
-          cancelViaEmailUrl = `${SITE_URL}/api/support/cancel-from-email?token=${encodeURIComponent(tok)}`;
+          cancelViaEmailUrl = `${getEmailFooterUrls().site}/api/support/cancel-from-email?token=${encodeURIComponent(tok)}`;
         } catch (e) {
           console.warn("Could not build email cancel link (set SUPPORT_CANCEL_TOKEN_SECRET or STRIPE_WEBHOOK_SECRET):", e);
         }
@@ -268,7 +185,7 @@ export async function POST(request: NextRequest) {
     ? `\n\nThis is a recurring contribution. Your Stripe receipt shows recurring billing.${intervalLabel ? ` (${intervalLabel})` : ""}${cancelAtLabel ? ` Scheduled end: ${cancelAtLabel}.` : ""} Manage or cancel from your profile.${cancelViaEmailUrl ? `\n\nCancel from email: ${cancelViaEmailUrl}` : ""}`
     : "";
 
-  const plainText = `Thank you for your contribution to Spring-Ford Press.\n\nAmount: ${amountDollars}${plainRecurring}\n\n${receiptUrl ? `View your receipt: ${receiptUrl}\n\n` : ""}— The Spring-Ford Press team\n\nSpring-Ford Press: ${SITE_URL}\nTerms of Service: ${TOS_URL}\nPrivacy Policy: ${PRIVACY_URL}\nContact Us: ${CONTACT_URL}`;
+  const plainText = `Thank you for your contribution to Spring-Ford Press.\n\nAmount: ${amountDollars}${plainRecurring}\n\n${receiptUrl ? `View your receipt: ${receiptUrl}\n\n` : ""}— The Spring-Ford Press team\n\n${buildStandardEmailFooterPlain()}`;
 
   try {
     const res = await fetch(SENDGRID_API_URL, {

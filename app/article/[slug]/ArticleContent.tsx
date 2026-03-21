@@ -23,6 +23,10 @@ import { usePageTracking } from "@/lib/analytics/usePageTracking";
 import { ArticleAudienceBookmark } from "@/components/ArticleAudienceBookmark";
 import { SubscriberArticlePaywall } from "@/components/SubscriberArticlePaywall";
 import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
+import {
+  DIFFUSE_AI_AVATAR_PUBLIC_PATH,
+  DIFFUSE_AI_BYLINE_DISPLAY,
+} from "@/lib/branding/diffuse";
 
 type ArticleContentProps = {
   initialArticle: Article;
@@ -364,7 +368,7 @@ export function ArticleContent({
                 )}
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   {showSectionAboveTitle && (
-                    <div className="text-sm font-semibold text-blue-600 uppercase tracking-wide">
+                    <div className="text-sm font-semibold text-[color:var(--color-riviera-blue)] uppercase tracking-wide">
                       {displaySectionLabel.toUpperCase()}
                       {article.category &&
                         displaySectionLabel.toLowerCase() !==
@@ -443,12 +447,10 @@ export function ArticleContent({
                     <span>•</span>
                     <ShareButton articleTitle={article.title} articleUrl={articleUrl} articleId={article.id} />
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <p className="text-sm text-[color:var(--color-medium)]">
                     Published {publishedDate}
-                    {hasUpdate && (
-                      <span> (Updated {updatedDate})</span>
-                    )}
-                  </div>
+                    {hasUpdate && <> (Updated {updatedDate})</>}
+                  </p>
                 </div>
               </header>
 

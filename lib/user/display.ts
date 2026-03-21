@@ -43,9 +43,11 @@ export function isDiffuseAIUser(
   name: string | null | undefined,
   email: string | null | undefined
 ): boolean {
+  const n = name?.toLowerCase() ?? "";
   return (
-    name?.toLowerCase().includes("diffuse.ai") === true ||
-    name?.toLowerCase().includes("powered by diffuse") === true ||
-    email?.toLowerCase().includes("diffuse") === true
+    n.includes("diffuse.ai") ||
+    n.includes("powered by diffuse") ||
+    n.includes("written by diffuse") ||
+    (email?.toLowerCase().includes("diffuse") === true)
   );
 }

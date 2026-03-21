@@ -97,6 +97,7 @@ function renderHeader(): string {
 }
 
 function renderFooter(unsubscribeUrl?: string): string {
+  const manageUrl = unsubscribeUrl || `${SITE_URL}/profile?tab=newsletter`;
   return `
   <tr>
     <td style="padding: 28px 32px 24px; background-color: ${DARK}; border-top: 3px solid ${BLUE};">
@@ -118,9 +119,8 @@ function renderFooter(unsubscribeUrl?: string): string {
               <td style="padding: 0 8px;"><a href="${PRIVACY_URL}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">Privacy</a></td>
               <td style="color: #555; font-size: 12px;">|</td>
               <td style="padding: 0 8px;"><a href="${CONTACT_URL}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">Contact</a></td>
-              ${unsubscribeUrl ? `
               <td style="color: #555; font-size: 12px;">|</td>
-              <td style="padding: 0 8px;"><a href="${esc(unsubscribeUrl)}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">Unsubscribe</a></td>` : ''}
+              <td style="padding: 0 8px;"><a href="${esc(manageUrl)}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: underline;">Unsubscribe</a></td>
             </tr></table>
           </td>
         </tr>

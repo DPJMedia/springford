@@ -51,6 +51,9 @@ export default function ProfilePage() {
     if (params.get("tab") === "support") {
       setActiveTab("support");
     }
+    if (params.get("tab") === "newsletter") {
+      setActiveTab("newsletter");
+    }
     if (params.get("supportCanceled") === "1") {
       setActiveTab("support");
       setSuccess("Your recurring support has been canceled. A confirmation email has been sent.");

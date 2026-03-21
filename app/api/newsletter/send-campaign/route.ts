@@ -76,11 +76,11 @@ export async function POST(request: Request) {
     }
 
     // Build the email HTML
-    const unsubscribeUrl = `${SITE_URL}/profile`;
+    const unsubscribeUrl = `${SITE_URL}/profile?tab=newsletter`;
     const html = buildEmailHtml(blocks, subject, previewText, unsubscribeUrl, articleLayout);
 
     // Build plain-text fallback
-    const plainText = blocks
+    const plainBody = blocks
       .map((b: NewsletterBlock) => {
         if (b.type === 'hero_text') return [b.headline, b.subheadline, b.introText].filter(Boolean).join('\n\n');
         if (b.type === 'article') return `${b.articleTitle}\n${b.articleExcerpt || ''}\n${SITE_URL}/article/${b.articleSlug}`;
@@ -90,6 +90,8 @@ export async function POST(request: Request) {
       })
       .filter(Boolean)
       .join('\n\n---\n\n');
+
+    const plainText = `${plainBody || subject}\n\n---\nUnsubscribe: ${unsubscribeUrl}`;
 
     // Determine recipients
     let recipients: Array<{ email: string; name?: string }> = [];

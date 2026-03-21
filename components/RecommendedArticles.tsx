@@ -93,7 +93,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
   if (loading) {
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-bold text-[color:var(--color-dark)]">Recommended Stories</h3>
+        <h3 className="text-lg font-bold text-[color:var(--color-riviera-blue)]">Recommended Stories</h3>
         {[1, 2, 3].map((i) => (
           <div key={i} className="animate-pulse">
             <div className="h-20 bg-gray-200 rounded"></div>
@@ -109,7 +109,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">Recommended Stories</h3>
+      <h3 className="text-lg font-bold text-[color:var(--color-riviera-blue)] mb-4">Recommended Stories</h3>
       <div className="space-y-4">
         {articles.map((article) => (
           <Link
@@ -128,10 +128,18 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
                 </div>
               )}
               <div className="p-3">
-                <div className="text-xs text-blue-600 font-semibold uppercase mb-1">
-                  {(article.sections?.filter((s) => s !== 'hero')[0]) || (article.section !== 'hero' ? article.section : null)}
-                </div>
-                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-blue-600 transition line-clamp-2 leading-snug">
+                {(() => {
+                  const raw =
+                    article.sections?.filter((s) => s !== "hero")[0] ||
+                    (article.section !== "hero" ? article.section : null);
+                  const label = raw ? String(raw).replace(/-/g, " ").toUpperCase() : null;
+                  return label ? (
+                    <div className="text-xs text-[color:var(--color-riviera-blue)] font-semibold uppercase tracking-wide mb-1">
+                      {label}
+                    </div>
+                  ) : null;
+                })()}
+                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2 leading-snug">
                   {article.title}
                 </h4>
                 {article.published_at && (

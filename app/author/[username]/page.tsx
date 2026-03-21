@@ -7,6 +7,10 @@ import { Footer } from "@/components/Footer";
 import { Avatar } from "@/components/Avatar";
 import type { Article, UserProfile } from "@/lib/types/database";
 import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
+import {
+  DIFFUSE_AI_AVATAR_PUBLIC_PATH,
+  DIFFUSE_AI_BYLINE_DISPLAY,
+} from "@/lib/branding/diffuse";
 import Link from "next/link";
 import { usePageTracking } from "@/lib/analytics/usePageTracking";
 
@@ -48,10 +52,10 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
         // Create a virtual author profile for DiffuseAI
         setAuthor({
           id: 'diffuse-ai',
-          full_name: 'Powered by diffuse.ai',
+          full_name: DIFFUSE_AI_BYLINE_DISPLAY,
           username: 'diffuse.ai',
           email: 'diffuse@ai.com',
-          avatar_url: null,
+          avatar_url: DIFFUSE_AI_AVATAR_PUBLIC_PATH,
           is_admin: false,
           is_super_admin: false,
           created_at: new Date().toISOString(),
@@ -184,8 +188,11 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
                         <h1 className="text-5xl font-black text-white mb-2 tracking-tight">
                           diffuse<span className="text-[#ff9628]">.ai</span>
                         </h1>
-                        <p className="text-xl text-[#dbdbdb] mb-2">
-                          AI-Powered Content Generation
+                        <p className="text-xl text-[#dbdbdb] mb-2 max-w-xl leading-snug">
+                          Human editors review every story. Articles here are published with help from{" "}
+                          <span className="text-white font-semibold">diffuse</span>
+                          <span className="text-[#ff9628] font-semibold">.ai</span>
+                          .
                         </p>
                         <p className="text-[#dbdbdb]">
                           {articles.length} article{articles.length !== 1 ? 's' : ''} published
@@ -248,7 +255,7 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
               <div className="mb-6">
                 {isDiffuseAI ? (
                   <h2 className="text-3xl font-bold text-white mb-6 pb-3 border-b-2 border-[#ff9628]" style={{ letterSpacing: '-0.01em' }}>
-                    AI-Generated Articles
+                    Articles published with the help of diffuse.ai
                   </h2>
                 ) : (
                   <h2 className="text-2xl font-black text-[color:var(--color-dark)] mb-6 pb-2 border-b-4 border-[color:var(--color-riviera-blue)]">

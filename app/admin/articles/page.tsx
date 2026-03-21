@@ -178,10 +178,18 @@ export default function ArticlesManagementPage() {
         return (a.title ?? "").localeCompare(b.title ?? "");
       case "title-za":
         return (b.title ?? "").localeCompare(a.title ?? "");
-      case "views-high":
-        return b.view_count - a.view_count;
-      case "views-low":
-        return a.view_count - b.view_count;
+      case "views-high": {
+        const vb = a.view_count ?? 0;
+        const va = b.view_count ?? 0;
+        if (va !== vb) return va - vb;
+        return (a.title ?? "").localeCompare(b.title ?? "");
+      }
+      case "views-low": {
+        const vb = a.view_count ?? 0;
+        const va = b.view_count ?? 0;
+        if (vb !== va) return vb - va;
+        return (a.title ?? "").localeCompare(b.title ?? "");
+      }
       default:
         return 0;
     }
@@ -402,8 +410,8 @@ export default function ArticlesManagementPage() {
                   <option value="date-oldest">Date (oldest)</option>
                   <option value="title-az">Title (A–Z)</option>
                   <option value="title-za">Title (Z–A)</option>
-                  <option value="views-high">Views (high–low)</option>
-                  <option value="views-low">Views (low–high)</option>
+                  <option value="views-high">Most views (all time)</option>
+                  <option value="views-low">Least views (all time)</option>
                 </select>
               </div>
             </div>
