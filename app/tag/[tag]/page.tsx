@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import type { Article } from "@/lib/types/database";
+import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
 import Link from "next/link";
 
 export default function TagPage({ params }: { params: Promise<{ tag: string }> }) {
@@ -18,18 +19,13 @@ export default function TagPage({ params }: { params: Promise<{ tag: string }> }
     async function fetchArticlesByTag() {
       const { data } = await supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
+        .contains("tags", [decodedTag])
         .lte("published_at", new Date().toISOString())
         .order("published_at", { ascending: false });
 
-      if (data) {
-        // Filter articles that contain this tag
-        const filtered = data.filter((article) => 
-          article.tags && article.tags.includes(decodedTag)
-        );
-        setArticles(filtered);
-      }
+      setArticles((data || []) as Article[]);
       setLoading(false);
     }
 

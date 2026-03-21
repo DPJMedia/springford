@@ -22,6 +22,7 @@ import {
 import { usePageTracking } from "@/lib/analytics/usePageTracking";
 import { ArticleAudienceBookmark } from "@/components/ArticleAudienceBookmark";
 import { SubscriberArticlePaywall } from "@/components/SubscriberArticlePaywall";
+import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
 
 type ArticleContentProps = {
   initialArticle: Article;
@@ -266,7 +267,7 @@ export function ArticleContent({
     const sectionForRelated = nonHero.length > 0 ? nonHero[0] : article.section;
     supabase
       .from("articles")
-      .select("*")
+      .select(ARTICLE_LIST_COLUMNS)
       .eq("status", "published")
       .eq("section", sectionForRelated)
       .neq("id", article.id)
@@ -275,7 +276,7 @@ export function ArticleContent({
       .limit(3)
       .then(({ data }) => {
         if (data) {
-          setRelatedArticles(data);
+          setRelatedArticles(data as Article[]);
         }
       });
   }, [article.id, article.section, article.sections, article.author_name, supabase]);

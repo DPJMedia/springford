@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import type { Article } from "@/lib/types/database";
+import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
 import Link from "next/link";
 import { usePageTracking } from "@/lib/analytics/usePageTracking";
 
@@ -55,15 +56,15 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
     async function fetchArticlesBySection() {
       const { data } = await supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", [section])
         .lte("published_at", new Date().toISOString())
         .order("published_at", { ascending: false });
 
       if (data) {
-        setArticles(data);
-        setFilteredArticles(data);
+        setArticles(data as Article[]);
+        setFilteredArticles(data as Article[]);
       }
       setLoading(false);
     }

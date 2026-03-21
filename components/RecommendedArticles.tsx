@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Article } from "@/lib/types/database";
+import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
 import Link from "next/link";
 
 type RecommendedArticlesProps = {
@@ -21,7 +22,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
         // First, try to find articles with matching tags
         let { data: taggedArticles } = await supabase
           .from("articles")
-          .select("*")
+          .select(ARTICLE_LIST_COLUMNS)
           .eq("status", "published")
           .neq("id", currentArticle.id)
           .lte("published_at", new Date().toISOString())
@@ -32,7 +33,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
 
         if (taggedArticles && currentArticle.tags && currentArticle.tags.length > 0) {
           // Filter articles that share tags
-          const articlesWithSharedTags = taggedArticles.filter((article) =>
+          const articlesWithSharedTags = (taggedArticles as Article[]).filter((article) =>
             article.tags?.some((tag: string) => currentArticle.tags?.includes(tag))
           );
           recommended = articlesWithSharedTags.slice(0, limit);
@@ -42,7 +43,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
         if (recommended.length < limit) {
           const { data: sectionArticles } = await supabase
             .from("articles")
-            .select("*")
+            .select(ARTICLE_LIST_COLUMNS)
             .eq("status", "published")
             .eq("section", currentArticle.section)
             .neq("id", currentArticle.id)
@@ -52,7 +53,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
 
           if (sectionArticles) {
             // Add articles from same section that aren't already in recommended
-            const uniqueSectionArticles = sectionArticles.filter(
+            const uniqueSectionArticles = (sectionArticles as Article[]).filter(
               (sa) => !recommended.some((ra) => ra.id === sa.id)
             );
             recommended = [...recommended, ...uniqueSectionArticles].slice(0, limit);
@@ -63,7 +64,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
         if (recommended.length < limit) {
           const { data: recentArticles } = await supabase
             .from("articles")
-            .select("*")
+            .select(ARTICLE_LIST_COLUMNS)
             .eq("status", "published")
             .neq("id", currentArticle.id)
             .lte("published_at", new Date().toISOString())
@@ -71,7 +72,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
             .limit(limit);
 
           if (recentArticles) {
-            const uniqueRecentArticles = recentArticles.filter(
+            const uniqueRecentArticles = (recentArticles as Article[]).filter(
               (ra) => !recommended.some((rec) => rec.id === ra.id)
             );
             recommended = [...recommended, ...uniqueRecentArticles].slice(0, limit);

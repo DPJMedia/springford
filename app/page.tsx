@@ -11,6 +11,7 @@ import type { Article } from "@/lib/types/database";
 import Link from "next/link";
 import { ArticleAudienceBookmark } from "@/components/ArticleAudienceBookmark";
 import { usePageTracking } from "@/lib/analytics/usePageTracking";
+import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
 
 // Ad slot wrapper component
 function AdSlot({ 
@@ -347,7 +348,7 @@ export default function Home() {
       // Hero article
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", ["hero"])
         .lte("published_at", now)
@@ -357,7 +358,7 @@ export default function Home() {
       // Breaking news
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .eq("is_breaking", true)
         .lte("published_at", now)
@@ -367,7 +368,7 @@ export default function Home() {
       // Featured articles (Top Stories by views)
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .lte("published_at", now)
         .order("view_count", { ascending: false })
@@ -376,7 +377,7 @@ export default function Home() {
       // Latest articles (newest first; fetch extra for "View more")
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .lte("published_at", now)
         .order("published_at", { ascending: false })
@@ -385,7 +386,7 @@ export default function Home() {
       // Trending articles (Most Read - past 30 days)
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .lte("published_at", now)
         .gte("published_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
@@ -395,7 +396,7 @@ export default function Home() {
       // Section queries (all in parallel)
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", ["spring-city"])
         .lte("published_at", now)
@@ -404,7 +405,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", ["royersford"])
         .lte("published_at", now)
@@ -413,7 +414,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", ["limerick"])
         .lte("published_at", now)
@@ -422,7 +423,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", ["upper-providence"])
         .lte("published_at", now)
@@ -431,7 +432,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", ["school-district"])
         .lte("published_at", now)
@@ -440,7 +441,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", ["politics"])
         .lte("published_at", now)
@@ -449,7 +450,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", ["business"])
         .lte("published_at", now)
@@ -458,7 +459,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", ["events"])
         .lte("published_at", now)
@@ -467,7 +468,7 @@ export default function Home() {
       
       supabase
         .from("articles")
-        .select("*")
+        .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("sections", ["opinion"])
         .lte("published_at", now)
@@ -506,7 +507,7 @@ export default function Home() {
       const pickIds = picksRows.map((r: { article_id: string }) => r.article_id);
       const { data: picksData } = await supabase
         .from("articles")
-        .select("id, title, slug, published_at, excerpt, image_url, author_name, subtitle, section, sections, category, tags")
+        .select("id, title, slug, published_at, excerpt, image_url, author_name, subtitle, section, sections, category, tags, visibility")
         .in("id", pickIds)
         .eq("status", "published");
       

@@ -6,6 +6,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Avatar } from "@/components/Avatar";
 import type { Article, UserProfile } from "@/lib/types/database";
+import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
 import Link from "next/link";
 import { usePageTracking } from "@/lib/analytics/usePageTracking";
 
@@ -60,14 +61,14 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
         // Fetch articles that have "Powered by diffuse.ai" in author_name
         const { data: articlesData } = await supabase
           .from("articles")
-          .select("*")
+          .select(ARTICLE_LIST_COLUMNS)
           .eq("status", "published")
           .or('author_name.ilike.%Powered by diffuse.ai%,author_name.ilike.%diffuse.ai%')
           .lte("published_at", new Date().toISOString())
           .order("published_at", { ascending: false });
 
         if (articlesData) {
-          setArticles(articlesData);
+          setArticles(articlesData as Article[]);
         }
       } else {
         // Regular author profile lookup - try username first
@@ -114,14 +115,14 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
           // Fetch articles by this author - try both author_id and author_name
           const { data: articlesData } = await supabase
             .from("articles")
-            .select("*")
+            .select(ARTICLE_LIST_COLUMNS)
             .eq("status", "published")
             .or(`author_id.eq.${authorData.id},author_name.ilike.%${authorData.full_name}%`)
             .lte("published_at", new Date().toISOString())
             .order("published_at", { ascending: false });
 
           if (articlesData) {
-            setArticles(articlesData);
+            setArticles(articlesData as Article[]);
           }
         }
       }
