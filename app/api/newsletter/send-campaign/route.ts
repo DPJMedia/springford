@@ -125,12 +125,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No recipients found' }, { status: 400 });
     }
 
-    // Send via SendGrid (batch into personalizations of max 1000 per call — SendGrid limit)
+    // Send via SendGrid — one personalization per recipient so each gets a separate message
+    // and cannot see other recipients (a single `to: [ ...many ]` exposes everyone in the headers).
+    // Up to 1000 personalizations per API request per SendGrid limits.
     const BATCH_SIZE = 1000;
     for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
       const batch = recipients.slice(i, i + BATCH_SIZE);
       const body = {
-        personalizations: [{ to: batch.map((r) => ({ email: r.email, ...(r.name ? { name: r.name } : {}) })) }],
+        personalizations: batch.map((r) => ({
+          to: [{ email: r.email, ...(r.name ? { name: r.name } : {}) }],
+        })),
         from: { email: fromEmail, name: fromName },
         subject,
         content: [
