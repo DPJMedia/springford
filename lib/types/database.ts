@@ -139,6 +139,26 @@ export interface DiffuseImportedArticle {
   imported_at: string;
 }
 
+/** Admin ad quoter — saved packages (JSON) + client / campaign dates */
+export interface SavedAdQuote {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  name: string;
+  client_name: string;
+  start_date: string | null;
+  end_date: string | null;
+  package_data: Record<string, unknown>;
+  total_usd: number | null;
+  monthly_views_snapshot: number | null;
+  /** Homepage + article view counts (30d) at save — used to reproduce article rate nudge */
+  homepage_views_snapshot?: number | null;
+  article_views_snapshot?: number | null;
+  /** When true, total was set without full calculator (e.g. edited price) — hide package math */
+  manual_total_override?: boolean | null;
+}
+
 export interface Database {
   public: {
     Tables: {

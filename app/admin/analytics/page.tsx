@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchAllRowsPaginated } from "@/lib/analytics/paginateSupabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -37,6 +38,15 @@ if (typeof window !== 'undefined') {
     });
   });
 }
+
+/** Y-axis max options — zoom out extends further so high-traffic days stay visible */
+const Y_AXIS_MAX_STEPS = [
+  10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000,
+] as const;
+
+/** Geographic lists: 10 collapsed, max 50 when expanded (avoids rendering hundreds of rows) */
+const GEO_LIST_COLLAPSED = 10;
+const GEO_LIST_EXPANDED_MAX = 50;
 
 export default function AnalyticsPage() {
   const [user, setUser] = useState<any>(null);
@@ -118,6 +128,7 @@ export default function AnalyticsPage() {
       setLoading(true);
       
       const now = new Date();
+      const endIso = now.toISOString();
       let startDate = new Date();
       
       switch (timeRange) {
@@ -143,12 +154,17 @@ export default function AnalyticsPage() {
         .gte('viewed_at', startDate.toISOString());
       setTotalPageViews(pageViewCount || 0);
 
-      // Average session duration
-      const { data: sessions } = await supabase
-        .from('page_views')
-        .select('time_spent_seconds, session_id')
-        .gte('viewed_at', startDate.toISOString())
-        .gt('time_spent_seconds', 0);
+      // Average session duration (paginate — default 1000 row cap otherwise truncates)
+      const sessions = await fetchAllRowsPaginated(async (from, to) =>
+        supabase
+          .from("page_views")
+          .select("time_spent_seconds, session_id")
+          .gte("viewed_at", startDate.toISOString())
+          .lte("viewed_at", endIso)
+          .gt("time_spent_seconds", 0)
+          .order("viewed_at", { ascending: true })
+          .range(from, to),
+      );
       
       if (sessions && sessions.length > 0) {
         const uniqueSessions = [...new Set(sessions.map(s => s.session_id))];
@@ -223,11 +239,16 @@ export default function AnalyticsPage() {
       }
 
       // Section performance
-      const { data: sectionViews } = await supabase
-        .from('page_views')
-        .select('view_type, article_id, time_spent_seconds')
-        .eq('view_type', 'section')
-        .gte('viewed_at', startDate.toISOString());
+      const sectionViews = await fetchAllRowsPaginated(async (from, to) =>
+        supabase
+          .from("page_views")
+          .select("view_type, article_id, time_spent_seconds")
+          .eq("view_type", "section")
+          .gte("viewed_at", startDate.toISOString())
+          .lte("viewed_at", endIso)
+          .order("viewed_at", { ascending: true })
+          .range(from, to),
+      );
 
       // Get section clicks
       const { data: sectionClicksData } = await supabase
@@ -402,10 +423,15 @@ export default function AnalyticsPage() {
       // === TRAFFIC QUALITY ===
       
       // Traffic sources - Consolidate into Search vs External
-      const { data: trafficData } = await supabase
-        .from('page_views')
-        .select('traffic_source')
-        .gte('viewed_at', startDate.toISOString());
+      const trafficData = await fetchAllRowsPaginated(async (from, to) =>
+        supabase
+          .from("page_views")
+          .select("traffic_source")
+          .gte("viewed_at", startDate.toISOString())
+          .lte("viewed_at", endIso)
+          .order("viewed_at", { ascending: true })
+          .range(from, to),
+      );
 
       const sourceMap: Record<string, number> = {
         'search': 0,
@@ -432,10 +458,15 @@ export default function AnalyticsPage() {
       setTrafficSources(sourcesArray);
 
       // Device breakdown
-      const { data: deviceData } = await supabase
-        .from('page_views')
-        .select('device_type')
-        .gte('viewed_at', startDate.toISOString());
+      const deviceData = await fetchAllRowsPaginated(async (from, to) =>
+        supabase
+          .from("page_views")
+          .select("device_type")
+          .gte("viewed_at", startDate.toISOString())
+          .lte("viewed_at", endIso)
+          .order("viewed_at", { ascending: true })
+          .range(from, to),
+      );
 
       const deviceMap: Record<string, number> = {};
       deviceData?.forEach(d => {
@@ -454,11 +485,16 @@ export default function AnalyticsPage() {
       const excludedCities = ['Unknown', 'Development', 'Santa Clara', 'San Jose', 'Mountain View', 'Palo Alto'];
       
       // Top cities - count UNIQUE SESSIONS, not total page views
-      const { data: cityData } = await supabase
-        .from('page_views')
-        .select('city, state, session_id')
-        .gte('viewed_at', startDate.toISOString())
-        .not('city', 'is', null);
+      const cityData = await fetchAllRowsPaginated(async (from, to) =>
+        supabase
+          .from("page_views")
+          .select("city, state, session_id")
+          .gte("viewed_at", startDate.toISOString())
+          .lte("viewed_at", endIso)
+          .not("city", "is", null)
+          .order("viewed_at", { ascending: true })
+          .range(from, to),
+      );
 
       const citySessionsMap: Record<string, Set<string>> = {};
       cityData?.forEach(c => {
@@ -480,11 +516,16 @@ export default function AnalyticsPage() {
       setTopCities(citiesArray);
 
       // Top states - count UNIQUE SESSIONS, not total page views
-      const { data: stateData } = await supabase
-        .from('page_views')
-        .select('state, city, session_id')
-        .gte('viewed_at', startDate.toISOString())
-        .not('state', 'is', null);
+      const stateData = await fetchAllRowsPaginated(async (from, to) =>
+        supabase
+          .from("page_views")
+          .select("state, city, session_id")
+          .gte("viewed_at", startDate.toISOString())
+          .lte("viewed_at", endIso)
+          .not("state", "is", null)
+          .order("viewed_at", { ascending: true })
+          .range(from, to),
+      );
 
       const stateSessionsMap: Record<string, Set<string>> = {};
       const devCitiesForState = ['Santa Clara', 'San Jose', 'Mountain View', 'Palo Alto', 'Sunnyvale', 'Development'];
@@ -506,9 +547,8 @@ export default function AnalyticsPage() {
         .sort((a, b) => b.count - a.count);
       setTopStates(statesArray);
 
-      // === CHART DATA ===
-      // This will be loaded separately based on chartTimeRange
-      loadChartData(chartTimeRange);
+      // === CHART DATA === (await so failures don’t race / duplicate with useEffect)
+      await loadChartData(chartTimeRange);
 
       // Traffic sources doughnut chart - Simplified
       if (sourcesArray.length > 0) {
@@ -554,6 +594,7 @@ export default function AnalyticsPage() {
   async function loadChartData(period: '24h' | '7d' | '30d' | '90d') {
     try {
       const now = new Date();
+      const chartEndIso = now.toISOString();
       let chartStartDate = new Date();
       let daysToShow = 7;
       let timeFormat: 'hour' | 'day' = 'day';
@@ -578,31 +619,41 @@ export default function AnalyticsPage() {
           break;
       }
 
-      // Fetch all page views for the period
-      const { data: allViews } = await supabase
-        .from('page_views')
-        .select('viewed_at, view_type')
-        .gte('viewed_at', chartStartDate.toISOString());
+      const chartStartIso = chartStartDate.toISOString();
 
-      // Initialize data structures
+      // Fetch all page views for the period (paginate — PostgREST caps at 1000 rows per request)
+      const allViews = await fetchAllRowsPaginated(async (from, to) =>
+        supabase
+          .from("page_views")
+          .select("viewed_at, view_type")
+          .gte("viewed_at", chartStartIso)
+          .lte("viewed_at", chartEndIso)
+          .order("viewed_at", { ascending: true })
+          .range(from, to),
+      );
+
+      // Initialize data structures — use UTC calendar days so keys match viewed_at (ISO UTC)
       const homepageByTime: Record<string, number> = {};
       const articlesByTime: Record<string, number> = {};
       
       if (timeFormat === 'hour') {
-        // For 24h view, group by hour
+        // For 24h view, group by UTC hour (matches viewed_at.slice(0, 13))
         for (let i = 23; i >= 0; i--) {
-          const date = new Date();
-          date.setHours(date.getHours() - i);
-          const hourStr = date.toISOString().slice(0, 13); // YYYY-MM-DDTHH
+          const date = new Date(now);
+          date.setUTCHours(date.getUTCHours() - i, 0, 0, 0);
+          const hourStr = date.toISOString().slice(0, 13);
           homepageByTime[hourStr] = 0;
           articlesByTime[hourStr] = 0;
         }
       } else {
-        // For day views, group by day
+        // For day views, one bucket per UTC calendar day
+        const endUtc = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+        );
         for (let i = daysToShow - 1; i >= 0; i--) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          const dateStr = date.toISOString().split('T')[0];
+          const d = new Date(endUtc);
+          d.setUTCDate(d.getUTCDate() - i);
+          const dateStr = d.toISOString().split("T")[0];
           homepageByTime[dateStr] = 0;
           articlesByTime[dateStr] = 0;
         }
@@ -673,19 +724,39 @@ export default function AnalyticsPage() {
     }
   }
 
-  // Zoom functions
   function zoomIn() {
-    if (yAxisMax > 10) {
-      const newMax = yAxisMax === 1000 ? 500 : yAxisMax === 500 ? 250 : yAxisMax === 250 ? 100 : yAxisMax === 100 ? 50 : yAxisMax === 50 ? 25 : 10;
-      setYAxisMax(newMax);
-    }
+    setYAxisMax((prev) => {
+      const idx = Y_AXIS_MAX_STEPS.findIndex((x) => x === prev);
+      if (idx > 0) return Y_AXIS_MAX_STEPS[idx - 1];
+      const smaller = [...Y_AXIS_MAX_STEPS].filter((x) => x < prev).pop();
+      return smaller ?? Y_AXIS_MAX_STEPS[0];
+    });
   }
 
   function zoomOut() {
-    if (yAxisMax < 1000) {
-      const newMax = yAxisMax === 10 ? 25 : yAxisMax === 25 ? 50 : yAxisMax === 50 ? 100 : yAxisMax === 100 ? 250 : yAxisMax === 250 ? 500 : 1000;
-      setYAxisMax(newMax);
+    setYAxisMax((prev) => {
+      const idx = Y_AXIS_MAX_STEPS.findIndex((x) => x === prev);
+      if (idx >= 0 && idx < Y_AXIS_MAX_STEPS.length - 1) return Y_AXIS_MAX_STEPS[idx + 1];
+      const larger = Y_AXIS_MAX_STEPS.find((x) => x > prev);
+      return larger ?? Y_AXIS_MAX_STEPS[Y_AXIS_MAX_STEPS.length - 1];
+    });
+  }
+
+  /** Set Y max so the tallest series fits (~10% headroom) */
+  function fitYAxisToData() {
+    if (!pageViewsOverTime?.datasets?.length) return;
+    const all: number[] = [];
+    for (const ds of pageViewsOverTime.datasets as { data?: number[] }[]) {
+      for (const n of ds.data ?? []) {
+        if (typeof n === "number") all.push(n);
+      }
     }
+    if (all.length === 0) return;
+    const maxVal = Math.max(...all);
+    const target = Math.max(10, Math.ceil(maxVal * 1.1));
+    const next =
+      Y_AXIS_MAX_STEPS.find((x) => x >= target) ?? Y_AXIS_MAX_STEPS[Y_AXIS_MAX_STEPS.length - 1];
+    setYAxisMax(next);
   }
 
   // Reload chart when controls change
@@ -1073,19 +1144,31 @@ export default function AnalyticsPage() {
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700">Y-Axis:</label>
                 <button
+                  type="button"
                   onClick={zoomOut}
-                  disabled={yAxisMax >= 1000}
+                  disabled={yAxisMax >= Y_AXIS_MAX_STEPS[Y_AXIS_MAX_STEPS.length - 1]}
                   className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-sm font-medium rounded-md transition"
                 >
                   Zoom Out
                 </button>
-                <span className="text-sm font-semibold text-gray-700 min-w-[80px] text-center">0 - {yAxisMax}</span>
+                <span className="text-sm font-semibold text-gray-700 min-w-[100px] text-center">
+                  0 – {yAxisMax.toLocaleString()}
+                </span>
                 <button
+                  type="button"
                   onClick={zoomIn}
-                  disabled={yAxisMax <= 10}
+                  disabled={yAxisMax <= Y_AXIS_MAX_STEPS[0]}
                   className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-sm font-medium rounded-md transition"
                 >
                   Zoom In
+                </button>
+                <button
+                  type="button"
+                  onClick={fitYAxisToData}
+                  className="px-3 py-1.5 bg-[color:var(--color-riviera-blue)] text-white hover:opacity-90 text-sm font-medium rounded-md transition"
+                  title="Set vertical scale to fit the highest point in the chart"
+                >
+                  Fit to data
                 </button>
               </div>
 
@@ -1154,10 +1237,10 @@ export default function AnalyticsPage() {
                         max: yAxisMax,
                         ticks: {
                           font: { size: 12 },
+                          maxTicksLimit: 12,
                           callback: function(value: any) {
                             return value.toLocaleString();
                           },
-                          stepSize: yAxisMax / 10,
                         },
                         grid: {
                           color: 'rgba(0, 0, 0, 0.05)',
@@ -1210,7 +1293,10 @@ export default function AnalyticsPage() {
               ) : (
                 <>
                   <div className="space-y-3">
-                    {(showAllCities ? topCities : topCities.slice(0, 10)).map((city, index) => {
+                    {(showAllCities
+                      ? topCities.slice(0, Math.min(GEO_LIST_EXPANDED_MAX, topCities.length))
+                      : topCities.slice(0, GEO_LIST_COLLAPSED)
+                    ).map((city, index) => {
                       const total = topCities.reduce((sum, c) => sum + c.count, 0);
                       const percentage = ((city.count / total) * 100).toFixed(1);
                       const visitorLabel = city.count === 1 ? 'visitor' : 'visitors';
@@ -1232,13 +1318,23 @@ export default function AnalyticsPage() {
                       );
                     })}
                   </div>
-                  {topCities.length > 10 && (
-                    <button
-                      onClick={() => setShowAllCities(!showAllCities)}
-                      className="mt-4 w-full px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition border border-blue-200"
-                    >
-                      {showAllCities ? `Show Less` : `View More (${topCities.length - 10} more cities)`}
-                    </button>
+                  {topCities.length > GEO_LIST_COLLAPSED && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllCities(!showAllCities)}
+                        className="mt-4 w-full px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition border border-blue-200"
+                      >
+                        {showAllCities
+                          ? "Show less"
+                          : `View more (${Math.min(GEO_LIST_EXPANDED_MAX, topCities.length) - GEO_LIST_COLLAPSED} more cities)`}
+                      </button>
+                      {showAllCities && topCities.length > GEO_LIST_EXPANDED_MAX && (
+                        <p className="mt-2 text-center text-xs text-gray-500">
+                          Showing top {GEO_LIST_EXPANDED_MAX} of {topCities.length.toLocaleString()} cities.
+                        </p>
+                      )}
+                    </>
                   )}
                 </>
               )}
@@ -1258,7 +1354,10 @@ export default function AnalyticsPage() {
               ) : (
                 <>
                   <div className="space-y-3">
-                    {(showAllStates ? topStates : topStates.slice(0, 10)).map((state, index) => {
+                    {(showAllStates
+                      ? topStates.slice(0, Math.min(GEO_LIST_EXPANDED_MAX, topStates.length))
+                      : topStates.slice(0, GEO_LIST_COLLAPSED)
+                    ).map((state, index) => {
                       const total = topStates.reduce((sum, s) => sum + s.count, 0);
                       const percentage = ((state.count / total) * 100).toFixed(1);
                       const visitorLabel = state.count === 1 ? 'visitor' : 'visitors';
@@ -1280,13 +1379,23 @@ export default function AnalyticsPage() {
                       );
                     })}
                   </div>
-                  {topStates.length > 10 && (
-                    <button
-                      onClick={() => setShowAllStates(!showAllStates)}
-                      className="mt-4 w-full px-4 py-2 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md transition border border-green-200"
-                    >
-                      {showAllStates ? `Show Less` : `View More (${topStates.length - 10} more states)`}
-                    </button>
+                  {topStates.length > GEO_LIST_COLLAPSED && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllStates(!showAllStates)}
+                        className="mt-4 w-full px-4 py-2 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md transition border border-green-200"
+                      >
+                        {showAllStates
+                          ? "Show less"
+                          : `View more (${Math.min(GEO_LIST_EXPANDED_MAX, topStates.length) - GEO_LIST_COLLAPSED} more states)`}
+                      </button>
+                      {showAllStates && topStates.length > GEO_LIST_EXPANDED_MAX && (
+                        <p className="mt-2 text-center text-xs text-gray-500">
+                          Showing top {GEO_LIST_EXPANDED_MAX} of {topStates.length.toLocaleString()} states/regions.
+                        </p>
+                      )}
+                    </>
                   )}
                 </>
               )}
