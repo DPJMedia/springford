@@ -339,10 +339,16 @@ export function ArticleContent({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Main Article Content - 8 columns */}
             <article ref={articleRef} className="lg:col-span-8">
-              {/* Advertisement label - subtle, centered, above content */}
+              {/* Sponsored — same spirit as subscriber bookmark: bold blue bar */}
               {article.is_advertisement && (
-                <div className="mb-4 flex justify-center items-center px-4 py-2 rounded-lg bg-gray-100 border border-gray-200">
-                  <span className="text-xs font-medium tracking-wider text-gray-600">advertisement article</span>
+                <div
+                  role="banner"
+                  aria-label="Sponsored article"
+                  className="mb-4 flex w-full justify-center items-center rounded-lg bg-[color:var(--color-riviera-blue)] px-4 py-2.5 shadow-sm"
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white sm:text-xs">
+                    Sponsored Article
+                  </span>
                 </div>
               )}
 
