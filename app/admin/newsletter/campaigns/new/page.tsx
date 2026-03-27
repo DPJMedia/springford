@@ -121,13 +121,25 @@ function ScheduleModal({ recipientsType, onSchedule, onClose }: {
 
   function handleSchedule() {
     try {
-      const nyTime = new Date(`${date}T${time}:00`).toLocaleString("en-US", { timeZone: "America/New_York" });
-      const nyDate = new Date(nyTime);
-      const utcDate = new Date(new Date(`${date}T${time}:00`).toLocaleString("en-US", { timeZone: "UTC" }));
-      const offsetMs = utcDate.getTime() - nyDate.getTime();
-      const isoUtc = new Date(new Date(`${date}T${time}:00`).getTime() + offsetMs).toISOString();
+      // Interpret the entered date+time as America/New_York (handles DST correctly).
+      // Probe with EST (-05:00) first; if ET displays a different hour it means we are
+      // in EDT (-04:00), so switch to that offset instead.
+      const estDate = new Date(`${date}T${time}:00-05:00`);
+      const etParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York",
+        hour: "2-digit",
+        hour12: false,
+      }).formatToParts(estDate);
+      const etHour = parseInt(etParts.find((p) => p.type === "hour")?.value ?? "0", 10);
+      const inputHour = parseInt(time.split(":")[0], 10);
+      const isoUtc =
+        etHour === inputHour
+          ? estDate.toISOString()
+          : new Date(`${date}T${time}:00-04:00`).toISOString();
       onSchedule(isoUtc);
-    } catch { onSchedule(new Date(`${date}T${time}:00`).toISOString()); }
+    } catch {
+      onSchedule(new Date(`${date}T${time}:00`).toISOString());
+    }
   }
 
   return (
@@ -140,7 +152,7 @@ function ScheduleModal({ recipientsType, onSchedule, onClose }: {
         <div className="px-6 py-5 space-y-4">
           <div><label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Date</label><input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]" /></div>
           <div><label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Time <span className="font-normal normal-case text-gray-400">(Eastern Time)</span></label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]" /></div>
-          {date && time && <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl"><p className="text-xs text-[color:var(--color-riviera-blue)] font-semibold">Will send to {RECIPIENTS_OPTIONS.find((o) => o.value === recipientsType)?.label}</p><p className="text-sm font-bold text-[color:var(--color-dark)] mt-0.5">{getLabel()}</p><p className="text-[10px] text-amber-700 mt-1.5 flex items-center gap-1"><svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>Test mode: will still go to test address only</p></div>}
+          {date && time && <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl"><p className="text-xs text-[color:var(--color-riviera-blue)] font-semibold">Will send to {RECIPIENTS_OPTIONS.find((o) => o.value === recipientsType)?.label}</p><p className="text-sm font-bold text-[color:var(--color-dark)] mt-0.5">{getLabel()}</p></div>}
         </div>
         <div className="px-6 pb-6 flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition">Cancel</button>
