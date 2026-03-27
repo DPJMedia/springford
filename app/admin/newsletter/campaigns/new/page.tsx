@@ -106,57 +106,85 @@ function CampaignNameModal({ onConfirm, onCancel }: { onConfirm: (name: string) 
 function ScheduleModal({ recipientsType, onSchedule, onClose }: {
   recipientsType: RecipientsType; onSchedule: (isoUtc: string) => void; onClose: () => void;
 }) {
+  // Default to 5 minutes from now in ET
+  function getDefaultET() {
+    const soon = new Date(Date.now() + 5 * 60 * 1000);
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(soon);
+    const p = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+    return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+  }
+
+  const defaults = getDefaultET();
   const today = new Date().toLocaleDateString("en-CA");
-  const [date, setDate] = useState(today);
-  const [time, setTime] = useState("09:00");
+  const [date, setDate] = useState(defaults.date);
+  const [time, setTime] = useState(defaults.time);
+  const [pastError, setPastError] = useState(false);
+
+  // Convert entered ET date+time to UTC ISO (DST-safe)
+  function etToUtcIso(d: string, t: string): string {
+    const estDate = new Date(`${d}T${t}:00-05:00`);
+    const etParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York", hour: "2-digit", hour12: false,
+    }).formatToParts(estDate);
+    const etHour = parseInt(etParts.find((p) => p.type === "hour")?.value ?? "0", 10);
+    const inputHour = parseInt(t.split(":")[0], 10);
+    return etHour === inputHour
+      ? estDate.toISOString()
+      : new Date(`${d}T${t}:00-04:00`).toISOString();
+  }
 
   function getLabel() {
     try {
-      return new Date(`${date}T${time}:00`).toLocaleString("en-US", {
+      const iso = etToUtcIso(date, time);
+      return new Date(iso).toLocaleString("en-US", {
         timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric",
         year: "numeric", hour: "numeric", minute: "2-digit",
       }) + " ET";
     } catch { return ""; }
   }
 
+  function isInPast(): boolean {
+    try { return new Date(etToUtcIso(date, time)) <= new Date(); }
+    catch { return false; }
+  }
+
   function handleSchedule() {
+    if (isInPast()) { setPastError(true); return; }
     try {
-      // Interpret the entered date+time as America/New_York (handles DST correctly).
-      // Probe with EST (-05:00) first; if ET displays a different hour it means we are
-      // in EDT (-04:00), so switch to that offset instead.
-      const estDate = new Date(`${date}T${time}:00-05:00`);
-      const etParts = new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/New_York",
-        hour: "2-digit",
-        hour12: false,
-      }).formatToParts(estDate);
-      const etHour = parseInt(etParts.find((p) => p.type === "hour")?.value ?? "0", 10);
-      const inputHour = parseInt(time.split(":")[0], 10);
-      const isoUtc =
-        etHour === inputHour
-          ? estDate.toISOString()
-          : new Date(`${date}T${time}:00-04:00`).toISOString();
-      onSchedule(isoUtc);
+      onSchedule(etToUtcIso(date, time));
     } catch {
       onSchedule(new Date(`${date}T${time}:00`).toISOString());
     }
   }
+
+  function handleDateChange(v: string) { setDate(v); setPastError(false); }
+  function handleTimeChange(v: string) { setTime(v); setPastError(false); }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="px-6 py-5 border-b border-gray-100">
           <h2 className="text-lg font-bold text-[color:var(--color-dark)]">Schedule Campaign</h2>
-          <p className="text-sm text-[color:var(--color-medium)] mt-0.5">Set a date and time to automatically send.</p>
+          <p className="text-sm text-[color:var(--color-medium)] mt-0.5">Set a future date and time to automatically send.</p>
         </div>
         <div className="px-6 py-5 space-y-4">
-          <div><label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Date</label><input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]" /></div>
-          <div><label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Time <span className="font-normal normal-case text-gray-400">(Eastern Time)</span></label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]" /></div>
-          {date && time && <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl"><p className="text-xs text-[color:var(--color-riviera-blue)] font-semibold">Will send to {RECIPIENTS_OPTIONS.find((o) => o.value === recipientsType)?.label}</p><p className="text-sm font-bold text-[color:var(--color-dark)] mt-0.5">{getLabel()}</p></div>}
+          <div><label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Date</label><input type="date" value={date} min={today} onChange={(e) => handleDateChange(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]" /></div>
+          <div><label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Time <span className="font-normal normal-case text-gray-400">(Eastern Time)</span></label><input type="time" value={time} onChange={(e) => handleTimeChange(e.target.value)} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]" /></div>
+          {pastError && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+              <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+              <p className="text-xs font-semibold text-red-700">That time is in the past. Please pick a future time.</p>
+            </div>
+          )}
+          {date && time && !pastError && <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl"><p className="text-xs text-[color:var(--color-riviera-blue)] font-semibold">Will send to {RECIPIENTS_OPTIONS.find((o) => o.value === recipientsType)?.label}</p><p className="text-sm font-bold text-[color:var(--color-dark)] mt-0.5">{getLabel()}</p></div>}
         </div>
         <div className="px-6 pb-6 flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition">Cancel</button>
-          <button onClick={handleSchedule} disabled={!date || !time} className="flex-1 py-2.5 text-sm font-semibold bg-[color:var(--color-riviera-blue)] text-white rounded-xl hover:opacity-90 transition disabled:opacity-40">Schedule</button>
+          <button onClick={handleSchedule} disabled={!date || !time || isInPast()} className="flex-1 py-2.5 text-sm font-semibold bg-[color:var(--color-riviera-blue)] text-white rounded-xl hover:opacity-90 transition disabled:opacity-40">Schedule</button>
         </div>
       </div>
     </div>
