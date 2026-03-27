@@ -279,6 +279,7 @@ function CampaignNewInner() {
   const [saveStatus, setSaveStatus] = useState<"" | "saved" | "error">("");
   const [sendResult, setSendResult] = useState<{ success?: boolean; error?: string; sentTo?: string } | null>(null);
   const [isSent, setIsSent] = useState(false);
+  const [isScheduled, setIsScheduled] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [templatePickModal, setTemplatePickModal] = useState<Template | null>(null);
   const [duplicating, setDuplicating] = useState(false);
@@ -311,6 +312,7 @@ function CampaignNewInner() {
           setPreviewText(c.preview_text || "");
           setRecipientsType((c.recipients_type as RecipientsType) || "newsletter");
           setIsSent(c.status === "sent");
+          setIsScheduled(c.status === "scheduled");
           setScheduledAt(c.scheduled_at || null);
           if (c.template_id) {
             const tmpl = tmplList.find((t) => t.id === c.template_id);
@@ -430,15 +432,30 @@ function CampaignNewInner() {
 
   // ── Schedule / Send ───────────────────────────────────────────────────────────
 
+  // "Schedule" in the modal just stores the intended time — status stays "draft"
+  // so the cron ignores it until the user explicitly confirms via "Confirm Schedule".
   async function handleSchedule(isoUtc: string) {
     setScheduledAt(isoUtc);
     setShowScheduleModal(false);
-    await saveNow(campaignName, subject, previewText, recipientsType, selectedTemplate?.id ?? null, isoUtc, "scheduled");
+    await saveNow(campaignName, subject, previewText, recipientsType, selectedTemplate?.id ?? null, isoUtc, "draft");
   }
 
   function clearSchedule() {
     setScheduledAt(null);
     saveNow(campaignName, subject, previewText, recipientsType, selectedTemplate?.id ?? null, null, "draft");
+  }
+
+  // Commits the scheduled send — sets status to "scheduled" so the cron picks it up.
+  async function executeSchedule() {
+    if (!selectedTemplate || !scheduledAt) return;
+    setSending(true); setSendResult(null);
+    const id = await saveNow(campaignName, subject, previewText, recipientsType, selectedTemplate.id, scheduledAt, "scheduled");
+    if (!id) { setSending(false); return; }
+    await supabase.from("newsletter_campaigns").update({ blocks: selectedTemplate.blocks }).eq("id", id);
+    setSending(false);
+    setIsScheduled(true);
+    setSendResult({ success: true, sentTo: `scheduled for ${formatScheduledAt(scheduledAt)}` });
+    setTimeout(() => router.push("/admin/newsletter"), 2500);
   }
 
   async function executeSend(testOnly: boolean) {
@@ -457,7 +474,6 @@ function CampaignNewInner() {
       setSendResult(data);
       if (data.success && !testOnly) {
         setIsSent(true);
-        // Redirect to campaign dashboard after a short delay
         setTimeout(() => router.push("/admin/newsletter"), 2500);
       }
     } catch { setSendResult({ error: "Network error." }); }
@@ -468,15 +484,34 @@ function CampaignNewInner() {
     if (!selectedTemplate) { setSendResult({ error: "Please select a template first." }); return; }
     if (!subject.trim()) { setSendResult({ error: "Please enter a subject line before sending." }); return; }
     const recipLabel = RECIPIENTS_OPTIONS.find((o) => o.value === recipientsType)?.label;
-    const isTest = testOnly;
-    setConfirmModal({
-      title: isTest ? "Send test email?" : "Send campaign?",
-      message: isTest
-        ? "A preview will be sent to dylancobb2525@gmail.com only. The campaign will not be marked as sent."
-        : `This will send to all ${recipLabel}. This cannot be undone.`,
-      confirmLabel: isTest ? "Send Test" : "Send Campaign",
-      onConfirm: () => { setConfirmModal(null); executeSend(isTest); },
-    });
+
+    if (testOnly) {
+      setConfirmModal({
+        title: "Send test email?",
+        message: "A preview will be sent to dylancobb2525@gmail.com only. The campaign will not be marked as sent.",
+        confirmLabel: "Send Test",
+        onConfirm: () => { setConfirmModal(null); executeSend(true); },
+      });
+      return;
+    }
+
+    // If a future scheduled time is set, confirm the schedule (not an immediate send)
+    const isFutureSchedule = scheduledAt && new Date(scheduledAt) > new Date();
+    if (isFutureSchedule) {
+      setConfirmModal({
+        title: "Confirm scheduled send?",
+        message: `This campaign will be sent to ${recipLabel} at ${formatScheduledAt(scheduledAt!)}. You can still cancel by coming back to this page before that time.`,
+        confirmLabel: "Confirm Schedule",
+        onConfirm: () => { setConfirmModal(null); executeSchedule(); },
+      });
+    } else {
+      setConfirmModal({
+        title: "Send campaign now?",
+        message: `This will send to all ${recipLabel} immediately. This cannot be undone.`,
+        confirmLabel: "Send Campaign",
+        onConfirm: () => { setConfirmModal(null); executeSend(false); },
+      });
+    }
   }
 
   // ── Computed ──────────────────────────────────────────────────────────────────
@@ -509,15 +544,15 @@ function CampaignNewInner() {
           </div>
           <span className="text-xs font-semibold text-[color:var(--color-riviera-blue)] uppercase tracking-wide">Campaign</span>
         </div>
-        <input type="text" value={campaignName} disabled={isSent}
+        <input type="text" value={campaignName} disabled={isSent || isScheduled}
           onChange={(e) => updateField({ name: e.target.value })}
           className="text-base font-semibold text-[color:var(--color-dark)] bg-transparent border-0 focus:outline-none focus:ring-0 flex-1 min-w-0" />
         <div className="flex items-center gap-2 flex-shrink-0">
           {saveStatus === "saved" && <span className="text-xs text-green-600 font-medium">✓ Saved</span>}
           {saveStatus === "error" && <span className="text-xs text-red-500 font-medium">Save failed</span>}
           {isSent && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">Sent</span>}
-          {!isSent && scheduledAt && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Scheduled</span>}
-          {!isSent && <button onClick={() => handleSend(true)} disabled={sending || !selectedTemplate} className="px-3 py-1.5 text-xs font-semibold text-[color:var(--color-riviera-blue)] border border-[color:var(--color-riviera-blue)] rounded-lg hover:bg-blue-50 transition disabled:opacity-40">Send Test</button>}
+          {isScheduled && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Scheduled</span>}
+          {!isSent && !isScheduled && <button onClick={() => handleSend(true)} disabled={sending || !selectedTemplate} className="px-3 py-1.5 text-xs font-semibold text-[color:var(--color-riviera-blue)] border border-[color:var(--color-riviera-blue)] rounded-lg hover:bg-blue-50 transition disabled:opacity-40">Send Test</button>}
         </div>
       </div>
 
@@ -591,7 +626,7 @@ function CampaignNewInner() {
                   <span className="text-gray-300 flex-shrink-0">|</span>
                   <span className="text-xs font-semibold text-gray-500 truncate">Using: <span className="text-[color:var(--color-riviera-blue)]">{selectedTemplate.name}</span></span>
                 </div>
-                {!isSent && (
+                {!isSent && !isScheduled && (
                   <button onClick={goToEditTemplate}
                     className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-[color:var(--color-riviera-blue)] text-white font-semibold text-xs rounded-lg hover:opacity-90 transition">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -636,14 +671,14 @@ function CampaignNewInner() {
             {/* Subject */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Subject line <span className="text-red-400">*</span></label>
-              <input type="text" value={subject} disabled={isSent} onChange={(e) => updateField({ subject: e.target.value })} placeholder="What's in this week's newsletter?"
+              <input type="text" value={subject} disabled={isSent || isScheduled} onChange={(e) => updateField({ subject: e.target.value })} placeholder="What's in this week's newsletter?"
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)] disabled:bg-gray-50 disabled:text-gray-400" />
             </div>
 
             {/* Preview text */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Preview text <span className="text-gray-400 font-normal normal-case">(optional)</span></label>
-              <input type="text" value={previewText} disabled={isSent} onChange={(e) => updateField({ previewText: e.target.value })} placeholder="Short text shown after subject in inbox…"
+              <input type="text" value={previewText} disabled={isSent || isScheduled} onChange={(e) => updateField({ previewText: e.target.value })} placeholder="Short text shown after subject in inbox…"
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)] disabled:bg-gray-50 disabled:text-gray-400" />
             </div>
 
@@ -652,8 +687,8 @@ function CampaignNewInner() {
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Send to</label>
               <div className="space-y-2">
                 {RECIPIENTS_OPTIONS.map((opt) => (
-                  <button key={opt.value} onClick={() => !isSent && updateField({ recipientsType: opt.value })}
-                    className={`w-full text-left flex items-start gap-3 p-3 rounded-xl border-2 transition ${recipientsType === opt.value ? "border-[color:var(--color-riviera-blue)] bg-blue-50" : "border-gray-200 hover:border-gray-300 bg-white"} ${isSent ? "opacity-60 cursor-default" : "cursor-pointer"}`}>
+                  <button key={opt.value} onClick={() => !isSent && !isScheduled && updateField({ recipientsType: opt.value })}
+                    className={`w-full text-left flex items-start gap-3 p-3 rounded-xl border-2 transition ${recipientsType === opt.value ? "border-[color:var(--color-riviera-blue)] bg-blue-50" : "border-gray-200 hover:border-gray-300 bg-white"} ${isSent || isScheduled ? "opacity-60 cursor-default" : "cursor-pointer"}`}>
                     <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${recipientsType === opt.value ? "border-[color:var(--color-riviera-blue)]" : "border-gray-300"}`}>
                       {recipientsType === opt.value && <div className="w-2 h-2 rounded-full bg-[color:var(--color-riviera-blue)]" />}
                     </div>
@@ -669,13 +704,13 @@ function CampaignNewInner() {
             {/* Campaign Name */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Campaign name <span className="text-gray-400 font-normal normal-case">(internal)</span></label>
-              <input type="text" value={campaignName} disabled={isSent} onChange={(e) => updateField({ name: e.target.value })} placeholder="e.g. March 4 Weekly Briefing"
+              <input type="text" value={campaignName} disabled={isSent || isScheduled} onChange={(e) => updateField({ name: e.target.value })} placeholder="e.g. March 4 Weekly Briefing"
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)] disabled:bg-gray-50 disabled:text-gray-400" />
             </div>
           </div>
 
           {/* ── BOTTOM ACTION BUTTONS ── */}
-          {!isSent && (
+          {!isSent && !isScheduled && (
             <div className="p-5 border-t border-gray-100 space-y-2.5">
               {scheduledAt && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl">
@@ -695,7 +730,11 @@ function CampaignNewInner() {
               </button>
               <button onClick={() => handleSend(false)} disabled={sending || !selectedTemplate || !subject.trim()}
                 className="w-full py-3 text-sm font-bold text-white bg-[color:var(--color-riviera-blue)] rounded-xl hover:opacity-90 transition disabled:opacity-40 flex items-center justify-center gap-2">
-                {sending ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" /> Sending…</> : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>Send Campaign</>}
+                {sending
+                  ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" /> {scheduledAt && new Date(scheduledAt) > new Date() ? "Scheduling…" : "Sending…"}</>
+                  : scheduledAt && new Date(scheduledAt) > new Date()
+                    ? <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Confirm Schedule</>
+                    : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>Send Campaign</>}
               </button>
               <p className="text-[10px] text-gray-400 text-center">Use "Super Admins Only" to review before sending to all subscribers.</p>
             </div>
@@ -706,6 +745,18 @@ function CampaignNewInner() {
               <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
                 <svg className="w-6 h-6 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <div><p className="text-sm font-bold text-green-800">Campaign Sent</p><p className="text-xs text-green-600">This campaign is read-only.</p></div>
+              </div>
+            </div>
+          )}
+
+          {isScheduled && scheduledAt && (
+            <div className="p-5 border-t border-gray-100">
+              <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <svg className="w-6 h-6 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                <div>
+                  <p className="text-sm font-bold text-amber-800">Scheduled</p>
+                  <p className="text-xs text-amber-700">{formatScheduledAt(scheduledAt)}</p>
+                </div>
               </div>
             </div>
           )}
