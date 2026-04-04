@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { fetchAllRowsPaginated } from "@/lib/analytics/paginateSupabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -66,7 +65,8 @@ export default function AnalyticsPage() {
   const [authorPerformance, setAuthorPerformance] = useState<any[]>([]);
   const [avgReadingTime, setAvgReadingTime] = useState(0);
   const [completionRate, setCompletionRate] = useState(0);
-  
+  const [publishedArticleCount, setPublishedArticleCount] = useState(0);
+
   // Ad metrics
   const [adSlotPerformance, setAdSlotPerformance] = useState<any[]>([]); // All-time by slot
   const [currentAdsStats, setCurrentAdsStats] = useState<any[]>([]); // Current active ads, stats since published
@@ -81,10 +81,12 @@ export default function AnalyticsPage() {
   const [topCities, setTopCities] = useState<any[]>([]);
   const [topStates, setTopStates] = useState<any[]>([]);
   
-  // Chart data
+  // Chart data (chartSeriesRaw from API; pageViewsOverTime derived for Chart.js)
+  const [chartSeriesRaw, setChartSeriesRaw] = useState<
+    { bucketKey: string; homepage: number; article: number }[]
+  >([]);
+  const [serverChartGranularity, setServerChartGranularity] = useState<"hour" | "day">("day");
   const [pageViewsOverTime, setPageViewsOverTime] = useState<any>(null);
-  const [homepageViewsOverTime, setHomepageViewsOverTime] = useState<any>(null);
-  const [articleViewsOverTime, setArticleViewsOverTime] = useState<any>(null);
   const [trafficChartData, setTrafficChartData] = useState<any>(null);
   const [deviceChartData, setDeviceChartData] = useState<any>(null);
   
@@ -109,10 +111,51 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     if (user) {
-      loadAllAnalytics();
-      loadChartData(chartTimeRange);
+      void loadDashboard();
     }
-  }, [user, timeRange]);
+  }, [user, timeRange, chartTimeRange]);
+
+  /** Rebuild Chart.js config when toggles or series change (no extra network). */
+  useEffect(() => {
+    if (!chartSeriesRaw.length) {
+      setPageViewsOverTime(null);
+      return;
+    }
+    const labels = chartSeriesRaw.map((p) => {
+      if (serverChartGranularity === "hour") {
+        const date = new Date(`${p.bucketKey}:00:00Z`);
+        return date.toLocaleTimeString("en-US", { hour: "numeric", hour12: true });
+      }
+      return new Date(`${p.bucketKey}T12:00:00Z`).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+    });
+    const datasets: unknown[] = [];
+    if (showHomepageViews) {
+      datasets.push({
+        label: "Homepage Views",
+        data: chartSeriesRaw.map((p) => p.homepage),
+        borderColor: "rgb(59, 130, 246)",
+        backgroundColor: "rgba(59, 130, 246, 0.1)",
+        fill: true,
+        tension: 0.4,
+        borderWidth: 2,
+      });
+    }
+    if (showArticleViews) {
+      datasets.push({
+        label: "Article Views",
+        data: chartSeriesRaw.map((p) => p.article),
+        borderColor: "rgb(16, 185, 129)",
+        backgroundColor: "rgba(16, 185, 129, 0.1)",
+        fill: true,
+        tension: 0.4,
+        borderWidth: 2,
+      });
+    }
+    setPageViewsOverTime({ labels, datasets });
+  }, [chartSeriesRaw, serverChartGranularity, showHomepageViews, showArticleViews]);
 
   async function checkUser() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -123,604 +166,89 @@ export default function AnalyticsPage() {
     setUser(user);
   }
 
-  async function loadAllAnalytics() {
+  async function loadDashboard() {
     try {
       setLoading(true);
-      
-      const now = new Date();
-      const endIso = now.toISOString();
-      let startDate = new Date();
-      
-      switch (timeRange) {
-        case '7d':
-          startDate.setDate(now.getDate() - 7);
-          break;
-        case '30d':
-          startDate.setDate(now.getDate() - 30);
-          break;
-        case '90d':
-          startDate.setDate(now.getDate() - 90);
-          break;
-        default:
-          startDate = new Date('2020-01-01'); // All time
+      const res = await fetch(
+        `/api/admin/analytics-dashboard?timeRange=${encodeURIComponent(timeRange)}&chartTimeRange=${encodeURIComponent(chartTimeRange)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("Analytics API error:", err);
+        return;
       }
+      const d = await res.json();
 
-      // === EXECUTIVE METRICS ===
-      
-      // Total page views
-      const { count: pageViewCount } = await supabase
-        .from('page_views')
-        .select('*', { count: 'exact', head: true })
-        .gte('viewed_at', startDate.toISOString());
-      setTotalPageViews(pageViewCount || 0);
+      setTotalPageViews(d.totalPageViews ?? 0);
+      setAvgSessionDuration(d.avgSessionSeconds ?? 0);
+      setTotalAdImpressions(d.totalAdImpressions ?? 0);
+      const impressions = d.totalAdImpressions ?? 0;
+      setRevenueEst((impressions / 1000) * 5);
+      const pv = d.totalPageViews ?? 0;
+      const clicks = d.adClicksInRange ?? 0;
+      setEngagementRate(pv > 0 ? (clicks / pv) * 100 : 0);
 
-      // Average session duration (paginate — default 1000 row cap otherwise truncates)
-      const sessions = await fetchAllRowsPaginated(async (from, to) =>
-        supabase
-          .from("page_views")
-          .select("time_spent_seconds, session_id")
-          .gte("viewed_at", startDate.toISOString())
-          .lte("viewed_at", endIso)
-          .gt("time_spent_seconds", 0)
-          .order("viewed_at", { ascending: true })
-          .range(from, to),
-      );
-      
-      if (sessions && sessions.length > 0) {
-        const uniqueSessions = [...new Set(sessions.map(s => s.session_id))];
-        const totalTime = sessions.reduce((sum, s) => sum + (s.time_spent_seconds || 0), 0);
-        setAvgSessionDuration(Math.round(totalTime / uniqueSessions.length));
-      }
+      setPublishedArticleCount(d.publishedArticleCount ?? 0);
+      setTopArticles(Array.isArray(d.topArticles) ? d.topArticles : []);
+      setCompletionRate(Number(d.completionRatePercent) || 0);
+      setAvgReadingTime(d.avgReadingTimeSeconds ?? 0);
 
-      // Ad impressions
-      const { count: impressionCount } = await supabase
-        .from('ad_impressions')
-        .select('*', { count: 'exact', head: true })
-        .gte('viewed_at', startDate.toISOString());
-      setTotalAdImpressions(impressionCount || 0);
+      setSectionPerformance(Array.isArray(d.sectionPerformance) ? d.sectionPerformance : []);
+      setAuthorPerformance(Array.isArray(d.authorPerformance) ? d.authorPerformance : []);
+      setAdSlotPerformance(Array.isArray(d.adSlotPerformance) ? d.adSlotPerformance : []);
+      setCurrentAdsStats(Array.isArray(d.currentAdsStats) ? d.currentAdsStats : []);
+      setTopAds(Array.isArray(d.topAds) ? d.topAds : []);
 
-      // Calculate revenue estimate (assuming $5 CPM)
-      const estimatedRevenue = ((impressionCount || 0) / 1000) * 5;
-      setRevenueEst(estimatedRevenue);
-
-      // Engagement rate (clicks / views)
-      const { count: clickCount } = await supabase
-        .from('ad_clicks')
-        .select('*', { count: 'exact', head: true })
-        .gte('clicked_at', startDate.toISOString());
-      
-      const engRate = pageViewCount && pageViewCount > 0 
-        ? ((clickCount || 0) / pageViewCount * 100)
-        : 0;
-      setEngagementRate(engRate);
-
-      // === CONTENT PERFORMANCE ===
-      
-      // Top articles by views with time spent
-      const { data: articles } = await supabase
-        .from('articles')
-        .select('id, title, slug, section, author_name, view_count, share_count')
-        .eq('status', 'published')
-        .order('view_count', { ascending: false })
-        .limit(10);
-
-      // Get time spent data for these articles
-      if (articles) {
-        const articlesWithTime = await Promise.all(
-          articles.map(async (article) => {
-            const { data: scrollData } = await supabase
-              .from('article_scroll_data')
-              .select('time_spent_seconds')
-              .eq('article_id', article.id)
-              .gte('created_at', startDate.toISOString());
-            
-            const avgTime = scrollData && scrollData.length > 0
-              ? Math.round(scrollData.reduce((sum, s) => sum + s.time_spent_seconds, 0) / scrollData.length)
-              : 0;
-            
-            return { ...article, avgTimeSpent: avgTime };
-          })
-        );
-        setTopArticles(articlesWithTime);
-      }
-
-      // Article completion rate
-      const { data: allScrollData } = await supabase
-        .from('article_scroll_data')
-        .select('max_scroll_percent, time_spent_seconds')
-        .gte('created_at', startDate.toISOString());
-      
-      if (allScrollData && allScrollData.length > 0) {
-        const completed = allScrollData.filter(s => s.max_scroll_percent >= 90).length;
-        setCompletionRate((completed / allScrollData.length) * 100);
-        
-        const totalReadTime = allScrollData.reduce((sum, s) => sum + (s.time_spent_seconds || 0), 0);
-        setAvgReadingTime(Math.round(totalReadTime / allScrollData.length));
-      }
-
-      // Section performance
-      const sectionViews = await fetchAllRowsPaginated(async (from, to) =>
-        supabase
-          .from("page_views")
-          .select("view_type, article_id, time_spent_seconds")
-          .eq("view_type", "section")
-          .gte("viewed_at", startDate.toISOString())
-          .lte("viewed_at", endIso)
-          .order("viewed_at", { ascending: true })
-          .range(from, to),
-      );
-
-      // Get section clicks
-      const { data: sectionClicksData } = await supabase
-        .from('section_clicks')
-        .select('section_name')
-        .gte('clicked_at', startDate.toISOString());
-
-      // Aggregate section data
-      const sectionMap: Record<string, { views: number; clicks: number; timeSpent: number }> = {};
-      sectionViews?.forEach(sv => {
-        const section = 'section'; // Would need to parse from URL or add section field
-        if (!sectionMap[section]) {
-          sectionMap[section] = { views: 0, clicks: 0, timeSpent: 0 };
-        }
-        sectionMap[section].views++;
-        sectionMap[section].timeSpent += sv.time_spent_seconds || 0;
-      });
-
-      sectionClicksData?.forEach(sc => {
-        if (!sectionMap[sc.section_name]) {
-          sectionMap[sc.section_name] = { views: 0, clicks: 0, timeSpent: 0 };
-        }
-        sectionMap[sc.section_name].clicks++;
-      });
-
-      const sectionPerfArray = Object.entries(sectionMap).map(([name, data]) => ({
-        name,
-        views: data.views,
-        clicks: data.clicks,
-        avgTimeSpent: data.views > 0 ? Math.round(data.timeSpent / data.views) : 0,
-      }));
-      setSectionPerformance(sectionPerfArray.slice(0, 5));
-
-      // Author performance
-      const { data: authorClicksData } = await supabase
-        .from('author_clicks')
-        .select('author_name')
-        .gte('clicked_at', startDate.toISOString());
-
-      const authorMap: Record<string, number> = {};
-      authorClicksData?.forEach(ac => {
-        authorMap[ac.author_name] = (authorMap[ac.author_name] || 0) + 1;
-      });
-
-      const authorPerfArray = Object.entries(authorMap)
-        .map(([name, clicks]) => ({ name, clicks }))
-        .sort((a, b) => b.clicks - a.clicks)
-        .slice(0, 5);
-      setAuthorPerformance(authorPerfArray);
-
-      // === AD PERFORMANCE ===
-      
-      // All-time performance by ad slot (no date filter – cumulative forever)
-      const { data: allTimeImpressions } = await supabase
-        .from('ad_impressions')
-        .select('ad_slot, ad_id');
-
-      const { data: allTimeClicks } = await supabase
-        .from('ad_clicks')
-        .select('ad_slot, ad_id');
-
-      const slotMap: Record<string, { slot: string; impressions: number; clicks: number }> = {};
-      allTimeImpressions?.forEach(imp => {
-        if (!slotMap[imp.ad_slot]) {
-          slotMap[imp.ad_slot] = { slot: imp.ad_slot, impressions: 0, clicks: 0 };
-        }
-        slotMap[imp.ad_slot].impressions++;
-      });
-      allTimeClicks?.forEach(click => {
-        if (slotMap[click.ad_slot]) {
-          slotMap[click.ad_slot].clicks++;
-        }
-      });
-      const slotPerfArray = Object.values(slotMap).map((slot: any) => ({
-        ...slot,
-        ctr: slot.impressions > 0 ? (slot.clicks / slot.impressions * 100).toFixed(2) : '0.00',
-      }));
-      setAdSlotPerformance(slotPerfArray);
-
-      // Current Ad Stats: active ads with stats since published (per ad per slot)
-      const nowIso = now.toISOString();
-      const { data: assignments } = await supabase
-        .from('ad_slot_assignments')
-        .select('ad_id, ad_slot, ads!inner(id, title, start_date, end_date, is_active)');
-      const activeAssignments = (assignments || []).filter(
-        (a: any) => {
-          const ad = a.ads;
-          if (!ad) return false;
-          return ad.is_active !== false &&
-            new Date(ad.start_date) <= now &&
-            new Date(ad.end_date || 0) >= now;
-        }
-      );
-      // If no assignments, fallback to legacy: ads with ad_slot set, active and in range
-      let currentAdSlots: { ad_id: string; ad_slot: string; title: string | null; start_date: string }[] = [];
-      if (activeAssignments.length > 0) {
-        currentAdSlots = activeAssignments.map((a: any) => ({
-          ad_id: a.ad_id,
-          ad_slot: a.ad_slot,
-          title: a.ads?.title ?? null,
-          start_date: a.ads?.start_date ?? new Date(0).toISOString(),
-        }));
-      } else {
-        const { data: legacyAds } = await supabase
-          .from('ads')
-          .select('id, title, start_date, ad_slot')
-          .eq('is_active', true)
-          .lte('start_date', nowIso)
-          .gte('end_date', nowIso);
-        legacyAds?.forEach((ad: any) => {
-          currentAdSlots.push({
-            ad_id: ad.id,
-            ad_slot: ad.ad_slot || 'unknown',
-            title: ad.title,
-            start_date: ad.start_date,
-          });
-        });
-      }
-      const currentStats = await Promise.all(
-        currentAdSlots.map(async (row) => {
-          const { count: impCount } = await supabase
-            .from('ad_impressions')
-            .select('*', { count: 'exact', head: true })
-            .eq('ad_id', row.ad_id)
-            .eq('ad_slot', row.ad_slot)
-            .gte('viewed_at', row.start_date);
-          const { count: clickCount } = await supabase
-            .from('ad_clicks')
-            .select('*', { count: 'exact', head: true })
-            .eq('ad_id', row.ad_id)
-            .eq('ad_slot', row.ad_slot)
-            .gte('clicked_at', row.start_date);
-          const impressions = impCount ?? 0;
-          const clicks = clickCount ?? 0;
-          return {
-            name: row.title || 'Untitled',
-            ad_slot: row.ad_slot,
-            impressions,
-            clicks,
-            ctr: impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '0.00',
-          };
-        })
-      );
-      setCurrentAdsStats(currentStats);
-
-      // Top performing ads (time-range filtered, for the sidebar widget)
-      const { data: rangeImpressions } = await supabase
-        .from('ad_impressions')
-        .select('ad_id')
-        .gte('viewed_at', startDate.toISOString());
-      const { data: rangeClicks } = await supabase
-        .from('ad_clicks')
-        .select('ad_id')
-        .gte('clicked_at', startDate.toISOString());
-      const adMap: Record<string, { adId: string; impressions: number; clicks: number }> = {};
-      rangeImpressions?.forEach(imp => {
-        if (!adMap[imp.ad_id]) adMap[imp.ad_id] = { adId: imp.ad_id, impressions: 0, clicks: 0 };
-        adMap[imp.ad_id].impressions++;
-      });
-      rangeClicks?.forEach(click => {
-        if (adMap[click.ad_id]) adMap[click.ad_id].clicks++;
-      });
-      const topAdsArray = Object.values(adMap)
-        .map((ad: any) => ({
-          ...ad,
-          ctr: ad.impressions > 0 ? ((ad.clicks / ad.impressions) * 100).toFixed(2) : '0.00',
-        }))
-        .sort((a: any, b: any) => parseFloat(b.ctr) - parseFloat(a.ctr))
-        .slice(0, 5);
-      setTopAds(topAdsArray);
-
-      // === TRAFFIC QUALITY ===
-      
-      // Traffic sources - Consolidate into Search vs External
-      const trafficData = await fetchAllRowsPaginated(async (from, to) =>
-        supabase
-          .from("page_views")
-          .select("traffic_source")
-          .gte("viewed_at", startDate.toISOString())
-          .lte("viewed_at", endIso)
-          .order("viewed_at", { ascending: true })
-          .range(from, to),
-      );
-
-      const sourceMap: Record<string, number> = {
-        'search': 0,
-        'external': 0
-      };
-      
-      trafficData?.forEach(t => {
-        const source = t.traffic_source;
-        
-        // Map all sources to either 'search' or 'external'
-        if (source === 'search') {
-          sourceMap['search']++;
-        } else if (source !== 'internal') {
-          // Consolidate: direct, social, referral, shared_link, unknown -> external
-          sourceMap['external']++;
-        }
-        // Skip 'internal' - don't count as traffic source
-      });
-
-      const sourcesArray = Object.entries(sourceMap)
-        .map(([source, count]) => ({ source, count }))
-        .filter(item => item.count > 0) // Only show sources with data
-        .sort((a, b) => b.count - a.count);
-      setTrafficSources(sourcesArray);
-
-      // Device breakdown
-      const deviceData = await fetchAllRowsPaginated(async (from, to) =>
-        supabase
-          .from("page_views")
-          .select("device_type")
-          .gte("viewed_at", startDate.toISOString())
-          .lte("viewed_at", endIso)
-          .order("viewed_at", { ascending: true })
-          .range(from, to),
-      );
-
-      const deviceMap: Record<string, number> = {};
-      deviceData?.forEach(d => {
-        const device = d.device_type || 'unknown';
-        deviceMap[device] = (deviceMap[device] || 0) + 1;
-      });
-
-      const devicesArray = Object.entries(deviceMap)
-        .map(([device, count]) => ({ device, count }))
-        .sort((a, b) => b.count - a.count);
-      setDeviceBreakdown(devicesArray);
-
-      // === LOCATION DATA ===
-      
-      // List of locations to exclude (development/test data)
-      const excludedCities = ['Unknown', 'Development', 'Santa Clara', 'San Jose', 'Mountain View', 'Palo Alto'];
-      
-      // Top cities - count UNIQUE SESSIONS, not total page views
-      const cityData = await fetchAllRowsPaginated(async (from, to) =>
-        supabase
-          .from("page_views")
-          .select("city, state, session_id")
-          .gte("viewed_at", startDate.toISOString())
-          .lte("viewed_at", endIso)
-          .not("city", "is", null)
-          .order("viewed_at", { ascending: true })
-          .range(from, to),
-      );
-
-      const citySessionsMap: Record<string, Set<string>> = {};
-      cityData?.forEach(c => {
-        // Exclude development/test cities AND exclude CA cities that are likely proxy locations
-        const isExcluded = excludedCities.includes(c.city) || 
-                          (c.state === 'California' && ['Santa Clara', 'San Jose', 'Mountain View', 'Palo Alto', 'Sunnyvale'].includes(c.city));
-        
-        if (c.city && !isExcluded) {
-          if (!citySessionsMap[c.city]) {
-            citySessionsMap[c.city] = new Set();
-          }
-          citySessionsMap[c.city].add(c.session_id);
-        }
-      });
-
-      const citiesArray = Object.entries(citySessionsMap)
-        .map(([city, sessions]) => ({ city, count: sessions.size }))
-        .sort((a, b) => b.count - a.count);
-      setTopCities(citiesArray);
-
-      // Top states - count UNIQUE SESSIONS, not total page views
-      const stateData = await fetchAllRowsPaginated(async (from, to) =>
-        supabase
-          .from("page_views")
-          .select("state, city, session_id")
-          .gte("viewed_at", startDate.toISOString())
-          .lte("viewed_at", endIso)
-          .not("state", "is", null)
-          .order("viewed_at", { ascending: true })
-          .range(from, to),
-      );
-
-      const stateSessionsMap: Record<string, Set<string>> = {};
-      const devCitiesForState = ['Santa Clara', 'San Jose', 'Mountain View', 'Palo Alto', 'Sunnyvale', 'Development'];
-      stateData?.forEach(s => {
-        // Exclude development states and localhost/proxy (California + dev city)
-        const isExcluded =
-          ['Unknown', 'Local'].includes(s.state) ||
-          (s.state === 'California' && s.city && devCitiesForState.includes(s.city));
-        if (s.state && !isExcluded) {
-          if (!stateSessionsMap[s.state]) {
-            stateSessionsMap[s.state] = new Set();
-          }
-          stateSessionsMap[s.state].add(s.session_id);
-        }
-      });
-
-      const statesArray = Object.entries(stateSessionsMap)
-        .map(([state, sessions]) => ({ state, count: sessions.size }))
-        .sort((a, b) => b.count - a.count);
-      setTopStates(statesArray);
-
-      // === CHART DATA === (await so failures don’t race / duplicate with useEffect)
-      await loadChartData(chartTimeRange);
-
-      // Traffic sources doughnut chart - Simplified
-      if (sourcesArray.length > 0) {
+      const traffic = Array.isArray(d.trafficSources) ? d.trafficSources : [];
+      setTrafficSources(traffic);
+      if (traffic.length > 0) {
         const displayNames: Record<string, string> = {
-          'search': 'Search Engines',
-          'external': 'External Sources'
+          search: "Search Engines",
+          external: "External Sources",
         };
-        
         setTrafficChartData({
-          labels: sourcesArray.map(s => displayNames[s.source] || s.source),
-          datasets: [{
-            data: sourcesArray.map(s => s.count),
-            backgroundColor: [
-              'rgba(59, 130, 246, 0.8)',  // Blue for Search
-              'rgba(16, 185, 129, 0.8)',  // Green for External
-            ],
-          }],
+          labels: traffic.map((s: { source: string }) => displayNames[s.source] || s.source),
+          datasets: [
+            {
+              data: traffic.map((s: { count: number }) => s.count),
+              backgroundColor: ["rgba(59, 130, 246, 0.8)", "rgba(16, 185, 129, 0.8)"],
+            },
+          ],
         });
       }
 
-      // Device breakdown pie chart
-      if (devicesArray.length > 0) {
+      const devices = Array.isArray(d.deviceBreakdown) ? d.deviceBreakdown : [];
+      setDeviceBreakdown(devices);
+      if (devices.length > 0) {
         setDeviceChartData({
-          labels: devicesArray.map(d => d.device.charAt(0).toUpperCase() + d.device.slice(1)),
-          datasets: [{
-            data: devicesArray.map(d => d.count),
-            backgroundColor: [
-              'rgba(16, 185, 129, 0.8)',
-              'rgba(59, 130, 246, 0.8)',
-              'rgba(245, 158, 11, 0.8)',
-            ],
-          }],
+          labels: devices.map((x: { device: string }) =>
+            x.device.charAt(0).toUpperCase() + x.device.slice(1),
+          ),
+          datasets: [
+            {
+              data: devices.map((x: { count: number }) => x.count),
+              backgroundColor: [
+                "rgba(16, 185, 129, 0.8)",
+                "rgba(59, 130, 246, 0.8)",
+                "rgba(245, 158, 11, 0.8)",
+              ],
+            },
+          ],
         });
       }
 
+      setTopCities(Array.isArray(d.topCities) ? d.topCities : []);
+      setTopStates(Array.isArray(d.topStates) ? d.topStates : []);
+
+      const chart = d.chart;
+      const series = Array.isArray(chart) ? chart : [];
+      setChartSeriesRaw(series);
+      setServerChartGranularity(d.chartGranularity === "hour" ? "hour" : "day");
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function loadChartData(period: '24h' | '7d' | '30d' | '90d') {
-    try {
-      const now = new Date();
-      const chartEndIso = now.toISOString();
-      let chartStartDate = new Date();
-      let daysToShow = 7;
-      let timeFormat: 'hour' | 'day' = 'day';
-      
-      switch (period) {
-        case '24h':
-          chartStartDate.setHours(now.getHours() - 24);
-          daysToShow = 24;
-          timeFormat = 'hour';
-          break;
-        case '7d':
-          chartStartDate.setDate(now.getDate() - 7);
-          daysToShow = 7;
-          break;
-        case '30d':
-          chartStartDate.setDate(now.getDate() - 30);
-          daysToShow = 30;
-          break;
-        case '90d':
-          chartStartDate.setDate(now.getDate() - 90);
-          daysToShow = 90;
-          break;
-      }
-
-      const chartStartIso = chartStartDate.toISOString();
-
-      // Fetch all page views for the period (paginate — PostgREST caps at 1000 rows per request)
-      const allViews = await fetchAllRowsPaginated(async (from, to) =>
-        supabase
-          .from("page_views")
-          .select("viewed_at, view_type")
-          .gte("viewed_at", chartStartIso)
-          .lte("viewed_at", chartEndIso)
-          .order("viewed_at", { ascending: true })
-          .range(from, to),
-      );
-
-      // Initialize data structures — use UTC calendar days so keys match viewed_at (ISO UTC)
-      const homepageByTime: Record<string, number> = {};
-      const articlesByTime: Record<string, number> = {};
-      
-      if (timeFormat === 'hour') {
-        // For 24h view, group by UTC hour (matches viewed_at.slice(0, 13))
-        for (let i = 23; i >= 0; i--) {
-          const date = new Date(now);
-          date.setUTCHours(date.getUTCHours() - i, 0, 0, 0);
-          const hourStr = date.toISOString().slice(0, 13);
-          homepageByTime[hourStr] = 0;
-          articlesByTime[hourStr] = 0;
-        }
-      } else {
-        // For day views, one bucket per UTC calendar day
-        const endUtc = new Date(
-          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-        );
-        for (let i = daysToShow - 1; i >= 0; i--) {
-          const d = new Date(endUtc);
-          d.setUTCDate(d.getUTCDate() - i);
-          const dateStr = d.toISOString().split("T")[0];
-          homepageByTime[dateStr] = 0;
-          articlesByTime[dateStr] = 0;
-        }
-      }
-
-      // Populate data
-      allViews?.forEach(v => {
-        const key = timeFormat === 'hour' 
-          ? v.viewed_at.slice(0, 13) 
-          : v.viewed_at.split('T')[0];
-        
-        if (v.view_type === 'homepage') {
-          if (homepageByTime[key] !== undefined) {
-            homepageByTime[key]++;
-          }
-        } else if (v.view_type === 'article') {
-          if (articlesByTime[key] !== undefined) {
-            articlesByTime[key]++;
-          }
-        }
-      });
-
-      // Format labels
-      const labels = Object.keys(homepageByTime).map(k => {
-        if (timeFormat === 'hour') {
-          const date = new Date(k + ':00:00Z');
-          return date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
-        } else {
-          return new Date(k).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        }
-      });
-
-      setHomepageViewsOverTime(Object.values(homepageByTime));
-      setArticleViewsOverTime(Object.values(articlesByTime));
-      
-      // Build chart data
-      const datasets = [];
-      if (showHomepageViews) {
-        datasets.push({
-          label: 'Homepage Views',
-          data: Object.values(homepageByTime),
-          borderColor: 'rgb(59, 130, 246)',
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          fill: true,
-          tension: 0.4,
-          borderWidth: 2,
-        });
-      }
-      if (showArticleViews) {
-        datasets.push({
-          label: 'Article Views',
-          data: Object.values(articlesByTime),
-          borderColor: 'rgb(16, 185, 129)',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          fill: true,
-          tension: 0.4,
-          borderWidth: 2,
-        });
-      }
-
-      setPageViewsOverTime({
-        labels,
-        datasets,
-      });
-
-    } catch (error) {
-      console.error('Error loading chart data:', error);
     }
   }
 
@@ -758,13 +286,6 @@ export default function AnalyticsPage() {
       Y_AXIS_MAX_STEPS.find((x) => x >= target) ?? Y_AXIS_MAX_STEPS[Y_AXIS_MAX_STEPS.length - 1];
     setYAxisMax(next);
   }
-
-  // Reload chart when controls change
-  useEffect(() => {
-    if (user) {
-      loadChartData(chartTimeRange);
-    }
-  }, [chartTimeRange, showHomepageViews, showArticleViews, user]);
 
   if (loading) {
     return (
@@ -832,7 +353,7 @@ export default function AnalyticsPage() {
               title="Avg Session Duration"
               value={`${Math.floor(avgSessionDuration / 60)}:${String(avgSessionDuration % 60).padStart(2, '0')}`}
               subtitle="minutes"
-              tooltip="Average time visitors spend on your site per session. Calculated by tracking time spent on pages with scroll activity."
+              tooltip="Average time per session (sum of time-on-page with scroll activity ÷ unique sessions). Development / localhost geolocation and localhost referrers are excluded so local testing does not inflate this number."
               icon={
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -898,11 +419,11 @@ export default function AnalyticsPage() {
             </div>
             <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-purple-500">
               <div className="text-2xl font-black text-purple-600 mb-1">
-                {topArticles.length}
+                {publishedArticleCount.toLocaleString()}
               </div>
               <div className="text-sm font-semibold text-gray-600 flex items-center">
                 Published Articles
-                <InfoTooltip text="Total number of articles currently published and visible on your site." />
+                <InfoTooltip text="Total number of articles with status “published” in article management (matches the CMS)." />
               </div>
             </div>
           </div>

@@ -12,13 +12,14 @@ import { buildEmailHtml } from "@/lib/newsletter/buildEmailHtml";
 interface Article {
   id: string; title: string; slug: string; excerpt: string | null;
   image_url: string | null; section: string; sections: string[]; published_at: string | null;
+  is_advertisement?: boolean | null;
 }
 
 function newBlock(type: BlockType): NewsletterBlock {
   const id = `block_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   switch (type) {
     case "hero_text": return { id, type, headline: "This Week in Spring Ford", subheadline: "", introText: "", alignment: "left" };
-    case "article":   return { id, type, articleTitle: "", articleExcerpt: "", articleImageUrl: "", articleSlug: "", articleSection: "" };
+    case "article":   return { id, type, articleTitle: "", articleExcerpt: "", articleImageUrl: "", articleSlug: "", articleSection: "", articleIsAdvertisement: false };
     case "text":      return { id, type, textTitle: "", textBody: "", alignment: "left" };
     case "image":     return { id, type, imageUrl: "", imageLink: "", imageAlt: "" };
     case "button":        return { id, type, buttonText: "Read More", buttonLink: "https://www.springford.press", buttonColor: "#2b8aa8", alignment: "center" };
@@ -213,7 +214,7 @@ function ArticlePickerModal({ onSelect, onClose }: { onSelect: (a: Article) => v
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
   useEffect(() => {
-    supabase.from("articles").select("id,title,slug,excerpt,image_url,section,sections,published_at")
+    supabase.from("articles").select("id,title,slug,excerpt,image_url,section,sections,published_at,is_advertisement")
       .eq("status", "published").order("published_at", { ascending: false }).limit(60)
       .then(({ data }) => { setArticles(data || []); setLoading(false); });
   }, [supabase]);
@@ -698,7 +699,15 @@ function TemplateEditorInner() {
     if (!selectedBlockId) return;
     const section = (article.sections?.filter((s) => s !== "hero")[0] || article.section || "");
     const excerptPlain = (article.excerpt || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
-    updateBlock(selectedBlockId, { articleId: article.id, articleTitle: article.title, articleExcerpt: excerptPlain, articleImageUrl: article.image_url || "", articleSlug: article.slug, articleSection: section });
+    updateBlock(selectedBlockId, {
+      articleId: article.id,
+      articleTitle: article.title,
+      articleExcerpt: excerptPlain,
+      articleImageUrl: article.image_url || "",
+      articleSlug: article.slug,
+      articleSection: section,
+      articleIsAdvertisement: article.is_advertisement === true,
+    });
     setShowArticlePicker(false);
   }
   function handleLayoutChange(layout: ArticleLayout) {

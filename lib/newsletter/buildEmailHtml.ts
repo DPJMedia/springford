@@ -27,6 +27,8 @@ export interface NewsletterBlock {
   articleImageUrl?: string;
   articleSlug?: string;
   articleSection?: string;
+  /** Mirrors site “sponsored” / Advertisement label on thumbnails when true */
+  articleIsAdvertisement?: boolean;
   // text
   textTitle?: string;
   textBody?: string;
@@ -209,6 +211,17 @@ function renderButton(block: NewsletterBlock): string {
   </tr>`;
 }
 
+/** Small label below article hero/card images, matching site feed styling */
+function renderArticleSponsoredLabelRow(align: 'left' | 'right' = 'left'): string {
+  const ta = align === 'right' ? 'right' : 'left';
+  return `
+  <tr>
+    <td style="padding: 2px 8px 8px; background-color: ${WHITE}; text-align: ${ta};">
+      <span style="display: inline-block; padding: 4px 8px; border-radius: 3px; background: rgba(31,41,55,0.82); color: #f9fafb; font-family: 'Red Hat Display', sans-serif; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">Advertisement</span>
+    </td>
+  </tr>`;
+}
+
 function renderAdvertisement(block: NewsletterBlock): string {
   if (!block.adImageUrl) return '';
   const href = esc(block.adLinkUrl || '#');
@@ -260,7 +273,8 @@ function renderArticleFull(block: NewsletterBlock): string {
             <img src="${esc(block.articleImageUrl)}" alt="${esc(block.articleTitle)}" width="600"
               style="width: 100%; max-width: 600px; height: auto; display: block; border: 0;" />
           </a>
-        </td></tr>` : ''}
+        </td></tr>
+        ${block.articleIsAdvertisement ? renderArticleSponsoredLabelRow('left') : ''}` : ''}
         <tr><td class="sfp-art-pad" style="padding: 24px 40px 28px;">
           <div style="font-family: 'Red Hat Display', sans-serif; font-size: 11px; font-weight: 700; color: ${BLUE}; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px;">
             ${esc(sectionLabel)}
@@ -308,6 +322,7 @@ function renderArticleCard(block: NewsletterBlock): string {
                </a>`
             : `<div style="height: ${IMG_HEIGHT}; background-color: #e8eaed;">&nbsp;</div>`}
         </td></tr>
+        ${block.articleIsAdvertisement && block.articleImageUrl ? renderArticleSponsoredLabelRow('left') : ''}
         <!-- Section label — always same position -->
         <tr><td style="padding: 14px 16px 0; line-height: 1;">
           <div style="font-family: 'Red Hat Display', sans-serif; font-size: 10px; font-weight: 700; color: ${BLUE}; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">

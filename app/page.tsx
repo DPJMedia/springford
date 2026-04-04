@@ -741,7 +741,7 @@ export default function Home() {
                               href={`/article/${article.slug}`}
                               className="flex gap-3 items-start group py-3 border-b border-gray-200 last:border-0"
                             >
-                              <span className="text-2xl font-black text-gray-300 flex-shrink-0">
+                              <span className="inline-flex w-9 shrink-0 justify-center text-2xl font-black tabular-nums text-gray-300">
                                 {index + 1}
                               </span>
                               <div className="flex-1 min-w-0">
@@ -887,7 +887,7 @@ export default function Home() {
                             href={`/article/${article.slug}`}
                             className="flex gap-3 items-start group py-3 border-b border-gray-200 last:border-0"
                           >
-                            <span className="text-2xl font-black text-gray-300 flex-shrink-0">
+                            <span className="inline-flex w-9 shrink-0 justify-center text-2xl font-black tabular-nums text-gray-300">
                               {index + 1}
                             </span>
                             <div className="flex-1 min-w-0">
@@ -936,7 +936,7 @@ export default function Home() {
                             href={`/article/${article.slug}`}
                             className="flex gap-3 items-start group py-3 border-b border-gray-200 last:border-0"
                           >
-                            <span className="text-2xl font-black text-gray-300 flex-shrink-0">
+                            <span className="inline-flex w-9 shrink-0 justify-center text-2xl font-black tabular-nums text-gray-300">
                               {index + 1}
                             </span>
                             <div className="flex-1 min-w-0">

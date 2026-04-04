@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { buildEmailHtml } from '@/lib/newsletter/buildEmailHtml';
 import type { NewsletterBlock, ArticleLayout } from '@/lib/newsletter/buildEmailHtml';
+import { enrichArticleBlocksWithAdvertisementFlags } from '@/lib/newsletter/enrichArticleBlocksForEmail';
 
 const SENDGRID_API_URL = 'https://api.sendgrid.com/v3/mail/send';
 const SITE_URL = 'https://www.springford.press';
@@ -55,7 +56,8 @@ export async function POST(request: Request) {
     }
 
     // Use blocks from campaign (which are a snapshot of the template at send time)
-    const blocks: NewsletterBlock[] = Array.isArray(campaign.blocks) ? campaign.blocks : [];
+    let blocks: NewsletterBlock[] = Array.isArray(campaign.blocks) ? campaign.blocks : [];
+    blocks = await enrichArticleBlocksWithAdvertisementFlags(supabase, blocks);
     const subject = campaign.subject || 'Spring-Ford Press Newsletter';
     const previewText = campaign.preview_text || '';
 
