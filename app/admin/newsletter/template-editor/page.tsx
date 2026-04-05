@@ -572,14 +572,26 @@ function BlockCard({ block, index, total, selected, onSelect, onMoveUp, onMoveDo
 
 function PreviewModal({ html, onClose }: { html: string; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-gray-900/95 backdrop-blur-sm">
-      <div className="flex items-center justify-between px-6 py-4 bg-gray-800 border-b border-gray-700">
-        <h2 className="text-white font-semibold text-sm">Template Preview</h2>
-        <button onClick={onClose} className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-medium transition">Close</button>
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/50 backdrop-blur-sm">
+      <div className="flex items-center justify-between px-6 py-4 bg-[var(--admin-card-bg)] border-b border-[var(--admin-border)]">
+        <h2 className="text-[var(--admin-text)] font-semibold text-sm">Template preview (as sent)</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 border border-[var(--admin-border)] text-[var(--admin-text)] rounded-lg text-sm font-semibold hover:bg-[var(--admin-table-header-bg)] transition"
+        >
+          Close
+        </button>
       </div>
-      <div className="flex-1 overflow-auto p-6 flex justify-center">
+      <div className="flex-1 overflow-auto p-6 flex justify-center bg-[#f0f2f4]">
         <div className="w-full max-w-2xl">
-          <iframe srcDoc={html} title="Template preview" className="w-full rounded-xl border border-gray-700 bg-white" style={{ height: "80vh" }} sandbox="allow-same-origin" />
+          <iframe
+            srcDoc={html}
+            title="Template preview"
+            className="w-full rounded-xl border border-[#e0e3e8] bg-[#f0f2f4]"
+            style={{ height: "80vh" }}
+            sandbox="allow-same-origin"
+          />
         </div>
       </div>
     </div>
@@ -732,12 +744,23 @@ function TemplateEditorInner() {
       {/* TOP BAR */}
       <div className="bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap mb-4">
         {returnTo && (
-          <button onClick={() => router.push(decodeURIComponent(returnTo))}
-            className="text-sm text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition flex-shrink-0 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => router.push(decodeURIComponent(returnTo))}
+            className="text-sm text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition flex-shrink-0 flex items-center gap-1"
+          >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             Back to Campaign
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => router.push("/admin/newsletter")}
+          className="text-sm transition flex-shrink-0 flex items-center gap-1 border border-[var(--admin-border)] rounded-lg px-3 py-1.5 font-semibold text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-table-header-bg)]"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          Back to Newsletter
+        </button>
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="w-7 h-7 bg-[var(--admin-accent)]/20 rounded-lg flex items-center justify-center">
             <svg className="w-4 h-4 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -781,32 +804,47 @@ function TemplateEditorInner() {
           </div>
         </div>
 
-        {/* CENTER: Canvas */}
-        <div className="flex-1 overflow-y-auto p-5 bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] rounded-lg">
-          <div className="max-w-xl mx-auto mb-0 bg-white border-2 border-b-0 border-gray-300 rounded-t-xl overflow-hidden">
-            <div className="text-center py-5 border-b-4 border-[#2b8aa8] bg-white">
-              <div className="font-semibold text-[#1a1a1a] text-2xl" style={{ fontFamily: "Georgia, serif" }}>Spring-Ford Press</div>
-              <div className="text-[10px] tracking-widest uppercase text-gray-400 mt-1 font-medium">Neighborhood-First Reporting</div>
+        {/* CENTER: Block list + iframe preview (matches buildEmailHtml / sent email) */}
+        <div className="flex-1 flex flex-col gap-3 min-h-0 overflow-hidden p-4 bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] rounded-lg">
+          <div className="flex-shrink-0 flex flex-col min-h-0 max-h-[42vh]">
+            <p className="text-xs font-semibold text-[var(--admin-text-muted)] uppercase tracking-widest mb-2 px-1">Blocks</p>
+            <div className="overflow-y-auto pr-1 space-y-1.5">
+              {blocks.length === 0 ? (
+                <div className="py-10 text-center rounded-lg border border-dashed border-[var(--admin-border)] bg-[var(--admin-card-bg)]">
+                  <p className="text-2xl mb-2">📭</p>
+                  <p className="text-sm font-semibold text-[var(--admin-text)] mb-0.5">No blocks yet</p>
+                  <p className="text-xs text-[var(--admin-text-muted)]">Add a block from the left panel.</p>
+                </div>
+              ) : (
+                blocks.map((block, index) => (
+                  <BlockCard
+                    key={block.id}
+                    block={block}
+                    index={index}
+                    total={blocks.length}
+                    selected={selectedBlockId === block.id}
+                    onSelect={() => setSelectedBlockId(selectedBlockId === block.id ? null : block.id)}
+                    onMoveUp={() => moveBlock(index, "up")}
+                    onMoveDown={() => moveBlock(index, "down")}
+                    onDelete={() => deleteBlock(block.id)}
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, index)}
+                  />
+                ))
+              )}
             </div>
           </div>
-          <div className="max-w-xl mx-auto border-x-2 border-gray-300">
-            {blocks.length === 0
-              ? <div className="py-16 text-center bg-white"><p className="text-3xl mb-3">📭</p><p className="text-sm font-semibold text-gray-800 mb-1">No blocks yet</p><p className="text-xs text-gray-500">Click a block type on the left to add content.</p></div>
-              : <div className="space-y-1.5 p-3 bg-white">
-                  {blocks.map((block, index) => (
-                    <BlockCard key={block.id} block={block} index={index} total={blocks.length}
-                      selected={selectedBlockId === block.id}
-                      onSelect={() => setSelectedBlockId(selectedBlockId === block.id ? null : block.id)}
-                      onMoveUp={() => moveBlock(index, "up")} onMoveDown={() => moveBlock(index, "down")}
-                      onDelete={() => deleteBlock(block.id)}
-                      onDragStart={(e) => handleDragStart(e, index)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, index)} />
-                  ))}
-                </div>}
-          </div>
-          <div className="max-w-xl mx-auto bg-[#1a1a1a] border-2 border-t-0 border-gray-300 rounded-b-xl overflow-hidden px-8 py-6 text-center">
-            <div className="text-white font-semibold text-base mb-3" style={{ fontFamily: "Georgia, serif" }}>Spring-Ford Press</div>
-            <div className="text-xs text-gray-500">springford.press | Terms | Privacy | Contact</div>
-            <p className="text-[11px] text-gray-600 mt-2">&copy; {new Date().getFullYear()} Spring-Ford Press. All rights reserved.</p>
+          <div className="flex-1 flex flex-col min-h-0 border-t border-[var(--admin-border)] pt-3">
+            <p className="text-xs font-semibold text-[var(--admin-text-muted)] uppercase tracking-widest mb-2 px-1">Preview as sent</p>
+            <div className="flex-1 min-h-[280px] rounded-lg overflow-hidden border border-[#e0e3e8] bg-[#f0f2f4] shadow-inner">
+              <iframe
+                srcDoc={previewHtml}
+                title="Email preview"
+                className="w-full h-full min-h-[280px] bg-[#f0f2f4]"
+                sandbox="allow-same-origin"
+              />
+            </div>
           </div>
         </div>
 

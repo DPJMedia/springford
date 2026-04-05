@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import Link from "next/link";
 
 interface ActionItem {
   icon: ReactNode;
@@ -34,9 +35,11 @@ export function AdminActionsPanel({
     <div key={idx}>
       {idx > 0 && <div className="border-t border-[var(--admin-border)]" />}
       <div className="p-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--admin-text-muted)]">
-          {section.title}
-        </h3>
+        {section.title.trim() ? (
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--admin-text-muted)]">
+            {section.title}
+          </h3>
+        ) : null}
         {section.customContent ? (
           section.customContent
         ) : (
@@ -62,15 +65,25 @@ export function AdminActionsPanel({
 
               if (item.href) {
                 const external = /^https?:\/\//i.test(item.href);
+                const className =
+                  "flex cursor-pointer items-center rounded-md px-3 py-2 transition-colors hover:bg-[var(--admin-table-row-hover)]";
+                if (external) {
+                  return (
+                    <a
+                      key={itemIdx}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={className}
+                    >
+                      {content}
+                    </a>
+                  );
+                }
                 return (
-                  <a
-                    key={itemIdx}
-                    href={item.href}
-                    {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                    className="flex cursor-pointer items-center rounded-md px-3 py-2 transition-colors hover:bg-[var(--admin-table-row-hover)]"
-                  >
+                  <Link key={itemIdx} href={item.href} className={className}>
                     {content}
-                  </a>
+                  </Link>
                 );
               }
 

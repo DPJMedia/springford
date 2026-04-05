@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { createDiffuseClient, type DiffuseOutput, type DiffuseProject, type DiffuseProjectInput } from "@/lib/diffuse/client";
+import {
+  loadDiffuseDashboardData,
+  type ProjectWithWorkspace,
+  type Workspace,
+} from "@/lib/diffuse/loadDashboard";
 import { useRouter } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
@@ -18,31 +23,6 @@ interface Connection {
 
 interface OutputWithProject extends DiffuseOutput {
   project?: DiffuseProject;
-}
-
-interface Workspace {
-  id: string;
-  name: string;
-  description: string | null;
-  plan: string | null;
-  owner_id: string;
-  created_at: string;
-}
-
-interface WorkspaceMember {
-  id: string;
-  workspace_id: string;
-  user_id: string;
-  role: string;
-}
-
-interface ProjectWithWorkspace extends DiffuseProject {
-  workspace?: Workspace;
-  latest_output?: DiffuseOutput;
-  all_outputs?: DiffuseOutput[];
-  creator_name?: string;
-  cover_image_path?: string | null;
-  cover_image_file_name?: string | null;
 }
 
 const ORG_ARTICLE_PREVIEW = 3;
@@ -391,496 +371,50 @@ export default function DiffuseIntegrationPage() {
   }
 
   async function fetchWorkspacesAndProjects() {
-    if (!connection) {
-      console.log("No connection found");
-      return;
-    }
+    if (!connection) return;
 
     setLoadingProjects(true);
-    console.log("🔍 Starting to fetch workspaces and projects...");
-    console.log("Connected user ID:", connection.diffuse_user_id);
 
     try {
       const diffuseClient = createDiffuseClient();
-      
-      // First, let's check what tables exist by trying different possible names
-      console.log("📊 Attempting to fetch workspace memberships...");
-      
-      // Try the original table name
-      let { data: memberships, error: membershipsError } = await diffuseClient
-        .from("diffuse_workspace_members")
-        .select("*")
-        .eq("user_id", connection.diffuse_user_id);
+      const result = await loadDiffuseDashboardData(diffuseClient, connection.diffuse_user_id);
 
-      // If that fails, try without the diffuse_ prefix
-      if (membershipsError) {
-        console.warn("⚠️ Error with 'diffuse_workspace_members':", membershipsError);
-        console.log("Trying 'workspace_members' instead...");
-        
-        const result = await diffuseClient
-          .from("workspace_members")
-          .select("*")
-          .eq("user_id", connection.diffuse_user_id);
-        
-        memberships = result.data;
-        membershipsError = result.error;
-      }
-
-      if (membershipsError) {
-        console.error("❌ Error fetching workspace memberships:", membershipsError);
+      if (!result.ok) {
+        const message =
+          result.kind === "memberships"
+            ? `Error fetching organizations: ${result.message}\n\nPlease check the browser console for details.`
+            : result.kind === "workspaces"
+              ? `Error fetching workspace details: ${result.message}`
+              : result.message;
         setConfirmModalData({
           title: "Fetch Error",
-          message: `Error fetching organizations: ${membershipsError.message}\n\nPlease check browser console for details.`,
-          onConfirm: () => setShowConfirmModal(false)
+          message,
+          onConfirm: () => setShowConfirmModal(false),
         });
         setShowConfirmModal(true);
         setLoadingProjects(false);
         return;
       }
 
-      console.log("✅ Memberships found:", memberships);
-
-      if (!memberships || memberships.length === 0) {
-        console.warn("⚠️ No workspace memberships found for this user");
+      if (result.workspaces.length === 0) {
         setConfirmModalData({
           title: "No Organizations",
-          message: "No organizations found. Make sure you're a member of at least one organization in DiffuseAI.",
-          onConfirm: () => setShowConfirmModal(false)
+          message:
+            "No organizations found. Make sure you're a member of at least one organization in DiffuseAI.",
+          onConfirm: () => setShowConfirmModal(false),
         });
         setShowConfirmModal(true);
-        setWorkspaces([]);
-        setProjectsByWorkspace({});
-        setLoadingProjects(false);
-        return;
       }
 
-      const workspaceIds = memberships.map(m => m.workspace_id);
-      console.log("📋 Workspace IDs:", workspaceIds);
-
-      // Fetch workspace details
-      console.log("📊 Fetching workspace details...");
-      let { data: workspacesData, error: workspacesError } = await diffuseClient
-        .from("diffuse_workspaces")
-        .select("*")
-        .in("id", workspaceIds)
-        .order("created_at", { ascending: false });
-
-      // Try without prefix if failed
-      if (workspacesError) {
-        console.warn("⚠️ Error with 'diffuse_workspaces':", workspacesError);
-        console.log("Trying 'workspaces' instead...");
-        
-        const result = await diffuseClient
-          .from("workspaces")
-          .select("*")
-          .in("id", workspaceIds)
-          .order("created_at", { ascending: false });
-        
-        workspacesData = result.data;
-        workspacesError = result.error;
-      }
-
-      if (workspacesError) {
-        console.error("❌ Error fetching workspaces:", workspacesError);
-        setConfirmModalData({
-          title: "Fetch Error",
-          message: `Error fetching workspace details: ${workspacesError.message}`,
-          onConfirm: () => setShowConfirmModal(false)
-        });
-        setShowConfirmModal(true);
-        setLoadingProjects(false);
-        return;
-      }
-
-      console.log("✅ Workspaces found:", workspacesData);
-      setWorkspaces(workspacesData || []);
-
-      // Get all workspace IDs the user is a member of
-      const userWorkspaceIds = workspacesData?.map(w => w.id) || [];
-      console.log("\n📊 User's workspace IDs:", userWorkspaceIds);
-
-      // Fetch ALL projects visible to the user's workspaces OR created by the user
-      console.log("\n📊 Fetching ALL projects for user's workspaces...");
-      let { data: allProjects, error: allProjectsError } = await diffuseClient
-        .from("diffuse_projects")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      // Try without prefix if failed
-      if (allProjectsError) {
-        console.warn(`⚠️ Error with 'diffuse_projects':`, allProjectsError);
-        const result = await diffuseClient
-          .from("projects")
-          .select("*")
-          .order("created_at", { ascending: false });
-        
-        allProjects = result.data;
-        allProjectsError = result.error;
-      }
-
-      // Filter projects to only those relevant to the user
-      // Include projects where:
-      // 1. workspace_id matches one of user's workspaces
-      // 2. visible_to_orgs includes one of user's workspaces
-      // 3. created_by matches the user (for private projects)
-      allProjects = allProjects?.filter(project => {
-        const isInHomeWorkspace = project.workspace_id && userWorkspaceIds.includes(project.workspace_id);
-        const isVisibleToUserWorkspace = project.visible_to_orgs && 
-                                         Array.isArray(project.visible_to_orgs) && 
-                                         project.visible_to_orgs.some((id: string) => userWorkspaceIds.includes(id));
-        const isCreatedByUser = project.created_by === connection.diffuse_user_id;
-        
-        return isInHomeWorkspace || isVisibleToUserWorkspace || isCreatedByUser;
-      }) || [];
-
-      console.log(`   Found ${allProjects?.length || 0} total relevant projects`);
-      
-      // Fetch creator information for all projects
-      console.log("\n👤 Fetching creator information...");
-      const creatorIds = [...new Set(allProjects?.map(p => p.created_by).filter(Boolean))];
-      console.log(`   Found ${creatorIds.length} unique creators:`, creatorIds);
-      
-      let creators: any[] = [];
-      
-      // Strategy 1: Try public.user_profiles
-      console.log("   Trying public.user_profiles...");
-      const { data: profiles, error: profilesError } = await diffuseClient
-        .from("user_profiles")
-        .select("*")
-        .in("id", creatorIds);
-      
-      console.log("   public.user_profiles result:", { data: profiles, error: profilesError, count: profiles?.length });
-      
-      if (profiles && profiles.length > 0) {
-        creators = profiles;
-      }
-      
-      // Strategy 2: Try to get user info from workspace_members (which might have user details)
-      if (creators.length === 0) {
-        console.log("   Trying to get user info from workspace_members...");
-        let { data: members } = await diffuseClient
-          .from("diffuse_workspace_members")
-          .select("user_id, user:user_profiles(*)")
-          .in("user_id", creatorIds);
-        
-        if (!members) {
-          const result = await diffuseClient
-            .from("workspace_members")
-            .select("user_id, user:user_profiles(*)")
-            .in("user_id", creatorIds);
-          members = result.data;
-        }
-        
-        console.log("   workspace_members with user join result:", { data: members, count: members?.length });
-        
-        if (members && members.length > 0) {
-          creators = members.map((m: any) => m.user || { id: m.user_id }).filter(Boolean);
-        }
-      }
-      
-      // Create a map of creator ID to creator name
-      const creatorMap: Record<string, string> = {};
-      if (creators && creators.length > 0) {
-        console.log("   Raw creator data:", creators);
-        creators.forEach((creator: any) => {
-          // Try multiple possible field names
-          const name = creator.full_name || 
-                      creator.user_metadata?.full_name ||
-                      creator.user_metadata?.name ||
-                      creator.name || 
-                      creator.display_name || 
-                      creator.username || 
-                      creator.email ||
-                      "Unknown";
-          creatorMap[creator.id] = name;
-          console.log(`   ✅ Mapping creator ${creator.id} to "${name}"`);
-        });
-        console.log("   ✅ Final creator map:", creatorMap);
-      } else {
-        console.warn("   ⚠️ Could not fetch any creator information");
-        console.warn("   ⚠️ All creators will show as 'Unknown'");
-        // Fill map with "Unknown" for all creator IDs
-        creatorIds.forEach(id => {
-          creatorMap[id] = "Unknown";
-        });
-      }
-      
-      if (allProjects) {
-        console.log("   Projects breakdown:");
-        allProjects.forEach(p => {
-          console.log(`      - ${p.name}:`, {
-            workspace_id: p.workspace_id,
-            visible_to_orgs: p.visible_to_orgs,
-            created_by: p.created_by,
-            creator_name: creatorMap[p.created_by] || "Unknown"
-          });
-        });
-      }
-
-      // Organize projects by workspace based on BOTH workspace_id (home) and visible_to_orgs
-      const projectsByWs: Record<string, ProjectWithWorkspace[]> = {};
-
-      for (const workspace of workspacesData || []) {
-        console.log(`\n📊 Organizing projects for workspace: ${workspace.name} (${workspace.id})`);
-        
-        // Find projects that belong to this workspace
-        // Either: workspace_id matches (home organization)
-        // Or: visible_to_orgs includes this workspace (visibility setting)
-        const workspaceProjects = allProjects?.filter(project => {
-          const isHomeOrg = project.workspace_id === workspace.id;
-          const isVisibleTo = project.visible_to_orgs && Array.isArray(project.visible_to_orgs) && project.visible_to_orgs.includes(workspace.id);
-          
-          console.log(`   Project "${project.name}": home=${isHomeOrg}, visible=${isVisibleTo}`);
-          
-          return isHomeOrg || isVisibleTo;
-        }) || [];
-
-        console.log(`   → ${workspaceProjects.length} projects for this workspace`);
-
-        // Fetch outputs for each project
-        if (workspaceProjects && workspaceProjects.length > 0) {
-          const projectsWithOutputs: ProjectWithWorkspace[] = [];
-          
-          for (const project of workspaceProjects) {
-            console.log(`  📝 Checking outputs for project: ${project.name}`);
-            
-            // Fetch ALL outputs (not just latest) - EXCLUDE DELETED
-            const { data: outputs } = await diffuseClient
-              .from("diffuse_project_outputs")
-              .select("*")
-              .eq("project_id", project.id)
-              .is("deleted_at", null)
-              .order("created_at", { ascending: false });
-
-            // Fetch cover image from project inputs
-            console.log(`  🖼️ Checking cover image for project: ${project.name}`);
-            let coverImagePath: string | null = null;
-            let coverImageFileName: string | null = null;
-            
-            const { data: coverInput } = await diffuseClient
-              .from("diffuse_project_inputs")
-              .select("file_path, file_name")
-              .eq("project_id", project.id)
-              .eq("type", "cover_photo")
-              .is("deleted_at", null)
-              .maybeSingle();
-            
-            if (!coverInput) {
-              // Try without prefix
-              const fallbackCoverResult = await diffuseClient
-                .from("project_inputs")
-                .select("file_path, file_name")
-                .eq("project_id", project.id)
-                .eq("type", "cover_photo")
-                .is("deleted_at", null)
-                .maybeSingle();
-              
-              if (fallbackCoverResult.data) {
-                coverImagePath = fallbackCoverResult.data.file_path;
-                coverImageFileName = fallbackCoverResult.data.file_name;
-                console.log(`  ✅ Found cover image (fallback): ${coverImageFileName}`);
-              }
-            } else {
-              coverImagePath = coverInput.file_path;
-              coverImageFileName = coverInput.file_name;
-              console.log(`  ✅ Found cover image: ${coverImageFileName}`);
-            }
-            
-            // If no project-level cover, check output cover
-            if (!coverImagePath && outputs && outputs.length > 0 && outputs[0].cover_photo_path) {
-              coverImagePath = outputs[0].cover_photo_path;
-              console.log(`  ✅ Found output-level cover image: ${coverImagePath}`);
-            }
-
-            if (!outputs) {
-              const fallbackResult = await diffuseClient
-                .from("project_outputs")
-                .select("*")
-                .eq("project_id", project.id)
-                .is("deleted_at", null)
-                .order("created_at", { ascending: false });
-              
-              if (fallbackResult.data && fallbackResult.data.length > 0) {
-                projectsWithOutputs.push({
-                  ...project,
-                  workspace: workspace,
-                  latest_output: fallbackResult.data[0],
-                  all_outputs: fallbackResult.data,
-                  creator_name: creatorMap[project.created_by] || "Unknown",
-                  cover_image_path: coverImagePath,
-                  cover_image_file_name: coverImageFileName,
-                });
-                console.log(`  ✅ Project "${project.name}" has ${fallbackResult.data.length} output(s) (fallback)`);
-              } else {
-                projectsWithOutputs.push({
-                  ...project,
-                  workspace: workspace,
-                  all_outputs: [],
-                  creator_name: creatorMap[project.created_by] || "Unknown",
-                  cover_image_path: coverImagePath,
-                  cover_image_file_name: coverImageFileName,
-                });
-                console.log(`  ⚠️ Project "${project.name}" has no outputs yet`);
-              }
-            } else if (outputs && outputs.length > 0) {
-              projectsWithOutputs.push({
-                ...project,
-                workspace: workspace,
-                latest_output: outputs[0],
-                all_outputs: outputs,
-                creator_name: creatorMap[project.created_by] || "Unknown",
-                cover_image_path: coverImagePath,
-                cover_image_file_name: coverImageFileName,
-              });
-              console.log(`  ✅ Project "${project.name}" has ${outputs.length} output(s)`);
-            } else {
-              projectsWithOutputs.push({
-                ...project,
-                workspace: workspace,
-                all_outputs: [],
-                creator_name: creatorMap[project.created_by] || "Unknown",
-                cover_image_path: coverImagePath,
-                cover_image_file_name: coverImageFileName,
-              });
-              console.log(`  ⚠️ Project "${project.name}" has no outputs yet`);
-            }
-          }
-
-          projectsByWs[workspace.id] = projectsWithOutputs;
-        }
-      }
-
-      // Find private projects (no home organization AND no visibility settings)
-      console.log("\n🔒 ====== FINDING PRIVATE PROJECTS ======");
-      const privateProjects = allProjects?.filter(project => {
-        const hasNoHome = !project.workspace_id || project.workspace_id === null;
-        const hasNoVisibility = !project.visible_to_orgs || 
-                               project.visible_to_orgs === null || 
-                               (Array.isArray(project.visible_to_orgs) && project.visible_to_orgs.length === 0);
-        
-        console.log(`   Project "${project.name}": noHome=${hasNoHome}, noVisibility=${hasNoVisibility}`);
-        
-        return hasNoHome && hasNoVisibility;
-      }) || [];
-
-      console.log(`   → Found ${privateProjects.length} truly private projects`);
-
-      if (privateProjects && privateProjects.length > 0) {
-        const privateProjectsWithOutputs: ProjectWithWorkspace[] = [];
-        
-        for (const project of privateProjects) {
-          console.log(`  📝 Checking private project: ${project.name}`);
-          
-          // Fetch ALL outputs (not just latest) - EXCLUDE DELETED
-          const { data: outputs } = await diffuseClient
-            .from("diffuse_project_outputs")
-            .select("*")
-            .eq("project_id", project.id)
-            .is("deleted_at", null)
-            .order("created_at", { ascending: false });
-
-          // Fetch cover image from project inputs
-          console.log(`  🖼️ Checking cover image for private project: ${project.name}`);
-          let coverImagePath: string | null = null;
-          let coverImageFileName: string | null = null;
-          
-          const { data: coverInput } = await diffuseClient
-            .from("diffuse_project_inputs")
-            .select("file_path, file_name")
-            .eq("project_id", project.id)
-            .eq("type", "cover_photo")
-            .is("deleted_at", null)
-            .maybeSingle();
-          
-          if (!coverInput) {
-            // Try without prefix
-            const fallbackCoverResult = await diffuseClient
-              .from("project_inputs")
-              .select("file_path, file_name")
-              .eq("project_id", project.id)
-              .eq("type", "cover_photo")
-              .is("deleted_at", null)
-              .maybeSingle();
-            
-            if (fallbackCoverResult.data) {
-              coverImagePath = fallbackCoverResult.data.file_path;
-              coverImageFileName = fallbackCoverResult.data.file_name;
-              console.log(`  ✅ Found cover image (fallback): ${coverImageFileName}`);
-            }
-          } else {
-            coverImagePath = coverInput.file_path;
-            coverImageFileName = coverInput.file_name;
-            console.log(`  ✅ Found cover image: ${coverImageFileName}`);
-          }
-          
-          // If no project-level cover, check output cover
-          if (!coverImagePath && outputs && outputs.length > 0 && outputs[0].cover_photo_path) {
-            coverImagePath = outputs[0].cover_photo_path;
-            console.log(`  ✅ Found output-level cover image: ${coverImagePath}`);
-          }
-
-          if (!outputs) {
-            const fallbackResult = await diffuseClient
-              .from("project_outputs")
-              .select("*")
-              .eq("project_id", project.id)
-              .is("deleted_at", null)
-              .order("created_at", { ascending: false });
-            
-            if (fallbackResult.data && fallbackResult.data.length > 0) {
-              privateProjectsWithOutputs.push({
-                ...project,
-                latest_output: fallbackResult.data[0],
-                all_outputs: fallbackResult.data,
-                creator_name: creatorMap[project.created_by] || "Unknown",
-                cover_image_path: coverImagePath,
-                cover_image_file_name: coverImageFileName,
-              });
-              console.log(`  ✅ Private project "${project.name}" has ${fallbackResult.data.length} output(s)`);
-            } else {
-              privateProjectsWithOutputs.push({
-                ...project,
-                all_outputs: [],
-                creator_name: creatorMap[project.created_by] || "Unknown",
-                cover_image_path: coverImagePath,
-                cover_image_file_name: coverImageFileName,
-              });
-              console.log(`  ⚠️ Private project "${project.name}" has no outputs yet`);
-            }
-          } else if (outputs && outputs.length > 0) {
-            privateProjectsWithOutputs.push({
-              ...project,
-              latest_output: outputs[0],
-              all_outputs: outputs,
-              creator_name: creatorMap[project.created_by] || "Unknown",
-              cover_image_path: coverImagePath,
-              cover_image_file_name: coverImageFileName,
-            });
-            console.log(`  ✅ Private project "${project.name}" has ${outputs.length} output(s)`);
-          } else {
-            privateProjectsWithOutputs.push({
-              ...project,
-              all_outputs: [],
-              creator_name: creatorMap[project.created_by] || "Unknown",
-              cover_image_path: coverImagePath,
-              cover_image_file_name: coverImageFileName,
-            });
-            console.log(`  ⚠️ Private project "${project.name}" has no outputs yet`);
-          }
-        }
-
-        projectsByWs["private"] = privateProjectsWithOutputs;
-      }
-
-      console.log("🎉 Final projects by workspace:", projectsByWs);
-      setProjectsByWorkspace(projectsByWs);
+      setWorkspaces(result.workspaces);
+      setProjectsByWorkspace(result.projectsByWorkspace);
       setLoadingProjects(false);
     } catch (err) {
-      console.error("❌ Unexpected error fetching workspaces and projects:", err);
+      console.error("Unexpected error fetching workspaces and projects:", err);
       setConfirmModalData({
         title: "Unexpected Error",
         message: `Unexpected error: ${err instanceof Error ? err.message : String(err)}`,
-        onConfirm: () => setShowConfirmModal(false)
+        onConfirm: () => setShowConfirmModal(false),
       });
       setShowConfirmModal(true);
       setLoadingProjects(false);
@@ -1442,6 +976,19 @@ export default function DiffuseIntegrationPage() {
               ),
               label: "Refresh",
               onClick: () => fetchWorkspacesAndProjects(),
+            },
+            {
+              icon: (
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
+                  />
+                </svg>
+              ),
+              label: "Back to Homepage",
+              href: "/",
             },
             {
               icon: (

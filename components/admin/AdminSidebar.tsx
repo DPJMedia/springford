@@ -115,6 +115,33 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
     return true;
   });
 
+  const hasUsersNavItem = filteredNavItems.some((item) => item.label === "Users");
+
+  const backToSiteNavLink = (
+    <Link
+      key="back-to-site"
+      href="/"
+      className="flex min-h-[2.75rem] items-center gap-3 px-3 py-2 rounded-lg transition-colors text-[var(--admin-text-muted)] hover:bg-[var(--admin-card-bg)] hover:text-[var(--admin-text)]"
+    >
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden>
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
+          />
+        </svg>
+      </span>
+      <span className="text-sm font-medium uppercase tracking-wide">Back to site</span>
+    </Link>
+  );
+
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   return (
@@ -122,7 +149,7 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
       <div className="flex flex-col h-full">
         {/* Logo/Brand */}
         <div className="p-6">
-          <Link href="/admin/articles" className="inline-flex flex-col gap-0.5">
+          <Link href="/" className="inline-flex flex-col gap-0.5">
             <span className="inline-flex items-baseline gap-0">
               <span className="text-[var(--admin-text)] font-semibold text-xl leading-none">Diffuse</span>
               <span className="text-[var(--admin-accent)] font-semibold text-xl leading-none">.AI</span>
@@ -136,10 +163,9 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 [scrollbar-gutter:stable]">
           <div className="space-y-1">
-            {filteredNavItems.map((item) => {
+            {filteredNavItems.flatMap((item, idx) => {
               const active = isActive(item);
-
-              return (
+              const navLink = (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -159,6 +185,12 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
                   </span>
                 </Link>
               );
+
+              const insertBack =
+                item.label === "Users" ||
+                (!hasUsersNavItem && idx === filteredNavItems.length - 1);
+
+              return insertBack ? [navLink, backToSiteNavLink] : [navLink];
             })}
           </div>
         </nav>

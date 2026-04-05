@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ScheduleDisplay } from "@/components/ScheduleDisplay";
 import { ScheduledPublisher } from "@/components/ScheduledPublisher";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
@@ -42,10 +41,6 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "views-low", label: "Least views (all time)" },
 ];
 
-const navItemActive = "bg-[var(--admin-accent)]/20 text-[var(--admin-accent)]";
-const navItemInactive =
-  "text-[var(--admin-text)] hover:bg-[var(--admin-card-bg)]";
-
 export default function ArticlesManagementPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,8 +50,9 @@ export default function ArticlesManagementPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("date-newest");
+  const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const router = useRouter();
+  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const supabase = createClient();
 
   const ROWS_PER_PAGE = 10;
@@ -131,6 +127,15 @@ export default function ArticlesManagementPage() {
   const scheduledCount = articles.filter((a) => a.status === "scheduled").length;
   const archivedCount = articles.filter((a) => a.status === "archived").length;
 
+  const sectionOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const a of articles) {
+      const sec = typeof a.section === "string" ? a.section.trim() : "";
+      if (sec) s.add(sec);
+    }
+    return [...s].sort((a, b) => a.localeCompare(b));
+  }, [articles]);
+
   // Tab-filtered list (same logic as table)
   const tabFiltered = articles.filter((article) => {
     if (filter === "all") return article.status !== "archived";
@@ -138,11 +143,16 @@ export default function ArticlesManagementPage() {
     return article.status === filter;
   });
 
+  const sectionFiltered =
+    sectionFilter === "all"
+      ? tabFiltered
+      : tabFiltered.filter((a) => (a.section ?? "").trim() === sectionFilter);
+
   const searchLower = searchQuery.trim().toLowerCase();
   const searchFiltered =
     !searchLower
-      ? tabFiltered
-      : tabFiltered.filter(
+      ? sectionFiltered
+      : sectionFiltered.filter(
           (a) =>
             a.title?.toLowerCase().includes(searchLower) ||
             (a.author_name ?? "").toLowerCase().includes(searchLower)
@@ -187,90 +197,66 @@ export default function ArticlesManagementPage() {
     currentPage * ROWS_PER_PAGE
   );
 
-  // Reset to page 1 when tab, search, or sort changes
+  // Reset to page 1 when tab, search, sort, or section filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [filter, searchQuery, sortBy]);
+  }, [filter, searchQuery, sortBy, sectionFilter]);
 
-  async function deleteArticle(id: string) {
-    if (!confirm("Are you sure you want to delete this article?")) return;
+  useEffect(() => {
+    setSelectedArticleId(null);
+  }, [filter, sectionFilter, sortBy]);
 
-    const { error } = await supabase.from("articles").delete().eq("id", id);
+  async function bulkArchive(ids: string[]) {
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `Archive ${ids.length} article${ids.length !== 1 ? "s" : ""}? They will no longer appear on the site.`,
+      )
+    )
+      return;
+
+    const { error } = await supabase.from("articles").update({ status: "archived" }).in("id", ids);
 
     if (error) {
-      alert("Error deleting article: " + error.message);
+      alert("Error archiving articles: " + error.message);
     } else {
-      setArticles(articles.filter((a) => a.id !== id));
+      setArticles((prev) =>
+        prev.map((a) => (ids.includes(a.id) ? { ...a, status: "archived" } : a)),
+      );
+      setSelectedArticleId(null);
+      alert(`Archived ${ids.length} article${ids.length !== 1 ? "s" : ""}.`);
     }
   }
 
-  async function archiveArticle(id: string) {
-    if (!confirm("Are you sure you want to archive this article? It will no longer appear on the site.")) return;
+  async function bulkDelete(ids: string[]) {
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `Permanently delete ${ids.length} article${ids.length !== 1 ? "s" : ""}? This cannot be undone.`,
+      )
+    )
+      return;
 
-    const { error } = await supabase
-      .from("articles")
-      .update({ status: "archived" })
-      .eq("id", id);
+    const { error } = await supabase.from("articles").delete().in("id", ids);
 
     if (error) {
-      alert("Error archiving article: " + error.message);
+      alert("Error deleting articles: " + error.message);
     } else {
-      // Update the local state
-      setArticles(articles.map((a) => (a.id === id ? { ...a, status: "archived" } : a)));
-      alert("Article archived successfully!");
+      setArticles((prev) => prev.filter((a) => !ids.includes(a.id)));
+      setSelectedArticleId(null);
+      void fetchEditorsPicks();
     }
   }
 
-  async function republishArticle(id: string) {
-    if (!confirm("Are you sure you want to republish this article?")) return;
-
-    const { error } = await supabase
-      .from("articles")
-      .update({ 
-        status: "published",
-        published_at: new Date().toISOString()
-      })
-      .eq("id", id);
-
-    if (error) {
-      alert("Error republishing article: " + error.message);
-    } else {
-      // Update the local state
-      setArticles(articles.map((a) => (a.id === id ? { ...a, status: "published", published_at: new Date().toISOString() } : a)));
-      alert("Article republished successfully!");
-    }
-  }
-
-  function audienceLabel(visibility: string | null | undefined) {
-    const v = visibility ?? "public";
-    if (v === "newsletter_subscribers") return { text: "Subscribers", color: "bg-sky-100 text-sky-900" };
-    if (v === "admin_only") return { text: "Admin only", color: "bg-orange-100 text-orange-900" };
-    return { text: "Public", color: "bg-gray-100 text-gray-800" };
-  }
-
-  function getStatusDisplay(article: Article) {
+  /** Uppercase status beside the date (same line, muted gray). */
+  function getStatusLineText(article: Article): string {
     if (article.status === "scheduled" && article.scheduled_for) {
-      const now = new Date();
       const scheduled = new Date(article.scheduled_for);
-      if (scheduled <= now) {
-        return {
-          text: "Publishing now...",
-          color: "bg-orange-100 text-orange-800 animate-pulse"
-        };
+      if (scheduled <= currentTime) {
+        return "PUBLISHING NOW";
       }
     }
-    
-    const statusColors: Record<string, string> = {
-      published: "bg-green-100 text-green-800",
-      scheduled: "bg-orange-100 text-orange-800",
-      draft: "bg-gray-100 text-gray-800",
-      archived: "bg-red-100 text-red-800"
-    };
-    
-    return {
-      text: article.status,
-      color: statusColors[article.status] || "bg-gray-100 text-gray-800"
-    };
+    return (article.status || "draft").toUpperCase();
   }
 
   if (!isAdmin) {
@@ -284,30 +270,80 @@ export default function ArticlesManagementPage() {
     );
   }
 
-  const filterRowBtn = (key: string, label: string, count: number) => (
-    <button
-      key={key}
-      type="button"
-      onClick={() => setFilter(key)}
-      className={`w-full flex items-center rounded-lg px-3 py-2 text-left text-sm font-medium transition-all ${
-        filter === key ? navItemActive : navItemInactive
-      }`}
-    >
-      {label} ({count})
-    </button>
-  );
+  const selectedArticle = selectedArticleId
+    ? articles.find((a) => a.id === selectedArticleId) ?? null
+    : null;
 
-  const sortRowBtn = (value: SortOption, label: string) => (
-    <button
-      key={value}
-      type="button"
-      onClick={() => setSortBy(value)}
-      className={`w-full flex items-center rounded-lg px-3 py-2 text-left text-sm font-medium transition-all ${
-        sortBy === value ? navItemActive : navItemInactive
-      }`}
-    >
-      {label}
-    </button>
+  const selectClass =
+    "w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-3 py-2 text-sm text-[var(--admin-text)] focus:border-[var(--admin-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--admin-accent)]";
+
+  const filterDropdowns = (
+    <div className="space-y-3">
+      <div>
+        <label
+          htmlFor="articles-status-desktop"
+          className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--admin-text-muted)]"
+        >
+          Status
+        </label>
+        <select
+          id="articles-status-desktop"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className={selectClass}
+          aria-label="Filter articles by status"
+        >
+          <option value="all">All ({allCount})</option>
+          <option value="published">Published ({publishedCount})</option>
+          <option value="draft">Drafts ({draftCount})</option>
+          <option value="scheduled">Scheduled ({scheduledCount})</option>
+          <option value="archived">Archived ({archivedCount})</option>
+        </select>
+      </div>
+      <div>
+        <label
+          htmlFor="articles-sort-desktop"
+          className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--admin-text-muted)]"
+        >
+          Sort
+        </label>
+        <select
+          id="articles-sort-desktop"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortOption)}
+          className={selectClass}
+          aria-label="Sort articles"
+        >
+          {SORT_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label
+          htmlFor="articles-section-filter-desktop"
+          className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--admin-text-muted)]"
+        >
+          Filter
+        </label>
+        <select
+          id="articles-section-filter-desktop"
+          value={sectionFilter}
+          onChange={(e) => setSectionFilter(e.target.value)}
+          className={selectClass}
+          aria-label="Filter articles by section"
+        >
+          <option value="all">All sections</option>
+          {sectionOptions.map((sec) => (
+            <option key={sec} value={sec}>
+              {sec}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
   );
 
   const actionsPanel = (
@@ -315,49 +351,70 @@ export default function ArticlesManagementPage() {
       attachBelowCreateButton
       sections={[
         {
-          title: "Filter",
-          customContent: (
-            <div className="space-y-3">
-              <div className="flex flex-col gap-1.5">
-                {filterRowBtn("all", "All", allCount)}
-                {filterRowBtn("published", "Published", publishedCount)}
-                {filterRowBtn("draft", "Drafts", draftCount)}
-                {filterRowBtn("scheduled", "Scheduled", scheduledCount)}
-                {filterRowBtn("archived", "Archived", archivedCount)}
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--admin-text-muted)]">
-                  Sort
-                </p>
-                <div className="flex flex-col gap-1.5" role="group" aria-label="Sort articles">
-                  {SORT_OPTIONS.map(({ value, label }) => sortRowBtn(value, label))}
-                </div>
-              </div>
-            </div>
-          ),
+          title: "",
+          customContent: filterDropdowns,
         },
-        {
-          title: "Actions",
-          customContent: (
-            <div className="space-y-1">
-              <Link
-                href="/"
-                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 transition-all ${navItemInactive}`}
-              >
-                <span className="h-4 w-4 shrink-0 text-[var(--admin-text-muted)]" aria-hidden>
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
-                    />
-                  </svg>
-                </span>
-                <span className="text-sm font-medium">Back to site</span>
-              </Link>
-            </div>
-          ),
-        },
+        ...(selectedArticle
+          ? [
+              {
+                title: "Article",
+                items: [
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                        />
+                      </svg>
+                    ),
+                    label: "Edit",
+                    href: `/admin/articles/edit/${selectedArticle.id}`,
+                  },
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"
+                        />
+                      </svg>
+                    ),
+                    label: "Archive",
+                    onClick: () => void bulkArchive([selectedArticle.id]),
+                  },
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    ),
+                    label: "Delete",
+                    variant: "danger" as const,
+                    onClick: () => void bulkDelete([selectedArticle.id]),
+                  },
+                ],
+              },
+            ]
+          : [
+              {
+                title: "Article",
+                customContent: (
+                  <p className="text-sm text-[var(--admin-text-muted)] px-1">
+                    Select an article in the table to edit, archive, or delete.
+                  </p>
+                ),
+              },
+            ]),
       ]}
     />
   );
@@ -379,45 +436,69 @@ export default function ArticlesManagementPage() {
       {!loading && (
         <>
           <div className="mb-4 xl:hidden space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">Filter</p>
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-              {[
-                ["all", "All", allCount],
-                ["published", "Published", publishedCount],
-                ["draft", "Drafts", draftCount],
-                ["scheduled", "Scheduled", scheduledCount],
-                ["archived", "Archived", archivedCount],
-              ].map(([key, label, count]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setFilter(key as string)}
-                  className={`shrink-0 flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                    filter === key ? navItemActive : navItemInactive
-                  }`}
-                >
-                  {label} ({count})
-                </button>
-              ))}
+            <div>
+              <label
+                htmlFor="articles-status-mobile"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]"
+              >
+                Status
+              </label>
+              <select
+                id="articles-status-mobile"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className={selectClass}
+                aria-label="Filter articles by status"
+              >
+                <option value="all">All ({allCount})</option>
+                <option value="published">Published ({publishedCount})</option>
+                <option value="draft">Drafts ({draftCount})</option>
+                <option value="scheduled">Scheduled ({scheduledCount})</option>
+                <option value="archived">Archived ({archivedCount})</option>
+              </select>
             </div>
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
+              <label
+                htmlFor="articles-sort-mobile"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]"
+              >
                 Sort
-              </p>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Sort articles">
+              </label>
+              <select
+                id="articles-sort-mobile"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className={selectClass}
+                aria-label="Sort articles"
+              >
                 {SORT_OPTIONS.map(({ value, label }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setSortBy(value)}
-                    className={`rounded-lg px-3 py-2 text-left text-xs font-medium transition-all sm:text-sm ${
-                      sortBy === value ? navItemActive : navItemInactive
-                    }`}
-                  >
+                  <option key={value} value={value}>
                     {label}
-                  </button>
+                  </option>
                 ))}
-              </div>
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="articles-section-filter-mobile"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]"
+              >
+                Filter
+              </label>
+              <select
+                id="articles-section-filter-mobile"
+                value={sectionFilter}
+                onChange={(e) => setSectionFilter(e.target.value)}
+                className={selectClass}
+                aria-label="Filter articles by section"
+              >
+                <option value="all">All sections</option>
+                {sectionOptions.map((sec) => (
+                  <option key={sec} value={sec}>
+                    {sec}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="mb-4">
@@ -480,12 +561,34 @@ export default function ArticlesManagementPage() {
                   </tr>
                 ) : (
                   paginatedList.map((article) => (
-                  <tr key={article.id} className="hover:bg-[var(--admin-table-row-hover)] transition">
+                  <tr
+                    key={article.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
+                      setSelectedArticleId((prev) => (prev === article.id ? null : article.id))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedArticleId((prev) => (prev === article.id ? null : article.id));
+                      }
+                    }}
+                    className={`cursor-pointer transition ${
+                      selectedArticleId === article.id
+                        ? "bg-[var(--admin-accent)]/10"
+                        : "hover:bg-[var(--admin-table-row-hover)]"
+                    }`}
+                  >
                     <td className="px-6 py-4">
                       <div className="space-y-1">
                         <div className="text-sm font-medium text-[var(--admin-text)]">{article.title}</div>
                         <div className="text-xs text-[var(--admin-text-muted)]">
-                          {new Date(article.published_at || article.created_at).toLocaleDateString()}
+                          <span>{new Date(article.published_at || article.created_at).toLocaleDateString()}</span>
+                          <span className="mx-1.5" aria-hidden>
+                            ·
+                          </span>
+                          <span className="uppercase">{getStatusLineText(article)}</span>
                         </div>
                         <ScheduleDisplay 
                           scheduledFor={article.scheduled_for || ""} 

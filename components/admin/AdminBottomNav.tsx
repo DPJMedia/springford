@@ -58,6 +58,8 @@ export function AdminBottomNav({ profile }: AdminBottomNavProps) {
 
   const isMoreActive = moreNavItems.some(item => isActive(item));
 
+  const hasUsersInMore = moreNavItems.some((item) => item.label === "Users");
+
   const getIcon = (iconName: string, className = "w-6 h-6") => {
     const icons: Record<string, ReactElement> = {
       dashboard: (
@@ -208,9 +210,9 @@ export function AdminBottomNav({ profile }: AdminBottomNavProps) {
               </div>
               
               <div className="space-y-2">
-                {moreNavItems.map((item) => {
+                {moreNavItems.flatMap((item, idx) => {
                   const active = isActive(item);
-                  return (
+                  const row = (
                     <Link
                       key={item.href}
                       href={item.href}
@@ -227,6 +229,39 @@ export function AdminBottomNav({ profile }: AdminBottomNavProps) {
                       <span className="text-sm font-medium">{item.label}</span>
                     </Link>
                   );
+
+                  const insertBack =
+                    item.label === "Users" ||
+                    (!hasUsersInMore && idx === moreNavItems.length - 1);
+
+                  if (!insertBack) return [row];
+
+                  return [
+                    row,
+                    <Link
+                      key="back-to-site"
+                      href="/"
+                      onClick={() => setShowMore(false)}
+                      className="flex items-center gap-3 px-4 py-3 rounded-lg text-[var(--admin-text-muted)] transition-colors hover:bg-[var(--admin-card-bg)] hover:text-[var(--admin-text)]"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center" aria-hidden>
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
+                          />
+                        </svg>
+                      </span>
+                      <span className="text-sm font-medium uppercase tracking-wide">Back to site</span>
+                    </Link>,
+                  ];
                 })}
               </div>
             </div>

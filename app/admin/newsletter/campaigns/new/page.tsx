@@ -102,6 +102,49 @@ function CampaignNameModal({ onConfirm, onCancel }: { onConfirm: (name: string) 
   );
 }
 
+// ─── New template name (before opening template editor from campaign flow) ─────
+
+function NewTemplateNameModal({ onConfirm, onCancel }: { onConfirm: (name: string) => void; onCancel: () => void }) {
+  const [name, setName] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { inputRef.current?.focus(); }, []);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-[var(--admin-card-bg)] rounded-lg shadow-xl w-full max-w-sm overflow-hidden border border-[var(--admin-border)]">
+        <div className="px-6 py-5 border-b border-[var(--admin-border)]">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-[var(--admin-accent)]/20 rounded-lg flex items-center justify-center">
+                <svg className="w-4 h-4 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              </div>
+              <span className="text-xs font-semibold text-[var(--admin-accent)] uppercase tracking-wide">New Template</span>
+            </div>
+            <button type="button" onClick={onCancel} className="w-7 h-7 rounded-full hover:bg-[var(--admin-table-header-bg)] flex items-center justify-center text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition text-lg leading-none">✕</button>
+          </div>
+          <h2 className="text-lg font-semibold text-white">Name your template</h2>
+          <p className="text-sm text-[var(--admin-text-muted)] mt-0.5">You can change this anytime in the template editor.</p>
+        </div>
+        <div className="px-6 py-5">
+          <input ref={inputRef} type="text" value={name} onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Weekly digest layout"
+            className="w-full px-3 py-2.5 text-sm border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]"
+            onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onConfirm(name.trim()); if (e.key === "Escape") onCancel(); }} />
+        </div>
+        <div className="px-6 pb-6 flex gap-3">
+          <button type="button" onClick={onCancel}
+            className="flex-1 py-2.5 text-sm font-semibold border border-[var(--admin-border)] text-[var(--admin-text-muted)] rounded-lg hover:bg-[var(--admin-table-header-bg)] transition">
+            Cancel
+          </button>
+          <button type="button" onClick={() => name.trim() && onConfirm(name.trim())} disabled={!name.trim()}
+            className="flex-1 py-2.5 text-sm font-semibold bg-[var(--admin-accent)] text-black rounded-lg hover:opacity-90 transition disabled:opacity-40">
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Schedule Modal ───────────────────────────────────────────────────────────
 
 function ScheduleModal({ recipientsType, onSchedule, onClose }: {
@@ -284,7 +327,9 @@ function CampaignNewInner() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [templatePickModal, setTemplatePickModal] = useState<Template | null>(null);
   const [duplicating, setDuplicating] = useState(false);
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
   const [showCampaignNameModal, setShowCampaignNameModal] = useState(!editId);
+  const [showNewTemplateNameModal, setShowNewTemplateNameModal] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void;
   } | null>(null);
@@ -423,12 +468,30 @@ function CampaignNewInner() {
     router.push(`/admin/newsletter/template-editor?id=${selectedTemplate.id}&returnTo=${returnTo}`);
   }
 
-  async function goToCreateTemplate() {
-    const id = await saveNow(campaignName, subject, previewText, recipientsType, null, scheduledAt);
-    const returnTo = id
-      ? encodeURIComponent(`/admin/newsletter/campaigns/new?id=${id}`)
-      : encodeURIComponent(`/admin/newsletter/campaigns/new`);
-    router.push(`/admin/newsletter/template-editor?returnTo=${returnTo}`);
+  function goToCreateTemplate() {
+    setShowNewTemplateNameModal(true);
+  }
+
+  async function handleNewTemplateNameConfirm(templateName: string) {
+    setShowNewTemplateNameModal(false);
+    setCreatingTemplate(true);
+    try {
+      const campaignId = await saveNow(campaignName, subject, previewText, recipientsType, null, scheduledAt);
+      const returnTo = campaignId
+        ? encodeURIComponent(`/admin/newsletter/campaigns/new?id=${campaignId}`)
+        : encodeURIComponent(`/admin/newsletter/campaigns/new`);
+      const { data, error } = await supabase.from("newsletter_templates").insert({
+        name: templateName.trim(),
+        blocks: [],
+        settings: {},
+      }).select("id").single();
+      if (error || !data) throw error;
+      router.push(`/admin/newsletter/template-editor?id=${data.id}&returnTo=${returnTo}`);
+    } catch {
+      setSendResult({ error: "Could not create template. Please try again." });
+    } finally {
+      setCreatingTemplate(false);
+    }
   }
 
   // ── Schedule / Send ───────────────────────────────────────────────────────────
@@ -542,9 +605,24 @@ function CampaignNewInner() {
       <AdminPageHeader title="Campaign Editor" />
       {/* Campaign name prompt — shown immediately for new campaigns */}
       {showCampaignNameModal && <CampaignNameModal onConfirm={handleCampaignNameConfirm} onCancel={handleCampaignNameCancel} />}
+      {showNewTemplateNameModal && (
+        <NewTemplateNameModal
+          onConfirm={handleNewTemplateNameConfirm}
+          onCancel={() => setShowNewTemplateNameModal(false)}
+        />
+      )}
 
       {/* TOP BAR */}
       <div className="bg-[var(--admin-card-bg)] border-b border-[var(--admin-border)] px-4 py-3 flex items-center gap-3 flex-wrap rounded-lg mb-4">
+        <Link
+          href="/admin/newsletter"
+          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[var(--admin-text-muted)] border border-[var(--admin-border)] rounded-lg hover:bg-[var(--admin-table-header-bg)] hover:text-[var(--admin-text)] transition"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Newsletter
+        </Link>
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="w-7 h-7 bg-[var(--admin-accent)]/20 rounded-lg flex items-center justify-center">
             <svg className="w-4 h-4 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
@@ -783,7 +861,7 @@ function CampaignNewInner() {
         />
       )}
 
-      {templatePickModal && !duplicating && (
+      {templatePickModal && !duplicating && !creatingTemplate && (
         <TemplatePicker
           template={templatePickModal}
           onUseAsIs={() => { applyTemplate(templatePickModal); setTemplatePickModal(null); }}
@@ -791,11 +869,13 @@ function CampaignNewInner() {
           onClose={() => setTemplatePickModal(null)}
         />
       )}
-      {duplicating && (
+      {(duplicating || creatingTemplate) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] p-8 flex flex-col items-center gap-3">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
-            <p className="text-sm font-semibold text-[var(--admin-text)]">Creating duplicate template…</p>
+            <p className="text-sm font-semibold text-[var(--admin-text)]">
+              {creatingTemplate ? "Creating template…" : "Creating duplicate template…"}
+            </p>
           </div>
         </div>
       )}

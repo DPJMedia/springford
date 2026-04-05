@@ -19,7 +19,7 @@ interface Campaign {
   id: string;
   name: string;
   subject: string;
-  status: "draft" | "sent";
+  status: "draft" | "sent" | "scheduled";
   recipients_type: string;
   template_id: string | null;
   preview_text: string;
@@ -38,7 +38,12 @@ interface Template {
   updated_at: string;
 }
 
-type CampaignFilter = "draft" | "sent";
+type CampaignFilter = "all" | "draft" | "sent";
+
+/** Match analytics sidebar filter chips (translucent orange + orange text when selected). */
+const navItemActive = "bg-[var(--admin-accent)]/20 text-[var(--admin-accent)]";
+const navItemInactive =
+  "text-[var(--admin-text)] hover:bg-[var(--admin-card-bg)]";
 
 // ─── Shared Modal Components ──────────────────────────────────────────────────
 
@@ -48,19 +53,19 @@ function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCance
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div className="bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="px-6 pt-6 pb-4">
-          <h2 className="text-base font-semibold text-[color:var(--color-dark)] mb-2">{title}</h2>
-          <p className="text-sm text-[color:var(--color-medium)]">{message}</p>
+          <h2 className="text-base font-semibold text-white mb-2">{title}</h2>
+          <p className="text-sm text-[var(--admin-text-muted)]">{message}</p>
         </div>
         <div className="px-6 pb-6 flex gap-3">
           <button onClick={onCancel}
-            className="flex-1 py-2.5 text-sm font-semibold border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition">
+            className="flex-1 py-2.5 text-sm font-semibold border border-[var(--admin-border)] text-[var(--admin-text-muted)] rounded-xl hover:bg-[var(--admin-table-header-bg)] transition">
             Cancel
           </button>
           <button onClick={onConfirm}
             className={`flex-1 py-2.5 text-sm font-semibold rounded-xl transition ${
-              danger ? "bg-red-600 text-white hover:bg-red-700" : "bg-[var(--admin-accent)] text-white hover:opacity-90"
+              danger ? "bg-red-600 text-white hover:bg-red-700" : "bg-[var(--admin-accent)] text-black hover:opacity-90"
             }`}>
             {confirmLabel || "Confirm"}
           </button>
@@ -79,21 +84,21 @@ function InputModal({ title, message, defaultValue, confirmLabel, onConfirm, onC
   useEffect(() => { inputRef.current?.focus(); inputRef.current?.select(); }, []);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div className="bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="px-6 pt-6 pb-4">
-          <h2 className="text-base font-semibold text-[color:var(--color-dark)] mb-1">{title}</h2>
-          <p className="text-sm text-[color:var(--color-medium)] mb-4">{message}</p>
+          <h2 className="text-base font-semibold text-white mb-1">{title}</h2>
+          <p className="text-sm text-[var(--admin-text-muted)] mb-4">{message}</p>
           <input ref={inputRef} type="text" value={value} onChange={(e) => setValue(e.target.value)}
-            className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]"
+            className="w-full px-3 py-2.5 text-sm border border-[var(--admin-border)] rounded-xl bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]"
             onKeyDown={(e) => { if (e.key === "Enter" && value.trim()) onConfirm(value.trim()); if (e.key === "Escape") onCancel(); }} />
         </div>
         <div className="px-6 pb-6 flex gap-3">
           <button onClick={onCancel}
-            className="flex-1 py-2.5 text-sm font-semibold border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition">
+            className="flex-1 py-2.5 text-sm font-semibold border border-[var(--admin-border)] text-[var(--admin-text-muted)] rounded-xl hover:bg-[var(--admin-table-header-bg)] transition">
             Cancel
           </button>
           <button onClick={() => value.trim() && onConfirm(value.trim())} disabled={!value.trim()}
-            className="flex-1 py-2.5 text-sm font-semibold bg-[var(--admin-accent)] text-white rounded-xl hover:opacity-90 transition disabled:opacity-40">
+            className="flex-1 py-2.5 text-sm font-semibold bg-[var(--admin-accent)] text-black rounded-xl hover:opacity-90 transition disabled:opacity-40">
             {confirmLabel || "Confirm"}
           </button>
         </div>
@@ -107,8 +112,13 @@ function InputModal({ title, message, defaultValue, confirmLabel, onConfirm, onC
 function StatusBadge({ status }: { status: string }) {
   const label =
     status === "sent" ? "Sent" : status === "scheduled" ? "Scheduled" : status === "draft" ? "Draft" : status;
+  const isSent = status === "sent";
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)]">
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] ${
+        isSent ? "text-emerald-400" : "text-[var(--admin-text)]"
+      }`}
+    >
       {label}
     </span>
   );
@@ -141,7 +151,7 @@ function NewsletterInner() {
 
   // Filters
   const [campaignSearch, setCampaignSearch] = useState("");
-  const [campaignFilter, setCampaignFilter] = useState<CampaignFilter>("sent");
+  const [campaignFilter, setCampaignFilter] = useState<CampaignFilter>("all");
   const [templateSearch, setTemplateSearch] = useState("");
 
   const supabase = createClient();
@@ -269,7 +279,12 @@ function NewsletterInner() {
     const matchesSearch = !campaignSearch ||
       c.name.toLowerCase().includes(campaignSearch.toLowerCase()) ||
       c.subject.toLowerCase().includes(campaignSearch.toLowerCase());
-    const matchesFilter = c.status === campaignFilter;
+    const matchesFilter =
+      campaignFilter === "all"
+        ? true
+        : campaignFilter === "draft"
+          ? c.status === "draft" || c.status === "scheduled"
+          : c.status === "sent";
     return matchesSearch && matchesFilter;
   });
 
@@ -284,7 +299,7 @@ function NewsletterInner() {
   // ── Stats ─────────────────────────────────────────────────────────────────────
 
   const sentCount = campaigns.filter((c) => c.status === "sent").length;
-  const draftCount = campaigns.filter((c) => c.status === "draft").length;
+  const draftCount = campaigns.filter((c) => c.status === "draft" || c.status === "scheduled").length;
 
   if (loading) {
     return (
@@ -299,18 +314,29 @@ function NewsletterInner() {
       attachBelowCreateButton
       sections={[
         {
-          title: "Actions",
-          items: [
-            {
-              icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              ),
-              label: "New Campaign",
-              href: "/admin/newsletter/campaigns/new",
-            },
-          ],
+          title: "Filter",
+          customContent: (
+            <div className="flex flex-col gap-1.5">
+              {(
+                [
+                  { key: "all" as const, label: "All campaigns" },
+                  { key: "draft" as const, label: "Drafts only" },
+                  { key: "sent" as const, label: "Sent only" },
+                ] as const
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setCampaignFilter(key)}
+                  className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all ${
+                    campaignFilter === key ? navItemActive : navItemInactive
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ),
         },
         ...(selectedCampaign
           ? [
@@ -388,20 +414,6 @@ function NewsletterInner() {
             <AdminActionsPanel
               attachBelowCreateButton
               sections={[
-                {
-                  title: "Actions",
-                  items: [
-                    {
-                      icon: (
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      ),
-                      label: "New Template",
-                      href: "/admin/newsletter/template-editor",
-                    },
-                  ],
-                },
                 {
                   title: "Stats",
                   items: [],
@@ -497,7 +509,7 @@ function NewsletterInner() {
           <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_16rem] xl:gap-x-6 xl:gap-y-16 xl:items-start">
             <div className="min-w-0 space-y-5 xl:col-span-2">
             <div className="flex flex-col sm:flex-row gap-3 mb-5 items-stretch">
-              <div className="relative min-w-0 sm:flex-[2]">
+              <div className="relative min-w-0 flex-1">
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 <input
                   type="text"
@@ -507,30 +519,6 @@ function NewsletterInner() {
                   className="w-full pl-9 pr-4 py-2.5 text-sm border border-[var(--admin-border)] rounded-lg bg-[var(--admin-card-bg)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]/30 focus:border-[var(--admin-accent)]"
                 />
               </div>
-              <div className="flex gap-2 min-w-0 sm:flex-1">
-                <button
-                  type="button"
-                  onClick={() => setCampaignFilter("draft")}
-                  className={`flex-1 px-3 py-2.5 text-sm font-semibold rounded-lg transition ${
-                    campaignFilter === "draft"
-                      ? "bg-[var(--admin-accent)] text-black"
-                      : "bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
-                  }`}
-                >
-                  All drafts
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCampaignFilter("sent")}
-                  className={`flex-1 px-3 py-2.5 text-sm font-semibold rounded-lg transition ${
-                    campaignFilter === "sent"
-                      ? "bg-[var(--admin-accent)] text-black"
-                      : "bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
-                  }`}
-                >
-                  Sent
-                </button>
-              </div>
             </div>
 
             {filteredCampaigns.length === 0 ? (
@@ -539,10 +527,18 @@ function NewsletterInner() {
                   <svg className="w-8 h-8 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                 </div>
                 <p className="text-lg font-semibold text-[var(--admin-text)] mb-2">
-                  {campaignSearch ? "No matching campaigns" : `No ${campaignFilter === "draft" ? "draft" : "sent"} campaigns`}
+                  {campaignSearch
+                    ? "No matching campaigns"
+                    : campaignFilter === "all"
+                      ? "No campaigns yet"
+                      : campaignFilter === "draft"
+                        ? "No draft campaigns"
+                        : "No sent campaigns"}
                 </p>
                 <p className="text-sm text-[var(--admin-text-muted)] mb-6">
-                  {campaignSearch ? "Try adjusting your search." : "Create a campaign or switch between drafts and sent."}
+                  {campaignSearch
+                    ? "Try adjusting your search."
+                    : "Create a campaign or change the filter in the sidebar."}
                 </p>
                 {!campaignSearch && (
                   <Link href="/admin/newsletter/campaigns/new"
