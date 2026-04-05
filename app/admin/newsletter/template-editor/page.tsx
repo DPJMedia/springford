@@ -737,6 +737,14 @@ function TemplateEditorInner() {
     );
   }
 
+  const topBarBtn =
+    "text-sm transition flex-shrink-0 inline-flex items-center gap-1.5 border border-[var(--admin-border)] rounded-lg px-3 py-1.5 font-semibold text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-table-header-bg)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent";
+  const backArrowIcon = (
+    <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+    </svg>
+  );
+
   return (
     <>
       <AdminPageHeader title="Template Editor" />
@@ -747,42 +755,45 @@ function TemplateEditorInner() {
           <button
             type="button"
             onClick={() => router.push(decodeURIComponent(returnTo))}
-            className="text-sm text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition flex-shrink-0 flex items-center gap-1"
+            className={topBarBtn}
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            Back to Campaign
+            {backArrowIcon}
+            Campaign
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => router.push("/admin/newsletter")}
-          className="text-sm transition flex-shrink-0 flex items-center gap-1 border border-[var(--admin-border)] rounded-lg px-3 py-1.5 font-semibold text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-table-header-bg)]"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          Back to Newsletter
+        <button type="button" onClick={() => router.push("/admin/newsletter")} className={topBarBtn}>
+          {backArrowIcon}
+          Newsletter
         </button>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-7 h-7 bg-[var(--admin-accent)]/20 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-          </div>
-          <span className="text-xs font-semibold text-[var(--admin-accent)] uppercase tracking-wide">Template</span>
+        <div className="flex items-center gap-2 flex-1 min-w-[12rem]">
+          <span className="text-sm font-medium text-[var(--admin-text-muted)] shrink-0">Title:</span>
+          <input
+            type="text"
+            value={templateName}
+            onChange={(e) => {
+              setTemplateName(e.target.value);
+              scheduleSave(e.target.value, blocks, articleLayout);
+            }}
+            placeholder="Template name"
+            className="text-sm font-semibold text-[var(--admin-text)] bg-transparent border-0 border-b border-transparent focus:border-[var(--admin-border)] focus:outline-none focus:ring-0 flex-1 min-w-0 py-0.5"
+            aria-label="Template title"
+          />
         </div>
-        <input type="text" value={templateName}
-          onChange={(e) => { setTemplateName(e.target.value); scheduleSave(e.target.value, blocks, articleLayout); }}
-          placeholder="Template name"
-          className="text-base font-semibold text-[var(--admin-text)] bg-transparent border-0 focus:outline-none focus:ring-0 flex-1 min-w-0" />
-        {saveStatus === "saved" && <span className="text-xs text-green-400 font-medium">✓ Saved</span>}
-        {saveStatus === "error" && <span className="text-xs text-red-400 font-medium">Save failed</span>}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button onClick={() => setShowPreview(true)} className="px-3 py-1.5 text-xs font-semibold text-[var(--admin-text-muted)] border border-[var(--admin-border)] rounded-lg hover:bg-[var(--admin-table-header-bg)] transition flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-            Preview
-          </button>
-          <button onClick={handleSaveClick} disabled={saving}
-            className="px-4 py-1.5 text-xs font-semibold text-black bg-[var(--admin-accent)] rounded-lg hover:opacity-90 transition disabled:opacity-50">
-            {saving ? "Saving…" : "Save Template"}
-          </button>
-        </div>
+        {saveStatus === "saved" && <span className="text-xs text-green-400 font-medium shrink-0">✓ Saved</span>}
+        {saveStatus === "error" && <span className="text-xs text-red-400 font-medium shrink-0">Save failed</span>}
+        <button type="button" onClick={() => setShowPreview(true)} className={topBarBtn}>
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          Preview
+        </button>
+        <button type="button" onClick={handleSaveClick} disabled={saving} className={topBarBtn}>
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l3 3m0 0l-3 3m3-3H12" />
+          </svg>
+          {saving ? "Saving…" : "Save Template"}
+        </button>
       </div>
 
       {/* 3-COL LAYOUT */}

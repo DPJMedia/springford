@@ -600,6 +600,16 @@ function CampaignNewInner() {
     );
   }
 
+  const topBarBtn =
+    "text-sm transition flex-shrink-0 inline-flex items-center gap-1.5 border border-[var(--admin-border)] rounded-lg px-3 py-1.5 font-semibold text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-table-header-bg)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent";
+  const backArrowIcon = (
+    <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+    </svg>
+  );
+  const sendActionBtnFull =
+    "w-full py-3 text-sm font-semibold border border-[var(--admin-border)] rounded-lg flex items-center justify-center gap-2 text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] hover:bg-[var(--admin-table-header-bg)] transition disabled:opacity-40 disabled:cursor-not-allowed";
+
   return (
     <>
       <AdminPageHeader title="Campaign Editor" />
@@ -613,31 +623,48 @@ function CampaignNewInner() {
       )}
 
       {/* TOP BAR */}
-      <div className="bg-[var(--admin-card-bg)] border-b border-[var(--admin-border)] px-4 py-3 flex items-center gap-3 flex-wrap rounded-lg mb-4">
-        <Link
-          href="/admin/newsletter"
-          className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[var(--admin-text-muted)] border border-[var(--admin-border)] rounded-lg hover:bg-[var(--admin-table-header-bg)] hover:text-[var(--admin-text)] transition"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+      <div className="bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap mb-4">
+        <Link href="/admin/newsletter" className={topBarBtn}>
+          {backArrowIcon}
           Newsletter
         </Link>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-7 h-7 bg-[var(--admin-accent)]/20 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-          </div>
-          <span className="text-xs font-semibold text-[var(--admin-accent)] uppercase tracking-wide">Campaign</span>
+        <div className="flex items-center gap-2 flex-1 min-w-[12rem]">
+          <span className="text-sm font-medium text-[var(--admin-text-muted)] shrink-0">Title:</span>
+          <input
+            type="text"
+            value={campaignName}
+            disabled={isSent || isScheduled}
+            onChange={(e) => updateField({ name: e.target.value })}
+            placeholder="Campaign name"
+            className="text-sm font-semibold text-[var(--admin-text)] bg-transparent border-0 border-b border-transparent focus:border-[var(--admin-border)] focus:outline-none focus:ring-0 flex-1 min-w-0 py-0.5"
+            aria-label="Campaign title"
+          />
         </div>
-        <input type="text" value={campaignName} disabled={isSent || isScheduled}
-          onChange={(e) => updateField({ name: e.target.value })}
-          className="text-base font-semibold text-[var(--admin-text)] bg-transparent border-0 focus:outline-none focus:ring-0 flex-1 min-w-0" />
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
           {saveStatus === "saved" && <span className="text-xs text-green-400 font-medium">✓ Saved</span>}
           {saveStatus === "error" && <span className="text-xs text-red-400 font-medium">Save failed</span>}
           {isSent && <span className="text-xs bg-green-900/40 border border-green-700/40 text-green-400 px-2 py-0.5 rounded-full font-semibold">Sent</span>}
-          {isScheduled && <span className="text-xs bg-amber-900/40 border border-amber-700/40 text-amber-400 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Scheduled</span>}
-          {!isSent && !isScheduled && <button onClick={() => handleSend(true)} disabled={sending || !selectedTemplate} className="px-3 py-1.5 text-xs font-semibold text-[var(--admin-accent)] border border-[var(--admin-accent)] rounded-lg hover:bg-[var(--admin-accent)]/10 transition disabled:opacity-40">Send Test</button>}
+          {isScheduled && (
+            <span className="text-xs bg-amber-900/40 border border-amber-700/40 text-amber-400 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Scheduled
+            </span>
+          )}
+          {!isSent && !isScheduled && (
+            <button
+              type="button"
+              onClick={() => handleSend(true)}
+              disabled={sending || !selectedTemplate}
+              className={topBarBtn}
+            >
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+              </svg>
+              Send Test
+            </button>
+          )}
         </div>
       </div>
 
@@ -786,12 +813,6 @@ function CampaignNewInner() {
               </div>
             </div>
 
-            {/* Campaign Name */}
-            <div>
-              <label className="block text-xs font-semibold text-[var(--admin-text-muted)] uppercase tracking-wide mb-1.5">Campaign name <span className="text-[var(--admin-text-muted)] font-normal normal-case">(internal)</span></label>
-              <input type="text" value={campaignName} disabled={isSent || isScheduled} onChange={(e) => updateField({ name: e.target.value })} placeholder="e.g. March 4 Weekly Briefing"
-                className="w-full px-3 py-2 text-sm border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)] disabled:opacity-50 placeholder:text-[var(--admin-text-muted)]" />
-            </div>
           </div>
 
           {/* ── BOTTOM ACTION BUTTONS ── */}
@@ -813,13 +834,32 @@ function CampaignNewInner() {
                 className="w-full py-2.5 text-sm font-semibold text-[var(--admin-text)] border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] hover:bg-[var(--admin-table-row-hover)] rounded-lg transition disabled:opacity-40">
                 {saving ? "Saving…" : "Save Draft"}
               </button>
-              <button onClick={() => handleSend(false)} disabled={sending || !selectedTemplate || !subject.trim()}
-                className="w-full py-3 text-sm font-semibold text-black bg-[var(--admin-accent)] rounded-lg hover:opacity-90 transition disabled:opacity-40 flex items-center justify-center gap-2">
-                {sending
-                  ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-black border-r-transparent" /> {scheduledAt && new Date(scheduledAt) > new Date() ? "Scheduling…" : "Sending…"}</>
-                  : scheduledAt && new Date(scheduledAt) > new Date()
-                    ? <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Confirm Schedule</>
-                    : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>Send Campaign</>}
+              <button
+                type="button"
+                onClick={() => handleSend(false)}
+                disabled={sending || !selectedTemplate || !subject.trim()}
+                className={sendActionBtnFull}
+              >
+                {sending ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--admin-text-muted)] border-r-transparent" />
+                    {scheduledAt && new Date(scheduledAt) > new Date() ? "Scheduling…" : "Sending…"}
+                  </>
+                ) : scheduledAt && new Date(scheduledAt) > new Date() ? (
+                  <>
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Confirm Schedule
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Send Campaign
+                  </>
+                )}
               </button>
               <p className="text-[10px] text-[var(--admin-text-muted)] text-center">Use &ldquo;Super Admins Only&rdquo; to review before sending to all subscribers.</p>
             </div>
