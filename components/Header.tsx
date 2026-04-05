@@ -8,6 +8,7 @@ import { Avatar } from "./Avatar";
 import { normalizeAvatarUrl } from "@/lib/user/display";
 import { NotificationBell } from "./NotificationBell";
 import { SearchDropdown } from "./SearchDropdown";
+import { trackSectionClick } from "@/lib/analytics/tracker";
 
 export function Header() {
   const [user, setUser] = useState<User | null>(null);
@@ -168,16 +169,16 @@ export function Header() {
   }, [showMobileUserMenu]);
 
   return (
-    <header className="sticky top-0 z-20 bg-white relative">
+    <header className="sticky top-0 z-20 bg-[color:var(--color-off-white)] relative">
       {/* Full two-row header sticks together (LA Times style) */}
-      <div className="border-b border-[color:var(--color-border)] bg-white backdrop-blur">
+      <div className="relative z-30 border-b border-black/10 bg-[color:var(--color-off-white)] backdrop-blur">
         <div className="mx-auto grid w-full max-w-none grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2 sm:px-6 lg:px-8">
           {/* Left: Search button (all breakpoints) */}
           <div className="flex min-w-0 items-center justify-start gap-2">
             <button
               onClick={() => { setShowMobileNav(false); setShowSearch(!showSearch); }}
               data-search-toggle="true"
-              className="p-2 rounded-full hover:bg-gray-100 transition text-[color:var(--color-dark)]"
+              className="p-2 rounded-full hover:bg-black/10 transition text-[color:var(--color-dark)]"
               aria-label="Search"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -199,7 +200,7 @@ export function Header() {
             <div className="flex xl:hidden items-center ml-auto">
               <button
                 onClick={() => setShowMobileNav(!showMobileNav)}
-                className="p-2 rounded-md hover:bg-gray-100"
+                className="p-2 rounded-md hover:bg-black/10"
                 aria-label="Toggle menu"
               >
                 <svg className="w-6 h-6 text-[color:var(--color-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,10 +217,10 @@ export function Header() {
             <div className="hidden xl:flex items-center gap-2 flex-shrink-0 justify-end">
               {user ? (
                 <>
-                  <Link href="/advertise" className="inline-flex h-9 items-center rounded-full border border-[color:var(--color-border)] bg-white px-3 sm:px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0">
+                  <Link href="/advertise" className="inline-flex h-9 items-center rounded-full border border-black/20 px-3 sm:px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-black/10 transition flex-shrink-0">
                     Advertise
                   </Link>
-                  <Link href="/support" className="inline-flex h-9 items-center rounded-full border border-[color:var(--color-border)] bg-white px-3 sm:px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0">
+                  <Link href="/support" className="inline-flex h-9 items-center rounded-full border border-black/20 px-3 sm:px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-black/10 transition flex-shrink-0">
                     Support
                   </Link>
                   {!newsletterSubscribed && (
@@ -230,7 +231,7 @@ export function Header() {
                   <div className="relative user-menu flex items-center">
                     <button
                       onClick={() => setShowMenu(!showMenu)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white hover:bg-gray-100 transition flex-shrink-0"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/10 transition flex-shrink-0"
                       aria-label="Open user menu"
                     >
                       <span className="relative inline-flex flex-shrink-0">
@@ -278,7 +279,7 @@ export function Header() {
                             )}
                             {isAdmin && <div className="border-t border-gray-100" />}
                             {isAdmin && (
-                              <Link href="/admin" onClick={() => setShowMenu(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-[color:var(--color-dark)] hover:bg-gray-100">
+                              <Link href="/admin/articles" onClick={() => setShowMenu(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-[color:var(--color-dark)] hover:bg-gray-100">
                                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                 Dashboard
                               </Link>
@@ -301,16 +302,16 @@ export function Header() {
                 </>
               ) : (
                 <>
-                  <Link href="/advertise" className="inline-flex h-9 items-center rounded-full border border-[color:var(--color-border)] bg-white px-3 sm:px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0">
+                  <Link href="/advertise" className="inline-flex h-9 items-center rounded-full border border-black/20 px-3 sm:px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-black/10 transition flex-shrink-0">
                     Advertise
                   </Link>
-                  <Link href="/support" className="inline-flex h-9 items-center rounded-full border border-[color:var(--color-border)] bg-white px-3 sm:px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition flex-shrink-0">
+                  <Link href="/support" className="inline-flex h-9 items-center rounded-full border border-black/20 px-3 sm:px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-black/10 transition flex-shrink-0">
                     Support
                   </Link>
                   <Link href="/subscribe" className="rounded-full bg-[color:var(--color-riviera-blue)] px-3 sm:px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition flex-shrink-0">
                     Subscribe
                   </Link>
-                  <Link href="/login" className="rounded-full bg-[color:var(--color-riviera-blue)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-opacity-90">
+                  <Link href="/login" className="rounded-full bg-[color:var(--color-riviera-blue)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
                     Log in
                   </Link>
                 </>
@@ -320,15 +321,19 @@ export function Header() {
         </div>
       </div>
 
-      {/* Section strip: section links centered (desktop only, 1280px+) */}
-      <div className="hidden xl:block border-b border-[color:var(--color-border)] bg-white">
+      {/* Section strip: below top row; lower z-index so user/search popovers from the row above stay on top */}
+      <div
+        className="relative z-10 hidden xl:block border-b border-black/10 bg-white/80 backdrop-blur"
+        style={{ backgroundColor: "rgba(250,250,250,0.85)" }}
+      >
         <div className="flex items-center justify-center px-4 py-3">
-          <nav className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1 text-[color:var(--color-dark)]">
+          <nav className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
             {nav.map((item) => (
               <a
                 key={item.label}
                 href={item.href}
-                className="rounded-md px-3 py-1.5 text-sm font-semibold transition hover:bg-gray-100 whitespace-nowrap flex-shrink-0"
+                onClick={() => trackSectionClick({ sectionName: item.slug, clickedFromPage: window.location.pathname, userId: user?.id })}
+                className="rounded-md px-3 py-1.5 text-sm font-semibold transition hover:bg-black/10 text-[color:var(--color-dark)] whitespace-nowrap flex-shrink-0"
               >
                 {item.label}
               </a>
@@ -342,22 +347,22 @@ export function Header() {
 
       {/* Hamburger dropdown - user account at top, then sections, Advertise, Support, Subscribe (shown below 1280px) */}
       {showMobileNav && (
-        <div className="xl:hidden border-t border-[color:var(--color-border)] bg-white">
+        <div className="xl:hidden border-t border-black/10 bg-[color:var(--color-off-white)]">
           {/* When not logged in, show Log in at top only */}
           {!user && (
-            <div className="px-4 py-3 border-b border-[color:var(--color-border)] bg-gray-50">
-              <Link href="/login" onClick={() => setShowMobileNav(false)} className="flex items-center justify-center gap-2 rounded-full bg-[color:var(--color-riviera-blue)] px-4 py-3 text-sm font-semibold text-white hover:bg-opacity-90 transition">
+            <div className="px-4 py-3 border-b border-black/10">
+              <Link href="/login" onClick={() => setShowMobileNav(false)} className="flex items-center justify-center gap-2 rounded-full bg-[color:var(--color-riviera-blue)] px-4 py-3 text-sm font-semibold text-white hover:opacity-90 transition">
                 Log in
               </Link>
             </div>
           )}
-          <nav className="px-4 py-3 space-y-1 border-b border-[color:var(--color-border)]">
+          <nav className="px-4 py-3 space-y-1 border-b border-black/10">
             {nav.map((item) => (
               <a
                 key={item.label}
                 href={item.href}
-                onClick={() => setShowMobileNav(false)}
-                className="block px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-100 rounded-md transition"
+                onClick={() => { setShowMobileNav(false); trackSectionClick({ sectionName: item.slug, clickedFromPage: window.location.pathname, userId: user?.id }); }}
+                className="block px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-black/10 rounded-md transition"
               >
                 {item.label}
               </a>
@@ -365,10 +370,10 @@ export function Header() {
           </nav>
           {/* Bottom row: Advertise, Support, Subscribe, and (when logged in) user pfp that opens Dashboard / My Profile / Log out */}
           <div className="px-4 py-3 flex flex-wrap items-center gap-2">
-            <Link href="/advertise" onClick={() => setShowMobileNav(false)} className="rounded-full border border-[color:var(--color-border)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition">
+            <Link href="/advertise" onClick={() => setShowMobileNav(false)} className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-black/10 transition">
               Advertise
             </Link>
-            <Link href="/support" onClick={() => setShowMobileNav(false)} className="rounded-full border border-[color:var(--color-border)] bg-white px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-50 transition">
+            <Link href="/support" onClick={() => setShowMobileNav(false)} className="rounded-full border border-black/20 px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-black/10 transition">
               Support
             </Link>
             {(!user || !newsletterSubscribed) && (
@@ -381,7 +386,7 @@ export function Header() {
                 <button
                   type="button"
                   onClick={() => setShowMobileUserMenu(!showMobileUserMenu)}
-                  className="rounded-full p-1 hover:bg-gray-100 transition flex-shrink-0"
+                  className="rounded-full p-1 hover:bg-black/10 transition flex-shrink-0"
                   aria-label="Account menu"
                 >
                   <span className="relative inline-flex flex-shrink-0">
@@ -395,7 +400,7 @@ export function Header() {
                   <div className="absolute right-0 bottom-full mb-2 w-56 rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-[55] overflow-hidden">
                     <div className="py-1">
                       {isAdmin && (
-                        <Link href="/admin" onClick={() => { setShowMobileNav(false); setShowMobileUserMenu(false); }} className="flex items-center gap-2 px-4 py-2 text-sm text-[color:var(--color-dark)] hover:bg-gray-100">
+                        <Link href="/admin/articles" onClick={() => { setShowMobileNav(false); setShowMobileUserMenu(false); }} className="flex items-center gap-2 px-4 py-2 text-sm text-[color:var(--color-dark)] hover:bg-gray-100">
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                           Dashboard
                         </Link>

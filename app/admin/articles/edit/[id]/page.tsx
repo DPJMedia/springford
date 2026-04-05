@@ -3,7 +3,8 @@
 import { useState, useEffect, use } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import type { Article, ArticleVisibility } from "@/lib/types/database";
 import { ArticleVisibilitySelector } from "@/components/ArticleVisibilitySelector";
 import { BlockEditor, ContentBlock } from "@/components/BlockEditor";
@@ -343,10 +344,10 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading article...</p>
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-solid border-[var(--admin-accent)] border-r-transparent" />
+          <p className="text-sm text-[var(--admin-text-muted)]">Loading article…</p>
         </div>
       </div>
     );
@@ -354,51 +355,30 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
 
   if (!isAdmin || !article) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-600">Article not found or access denied</p>
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <p className="text-red-400">Article not found or access denied</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-5xl mx-auto px-4">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <Link
-              href="/admin/articles"
-              className="text-blue-600 hover:underline flex items-center gap-1"
-            >
-              ← Back to Articles
-            </Link>
-            <Link
-              href="/admin/diffuse"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black text-white text-sm font-semibold hover:opacity-90 transition shadow-sm"
-              style={{ fontFamily: 'var(--font-space-grotesk)' }}
-            >
-              <span><span className="text-white">diffuse</span><span className="text-[#ff9628]">.ai</span></span>
-              <span className="text-white">integration</span>
-            </Link>
-          </div>
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-black text-gray-900">Edit Article</h1>
-            <span className="text-sm text-gray-500">
-              Last updated: {new Date(article.updated_at).toLocaleString()}
-            </span>
-          </div>
-        </div>
+    <>
+      <AdminPageHeader
+        title="Edit Article"
+        description={`Last updated: ${new Date(article.updated_at).toLocaleString()}`}
+      />
+      <AdminPageLayout>
 
         {error && (
-          <div className="bg-red-50 border border-red-300 text-red-800 rounded-lg p-4 mb-6">
+          <div className="bg-red-950/30 border border-red-800/50 text-red-400 rounded-lg p-4 mb-6">
             {error}
           </div>
         )}
 
         <form className="space-y-6">
           {/* Basic Info */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Basic Information</h2>
+          <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Basic Information</h2>
             
             <div className="space-y-4">
               {/* Author Selection */}
@@ -416,14 +396,14 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       setAuthorName("Powered by diffuse.ai");
                     }
                   }}
-                  className="w-5 h-5 text-[#ff9628] bg-white border-gray-300 rounded focus:ring-[#ff9628] focus:ring-2 cursor-pointer"
+                  className="w-5 h-5 accent-[#ff9628] border-[var(--admin-border)] rounded focus:ring-[#ff9628] focus:ring-2 cursor-pointer"
                 />
                 <label 
                   htmlFor="powered-by-diffuse" 
-                  className="text-sm font-bold cursor-pointer select-none"
+                  className="text-sm font-semibold cursor-pointer select-none text-[var(--admin-text)]"
                   style={{ fontFamily: 'var(--font-space-grotesk)' }}
                 >
-                  Use "<span className="text-gray-900">Powered by </span><span className="text-gray-900">diffuse</span><span className="text-[#ff9628]">.ai</span>" as author
+                  Use &ldquo;Powered by diffuse<span className="text-[#ff9628]">.ai</span>&rdquo; as author
                 </label>
               </div>
 
@@ -432,7 +412,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                 <button
                   type="button"
                   onClick={() => setShowCoAuthor(true)}
-                  className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700 transition"
+                  className="flex items-center gap-2 text-sm font-semibold text-[var(--admin-accent)] hover:opacity-80 transition"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -442,7 +422,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="block text-sm font-semibold text-gray-900">
+                    <label className="block text-sm font-semibold text-[var(--admin-text)]">
                       Co-Author
                     </label>
                     <button
@@ -451,67 +431,67 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                         setShowCoAuthor(false);
                         setCoAuthorName("");
                       }}
-                      className="text-sm font-semibold text-red-600 hover:text-red-700 transition"
+                      className="text-sm font-semibold text-red-400 hover:text-red-300 transition"
                     >
                       Remove
                     </button>
                   </div>
                   <AuthorSelector value={coAuthorName} onChange={setCoAuthorName} />
-                  <p className="text-xs text-gray-500">
-                    Both authors will be displayed with their profile pictures and an "&" between their names.
+                  <p className="text-xs text-[var(--admin-text-muted)]">
+                    Both authors will be displayed with their profile pictures and an &ldquo;&amp;&rdquo; between their names.
                   </p>
                 </div>
               )}
 
               {/* Is the article an advertisement? */}
-              <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-3 p-4 bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] rounded-lg">
                 <input
                   type="checkbox"
                   id="is-advertisement"
                   checked={isAdvertisement}
                   onChange={(e) => setIsAdvertisement(e.target.checked)}
-                  className="w-5 h-5 text-[color:var(--color-riviera-blue)] bg-white border-gray-300 rounded focus:ring-[color:var(--color-riviera-blue)] focus:ring-2 cursor-pointer"
+                  className="w-5 h-5 accent-[var(--admin-accent)] border-[var(--admin-border)] rounded focus:ring-[var(--admin-accent)] focus:ring-2 cursor-pointer"
                 />
-                <label htmlFor="is-advertisement" className="text-sm font-medium text-gray-900 cursor-pointer">
+                <label htmlFor="is-advertisement" className="text-sm font-medium text-[var(--admin-text)] cursor-pointer">
                   Is the article an advertisement?
                 </label>
                 <Tooltip text="When checked, a subtle 'Advertisement' label will appear on this article in the feed and on the article page so readers know it's sponsored content." />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2">
                   Title *
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)] focus:border-[var(--admin-accent)]"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2">
                   Subtitle
                 </label>
                 <input
                   type="text"
                   value={subtitle}
                   onChange={(e) => setSubtitle(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-4 py-2"
+                  className="w-full border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md px-4 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--admin-accent)]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2">
                   Excerpt *
                 </label>
                 <textarea
                   value={excerpt}
                   onChange={(e) => setExcerpt(e.target.value)}
                   rows={3}
-                  className="w-full border border-gray-300 rounded-md px-4 py-2"
+                  className="w-full border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md px-4 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--admin-accent)]"
                   required
                 />
               </div>
@@ -525,19 +505,19 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           />
 
           {/* Featured Image */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Featured Image (Cover)</h2>
+          <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Featured Image (Cover)</h2>
             
             {/* Toggle */}
-            <div className="flex items-center gap-3 mb-4 p-4 bg-gray-50 rounded-lg">
-              <label className="text-sm font-semibold text-gray-900">
+            <div className="flex items-center gap-3 mb-4 p-4 bg-[var(--admin-table-header-bg)] rounded-lg">
+              <label className="text-sm font-semibold text-[var(--admin-text)]">
                 Use Featured Image:
               </label>
               <button
                 type="button"
                 onClick={() => setUseFeaturedImage(!useFeaturedImage)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-                  useFeaturedImage ? "bg-blue-600" : "bg-gray-300"
+                  useFeaturedImage ? "bg-[var(--admin-accent)]" : "bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)]"
                 }`}
               >
                 <span
@@ -546,7 +526,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                   }`}
                 />
               </button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-[var(--admin-text-muted)]">
                 {useFeaturedImage ? "Yes" : "No"}
               </span>
             </div>
@@ -555,9 +535,9 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
               <div className="space-y-4">
                 {!imagePreview && !currentImageUrl ? (
                   <div>
-                    <label className="block w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition cursor-pointer">
+                    <label className="block w-full border-2 border-dashed border-[var(--admin-border)] rounded-lg p-8 text-center hover:border-[var(--admin-accent)] transition cursor-pointer bg-[var(--admin-table-header-bg)]">
                       <svg
-                        className="mx-auto h-12 w-12 text-gray-400"
+                        className="mx-auto h-12 w-12 text-[var(--admin-text-muted)]"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -569,7 +549,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
-                      <p className="mt-2 text-sm text-gray-600">
+                      <p className="mt-2 text-sm text-[var(--admin-text-muted)]">
                         Click to upload new featured image
                       </p>
                       <input
@@ -595,7 +575,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       Remove
                     </button>
                     {!imagePreview && currentImageUrl && (
-                      <label className="absolute bottom-2 right-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 cursor-pointer">
+                      <label className="absolute bottom-2 right-2 bg-[var(--admin-accent)] text-black px-4 py-2 rounded-lg hover:opacity-90 cursor-pointer">
                         Change Image
                         <input
                           type="file"
@@ -614,14 +594,14 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       type="text"
                       value={imageCaption}
                       onChange={(e) => setImageCaption(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-4 py-2"
+                      className="w-full border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md px-4 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--admin-accent)]"
                       placeholder="Image caption (optional)"
                     />
                     <input
                       type="text"
                       value={imageCredit}
                       onChange={(e) => setImageCredit(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-4 py-2"
+                      className="w-full border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md px-4 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--admin-accent)]"
                       placeholder="Photo credit (optional)"
                     />
                   </>
@@ -630,32 +610,32 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
             )}
 
             {!useFeaturedImage && (
-              <p className="text-sm text-gray-600 italic">
+              <p className="text-sm text-[var(--admin-text-muted)] italic">
                 No featured image will be displayed.
               </p>
             )}
           </div>
 
           {/* Content Blocks */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Article Content</h2>
+          <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Article Content</h2>
             <BlockEditor blocks={contentBlocks} onChange={setContentBlocks} />
           </div>
 
           {/* Sections */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Sections *</h2>
+          <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Sections *</h2>
             <SectionSelector selectedSections={sections} onChange={setSections} />
           </div>
 
           {/* Category & Tags */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Category & Tags</h2>
+          <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Category & Tags</h2>
             <div className="space-y-4">
               <CategorySelector value={category} onChange={setCategory} />
 
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2">
                   Tags
                 </label>
                 <TagSelector selectedTags={tags} onChange={setTags} />
@@ -664,15 +644,15 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           </div>
 
           {/* Options */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Article Options</h2>
+          <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Article Options</h2>
             <div className="space-y-3">
               <label className="flex items-center gap-3">
                 <input
                   type="checkbox"
                   checked={isFeatured}
                   onChange={(e) => setIsFeatured(e.target.checked)}
-                  className="w-5 h-5"
+                  className="w-5 h-5 accent-[var(--admin-accent)]"
                 />
                 <span className="text-sm font-medium flex items-center">
                   Featured Article (Top Stories)
@@ -686,7 +666,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                     type="checkbox"
                     checked={isBreaking}
                     onChange={(e) => setIsBreaking(e.target.checked)}
-                    className="w-5 h-5"
+                    className="w-5 h-5 accent-[var(--admin-accent)]"
                   />
                   <span className="text-sm font-medium flex items-center">
                     Breaking News
@@ -695,8 +675,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                 </label>
 
                 {isBreaking && (
-                  <div className="ml-8 p-4 bg-red-50 rounded-lg border border-red-200">
-                    <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                  <div className="ml-8 p-4 bg-red-950/20 rounded-lg border border-red-800/40">
+                    <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2 flex items-center">
                       Breaking News Duration (hours)
                       <Tooltip text="How many hours this article should remain as breaking news. After this duration, it will automatically stop showing in the breaking news banner. Default is 24 hours." />
                     </label>
@@ -706,9 +686,9 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       onChange={(e) => setBreakingNewsDuration(Math.max(1, parseInt(e.target.value) || 24))}
                       min="1"
                       max="168"
-                      className="w-32 border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      className="w-32 border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md px-3 py-2 text-sm"
                     />
-                    <p className="text-xs text-gray-600 mt-1">
+                    <p className="text-xs text-[var(--admin-text-muted)] mt-1">
                       Breaking news will expire after {breakingNewsDuration} hour{breakingNewsDuration !== 1 ? 's' : ''} and automatically stop displaying in the banner.
                     </p>
                   </div>
@@ -719,11 +699,11 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           </div>
 
           {/* SEO */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">SEO Settings</h2>
+          <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">SEO Settings</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2">
                   Meta Title (for Google)
                 </label>
                 <input
@@ -731,15 +711,15 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                   value={metaTitle}
                   onChange={(e) => setMetaTitle(e.target.value)}
                   maxLength={60}
-                  className="w-full border border-gray-300 rounded-md px-4 py-2"
+                  className="w-full border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md px-4 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--admin-accent)]"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[var(--admin-text-muted)] mt-1">
                   {metaTitle.length}/60 characters
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2">
                   Meta Description (for Google)
                 </label>
                 <textarea
@@ -747,9 +727,9 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                   onChange={(e) => setMetaDescription(e.target.value)}
                   maxLength={160}
                   rows={3}
-                  className="w-full border border-gray-300 rounded-md px-4 py-2"
+                  className="w-full border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md px-4 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--admin-accent)]"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[var(--admin-text-muted)] mt-1">
                   {metaDescription.length}/160 characters
                 </p>
               </div>
@@ -757,8 +737,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           </div>
 
           {/* Publishing Options */}
-          <div className="bg-white rounded-lg p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+          <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] p-6">
+            <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
               {article?.status === "published" ? "Update Article" : "Publishing"}
               <Tooltip text={article?.status === "published" ? "Update your published article immediately or schedule the changes for later." : "Control when your article goes live. You can publish immediately, save as a draft to work on later, or schedule it to publish automatically at a future date and time."} />
             </h2>
@@ -767,8 +747,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
               {/* For published articles - show update options */}
               {article?.status === "published" ? (
                 <>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-blue-900">
+                  <div className="bg-[var(--admin-accent)]/10 border border-[var(--admin-accent)]/30 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-[var(--admin-text)]">
                       <strong>Note:</strong> This article is currently published and visible to readers. 
                       You can update it immediately or schedule the changes for later.
                     </p>
@@ -776,7 +756,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
 
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <label className="text-sm font-semibold text-gray-900 flex items-center">
+                      <label className="text-sm font-semibold text-[var(--admin-text)] flex items-center">
                         Schedule Update For (optional)
                         <Tooltip text="Schedule when these changes should go live. Leave empty to update the article immediately. The updated version will replace the current version at the scheduled time." />
                       </label>
@@ -792,7 +772,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       type="button"
                       onClick={() => handleUpdate("publish")}
                       disabled={saving}
-                      className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-semibold"
+                      className="flex-1 px-6 py-3 bg-[var(--admin-accent)] text-black rounded-lg hover:opacity-90 disabled:opacity-50 font-semibold"
                     >
                       {saving ? "Updating..." : "Update Article Now"}
                     </button>
@@ -801,13 +781,13 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       type="button"
                       onClick={() => handleUpdate("schedule")}
                       disabled={saving || !scheduledFor}
-                      className="flex-1 px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 font-semibold"
+                      className="flex-1 px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 font-semibold"
                     >
                       Schedule Update
                     </button>
                   </div>
 
-                  <div className="pt-2 text-xs text-gray-600 border-t mt-4">
+                  <div className="pt-2 text-xs text-[var(--admin-text-muted)] border-t border-[var(--admin-border)] mt-4">
                     <p>• <strong>Update Article Now:</strong> Changes go live immediately</p>
                     <p>• <strong>Schedule Update:</strong> Changes go live at the date/time you set above</p>
                   </div>
@@ -817,7 +797,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                 <>
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <label className="text-sm font-semibold text-gray-900 flex items-center">
+                      <label className="text-sm font-semibold text-[var(--admin-text)] flex items-center">
                         Schedule For (optional)
                         <Tooltip text="Set a specific date and time (Eastern Time) for this article to be automatically published. Leave empty to publish immediately or save as draft." />
                       </label>
@@ -833,7 +813,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       type="button"
                       onClick={() => handleUpdate("draft")}
                       disabled={saving}
-                      className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 font-semibold"
+                      className="px-6 py-3 bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] text-[var(--admin-text)] rounded-lg hover:bg-[var(--admin-table-row-hover)] disabled:opacity-50 font-semibold"
                     >
                       Save as Draft
                     </button>
@@ -842,7 +822,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       type="button"
                       onClick={() => handleUpdate("schedule")}
                       disabled={saving || !scheduledFor}
-                      className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 font-semibold"
+                      className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 font-semibold"
                     >
                       Schedule
                     </button>
@@ -851,13 +831,13 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       type="button"
                       onClick={() => handleUpdate("publish")}
                       disabled={saving}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-semibold"
+                      className="px-6 py-3 bg-[var(--admin-accent)] text-black rounded-lg hover:opacity-90 disabled:opacity-50 font-semibold"
                     >
                       {saving ? "Publishing..." : "Publish Now"}
                     </button>
                   </div>
 
-                  <div className="pt-2 space-y-1 text-xs text-gray-600 border-t">
+                  <div className="pt-2 space-y-1 text-xs text-[var(--admin-text-muted)] border-t border-[var(--admin-border)]">
                     <p>• <strong>Save as Draft:</strong> Article saved but NOT visible to public</p>
                     <p>• <strong>Schedule:</strong> Article will auto-publish at the date/time you set above</p>
                     <p>• <strong>Publish Now:</strong> Article goes live immediately</p>
@@ -867,7 +847,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
         </form>
-      </div>
-    </div>
+      </AdminPageLayout>
+    </>
   );
 }

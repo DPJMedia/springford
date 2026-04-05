@@ -34,18 +34,18 @@ function PlacementCheck({
   return (
     <label
       htmlFor={id}
-      className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-100 bg-slate-50/80 p-4 transition-colors hover:bg-slate-50"
+      className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] p-4 transition-colors hover:bg-[var(--admin-table-row-hover)]"
     >
       <input
         id={id}
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-[color:var(--color-riviera-blue)] focus:ring-[color:var(--color-riviera-blue)]"
+        className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--admin-border)] accent-[var(--admin-accent)] focus:ring-[var(--admin-accent)]"
       />
       <span>
-        <span className="block font-bold text-[color:var(--color-dark)]">{label}</span>
-        <span className="mt-0.5 block text-xs text-[color:var(--color-medium)]">{sub}</span>
+        <span className="block font-semibold text-[var(--admin-text)]">{label}</span>
+        <span className="mt-0.5 block text-xs text-[var(--admin-text-muted)]">{sub}</span>
       </span>
     </label>
   );
@@ -73,7 +73,7 @@ export function PackageBuilderSection({ pkg, onChange }: Props) {
     onChange("includeMobileArticle", on);
   }
 
-  const inp = "w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold";
+  const inp = "w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold focus:border-[var(--admin-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--admin-accent)]";
   const inpNarrow = `${inp} max-w-xs`;
 
   return (
@@ -89,7 +89,7 @@ export function PackageBuilderSection({ pkg, onChange }: Props) {
             emptyFallback={1}
             className={inpNarrow}
           />
-          <p className="mt-1 text-xs text-[color:var(--color-medium)]">
+          <p className="mt-1 text-xs text-[var(--admin-text-muted)]">
             Site ad placements below run for the full campaign when enabled (every month in this
             window).
           </p>
@@ -108,8 +108,8 @@ export function PackageBuilderSection({ pkg, onChange }: Props) {
               emptyFallback={0}
               className={inp}
             />
-            <p className="mt-1 text-xs text-[color:var(--color-medium)]">
-              Max <strong>{maxSponsored}</strong> (one per month per advertiser) · $
+            <p className="mt-1 text-xs text-[var(--admin-text-muted)]">
+              Max <strong className="text-[var(--admin-text)]">{maxSponsored}</strong> (one per month per advertiser) · $
               {RATES_USD.sponsoredArticle} each
             </p>
           </Field>
@@ -122,9 +122,9 @@ export function PackageBuilderSection({ pkg, onChange }: Props) {
               emptyFallback={0}
               className={inp}
             />
-            <p className="mt-1 text-xs text-[color:var(--color-medium)]">
-              Max <strong>{MAX_NEWSLETTER_SENDS_PER_MONTH}</strong>/mo · Total sends{" "}
-              <strong>{totalNewsletterSends(pkg)}</strong> · ${RATES_USD.newsletterSend}/send
+            <p className="mt-1 text-xs text-[var(--admin-text-muted)]">
+              Max <strong className="text-[var(--admin-text)]">{MAX_NEWSLETTER_SENDS_PER_MONTH}</strong>/mo · Total sends{" "}
+              <strong className="text-[var(--admin-text)]">{totalNewsletterSends(pkg)}</strong> · ${RATES_USD.newsletterSend}/send
             </p>
           </Field>
           <Field label="Newsletter spotlight sections (total)" className="sm:col-span-2">
@@ -136,8 +136,8 @@ export function PackageBuilderSection({ pkg, onChange }: Props) {
               emptyFallback={0}
               className={inp}
             />
-            <p className="mt-1 text-xs text-[color:var(--color-medium)]">
-              Max <strong>{MAX_NEWSLETTER_SPOTLIGHTS_PER_MONTH}</strong>/mo (
+            <p className="mt-1 text-xs text-[var(--admin-text-muted)]">
+              Max <strong className="text-[var(--admin-text)]">{MAX_NEWSLETTER_SPOTLIGHTS_PER_MONTH}</strong>/mo (
               {maxSpot} this campaign) · ${RATES_USD.newsletterSpotlight} each
             </p>
           </Field>
@@ -155,14 +155,14 @@ export function PackageBuilderSection({ pkg, onChange }: Props) {
             emptyFallback={0}
             className={inpNarrow}
           />
-          <p className="mt-1 text-xs text-[color:var(--color-medium)]">${RATES_USD.facebookBoost} each</p>
+          <p className="mt-1 text-xs text-[var(--admin-text-muted)]">${RATES_USD.facebookBoost} each</p>
         </Field>
       </Card>
 
       {/* Desktop */}
       <Card title="Desktop site ads">
-        <p className="mb-4 text-sm text-[color:var(--color-medium)]">
-          Toggle each surface for the <strong>whole campaign</strong> ({d} mo). Article inventory is
+        <p className="mb-4 text-sm text-[var(--admin-text-muted)]">
+          Toggle each surface for the <strong className="text-[var(--admin-text)]">whole campaign</strong> ({d} mo). Article inventory is
           priced higher than main page; rate card reflects that.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -189,7 +189,7 @@ export function PackageBuilderSection({ pkg, onChange }: Props) {
 
       {/* Mobile */}
       <Card title="Mobile site ads">
-        <p className="mb-4 text-sm text-[color:var(--color-medium)]">
+        <p className="mb-4 text-sm text-[var(--admin-text-muted)]">
           Mobile article placements are the premium tier (typically highest traffic).
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -216,8 +216,8 @@ export function PackageBuilderSection({ pkg, onChange }: Props) {
 
       {/* Cross-device */}
       <Card title="Full-site bundles">
-        <p className="mb-3 text-sm text-[color:var(--color-medium)]">
-          Turn <strong>all four</strong> site surfaces on or off at once (desktop + mobile, main +
+        <p className="mb-3 text-sm text-[var(--admin-text-muted)]">
+          Turn <strong className="text-[var(--admin-text)]">all four</strong> site surfaces on or off at once (desktop + mobile, main +
           article).
         </p>
         <div className="flex flex-wrap gap-2">
@@ -227,14 +227,14 @@ export function PackageBuilderSection({ pkg, onChange }: Props) {
       </Card>
 
       {/* Inventory reference */}
-      <details className="rounded-xl border border-gray-200 bg-slate-50/90 p-4 text-sm">
-        <summary className="cursor-pointer font-bold text-[color:var(--color-dark)]">
+      <details className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] p-4 text-sm">
+        <summary className="cursor-pointer font-semibold text-[var(--admin-text)]">
           Ad slot inventory (reference)
         </summary>
-        <ul className="mt-3 max-h-52 space-y-1 overflow-y-auto text-xs font-mono text-[color:var(--color-dark)]">
+        <ul className="mt-3 max-h-52 space-y-1 overflow-y-auto text-xs font-mono text-[var(--admin-text)]">
           {AD_SLOTS.map((s) => (
             <li key={s.value}>
-              <span className="text-[color:var(--color-medium)]">{s.value}</span> — {s.label}
+              <span className="text-[var(--admin-text-muted)]">{s.value}</span> — {s.label}
             </li>
           ))}
         </ul>
@@ -245,8 +245,8 @@ export function PackageBuilderSection({ pkg, onChange }: Props) {
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm ring-1 ring-black/5">
-      <h3 className="mb-4 border-b border-gray-100 pb-2 text-sm font-black uppercase tracking-wide text-[color:var(--color-dark)]">
+    <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-5">
+      <h3 className="mb-4 border-b border-[var(--admin-border)] pb-2 text-sm font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
         {title}
       </h3>
       {children}
@@ -257,7 +257,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
 function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
     <label className={className ?? "block"}>
-      <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[color:var(--color-medium)]">
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
         {label}
       </span>
       {children}
@@ -270,7 +270,7 @@ function BundleBtn({ children, onClick }: { children: ReactNode; onClick: () => 
     <button
       type="button"
       onClick={onClick}
-      className="rounded-lg border border-[color:var(--color-riviera-blue)]/40 bg-[color:var(--color-riviera-blue)]/5 px-3 py-1.5 text-xs font-bold text-[color:var(--color-riviera-blue)] hover:bg-[color:var(--color-riviera-blue)]/10 transition-colors"
+      className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)] transition-colors"
     >
       {children}
     </button>

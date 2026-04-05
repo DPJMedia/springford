@@ -17,12 +17,22 @@ function ComposeRedirectInner() {
       router.replace("/admin/newsletter/template-editor");
     }
   }, [router, searchParams]);
-  return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-600 border-r-transparent" /></div>;
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
+    </div>
+  );
 }
 
 export default function ComposeRedirect() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-600 border-r-transparent" /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
+        </div>
+      }
+    >
       <ComposeRedirectInner />
     </Suspense>
   );

@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
+import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
 import { NumericTextInput } from "@/components/ad-quoter/NumericTextInput";
 import { PackageBuilderSection } from "@/components/ad-quoter/PackageBuilderSection";
 import { SavedQuoteDocumentModal } from "@/components/ad-quoter/SavedQuoteDocumentModal";
@@ -379,8 +381,8 @@ export default function AdQuoterPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[color:var(--color-riviera-blue)] border-r-transparent" />
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
       </div>
     );
   }
@@ -391,61 +393,73 @@ export default function AdQuoterPage() {
   const referenceAtCurrent = computeQuote(REFERENCE_DEAL_PRESET, monthlyViews, referenceMix);
   const budgetDelta = quote.totalUsd - budgetUsd;
 
+  const actionsPanel = (
+    <AdminActionsPanel
+      sections={[
+        {
+          title: "Traffic (30d)",
+          customContent: (
+            <div className="space-y-1">
+              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)]">
+                {viewsLoading ? "…" : monthlyViews.toLocaleString()}
+              </div>
+              <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
+                Page views · index ×{mult.toFixed(2)}
+              </div>
+              {!viewsLoading && viewMix.homepageViews + viewMix.articleViews > 0 && (
+                <div className="text-xs text-[var(--admin-text-muted)] pt-2 border-t border-[var(--admin-border)] mt-2">
+                  Homepage {viewMix.homepageViews.toLocaleString()} · Article{" "}
+                  {viewMix.articleViews.toLocaleString()}
+                </div>
+              )}
+            </div>
+          ),
+        },
+        ...(tab !== "saved" ? [{
+          title: "Live Quote",
+          customContent: (
+            <div>
+              <div className="text-2xl font-semibold text-[var(--admin-accent)] tabular-nums transition-all duration-300">
+                ${quote.totalUsd.toLocaleString()}
+              </div>
+              <div className="mt-1 text-xs text-[var(--admin-text-muted)]">
+                ×{quote.viewershipMultiplier.toFixed(3)} · ${quote.subtotalBaselineUsd.toLocaleString()} before index
+              </div>
+              {quote.viewMixNote && (
+                <p className="mt-2 rounded bg-[var(--admin-table-header-bg)] px-2 py-1.5 text-xs text-[var(--admin-text-muted)]">
+                  {quote.viewMixNote}
+                </p>
+              )}
+              <ul className="mt-3 max-h-64 space-y-1.5 overflow-y-auto text-xs border-t border-[var(--admin-border)] pt-3">
+                {quote.lineItems.map((row) => (
+                  <li key={row.id} className="flex justify-between gap-2 rounded bg-[var(--admin-table-row-hover)] px-2 py-1.5 text-[var(--admin-text)]">
+                    <span>
+                      <span className="font-semibold">{row.label}</span>
+                      <span className="block text-[var(--admin-text-muted)]">{row.detail}</span>
+                    </span>
+                    <span className="shrink-0 font-semibold tabular-nums">${row.lineSubtotalUsd.toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={openSaveModal}
+                className="mt-3 w-full rounded-lg bg-[var(--admin-accent)] py-2 text-sm font-semibold text-black hover:opacity-90"
+              >
+                Save quote
+              </button>
+            </div>
+          ),
+        }] : []),
+      ]}
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#f0f7f9] via-[color:var(--color-surface)] to-[#e8eef0]">
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <Link
-              href="/admin"
-              className="text-sm font-semibold text-[color:var(--color-riviera-blue)] hover:underline"
-            >
-              ← Admin home
-            </Link>
-            <h1 className="mt-2 text-3xl font-black text-[color:var(--color-dark)] tracking-tight">
-              Advertisement quoter
-            </h1>
-            <p className="mt-4 max-w-2xl text-[color:var(--color-medium)] leading-relaxed">
-              Estimate sponsorship packages from real site traffic. Prices go up a bit automatically
-              when readership grows so rate cards stay fair.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/80 bg-white/90 px-5 py-4 shadow-lg backdrop-blur-sm transition-transform duration-300 hover:scale-[1.02]">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--color-medium)]">
-              Last 30 days (site)
-            </p>
-            <p className="text-2xl font-black text-[color:var(--color-riviera-blue)] tabular-nums">
-              {viewsLoading ? "…" : monthlyViews.toLocaleString()}
-            </p>
-            <p className="text-xs text-[color:var(--color-medium)] mt-1">
-              Page views → index ×{mult.toFixed(2)}
-            </p>
-            {!viewsLoading && viewMix.homepageViews + viewMix.articleViews > 0 && (
-              <p className="text-xs text-[color:var(--color-medium)] mt-2 border-t border-gray-100 pt-2">
-                Homepage {viewMix.homepageViews.toLocaleString()} · Article{" "}
-                {viewMix.articleViews.toLocaleString()} (30d)
-              </p>
-            )}
-          </div>
-        </div>
-
-        {loadedQuote && (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color:var(--color-riviera-blue)]/30 bg-[color:var(--color-riviera-blue)]/5 px-4 py-3 text-sm">
-            <p className="text-[color:var(--color-dark)]">
-              <span className="font-bold">Loaded quote:</span> {loadedQuote.name}
-              {loadedQuote.client_name ? ` · ${loadedQuote.client_name}` : ""}
-            </p>
-            <button
-              type="button"
-              onClick={startNewQuote}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-[color:var(--color-dark)] hover:bg-gray-50"
-            >
-              New quote
-            </button>
-          </div>
-        )}
-
-        <div className="mb-6 flex flex-wrap gap-2 rounded-xl bg-white/60 p-1 shadow-sm border border-white/80">
+    <>
+      <AdminPageHeader title="Ad Quoter" reserveActionsPanelSpace />
+      <AdminPageLayout actionsPanel={actionsPanel}>
+        <div className="mb-6 flex flex-wrap gap-2 rounded-lg bg-[var(--admin-table-header-bg)] p-1 border border-[var(--admin-border)]">
           {(
             [
               ["package", "Build a package"],
@@ -457,10 +471,10 @@ export default function AdQuoterPage() {
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`flex-1 min-w-[140px] rounded-lg px-4 py-3 text-sm font-bold transition-all duration-300 ${
+              className={`flex-1 min-w-[120px] rounded-md px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
                 tab === id
-                  ? "bg-[color:var(--color-riviera-blue)] text-white shadow-md scale-[1.02]"
-                  : "text-[color:var(--color-dark)] hover:bg-white/80"
+                  ? "bg-[var(--admin-accent)] text-black shadow-sm"
+                  : "text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
               }`}
             >
               {label}
@@ -468,22 +482,29 @@ export default function AdQuoterPage() {
           ))}
         </div>
 
-        <div
-          className={
-            tab === "saved" ? "grid gap-6" : "grid gap-6 lg:grid-cols-5"
-          }
-        >
-          <div
-            className={
-              tab === "saved" ? "space-y-6" : "lg:col-span-3 space-y-6"
-            }
-          >
+        {loadedQuote && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--admin-accent)]/30 bg-[var(--admin-accent)]/5 px-4 py-3 text-sm">
+            <p className="text-[var(--admin-text)]">
+              <span className="font-semibold">Loaded quote:</span> {loadedQuote.name}
+              {loadedQuote.client_name ? ` · ${loadedQuote.client_name}` : ""}
+            </p>
+            <button
+              type="button"
+              onClick={startNewQuote}
+              className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+            >
+              New quote
+            </button>
+          </div>
+        )}
+
+        <div className="space-y-6">
             {tab === "package" && (
-              <section className="rounded-2xl border border-white/80 bg-white/95 p-6 shadow-lg transition-shadow duration-300 hover:shadow-xl">
-                <h2 className="text-xl font-black text-[color:var(--color-dark)] tracking-tight mb-1">
+              <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6">
+                <h2 className="text-xl font-semibold text-white tracking-tight mb-1">
                   Build a package
                 </h2>
-                <p className="text-sm text-[color:var(--color-medium)] mb-6 max-w-2xl">
+                <p className="text-sm text-[var(--admin-text-muted)] mb-6 max-w-2xl">
                   Set campaign length, then editorial &amp; newsletter, social, and site placements.
                   Check each desktop/mobile surface for the full campaign — ads run for every month in
                   the window you set.
@@ -493,23 +514,23 @@ export default function AdQuoterPage() {
             )}
 
             {tab === "saved" && (
-              <section className="rounded-2xl border border-white/80 bg-white p-6 shadow-lg">
-                <h2 className="text-lg font-bold text-[color:var(--color-dark)] mb-2">Saved quotes</h2>
-                <p className="text-sm text-[color:var(--color-medium)] mb-4">
+              <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6">
+                <h2 className="text-lg font-semibold text-white mb-2">Saved quotes</h2>
+                <p className="text-sm text-[var(--admin-text-muted)] mb-4">
                   Open a saved quote to edit the package and save again, or start from{" "}
                   <button
                     type="button"
                     onClick={startNewQuote}
-                    className="font-bold text-[color:var(--color-riviera-blue)] underline"
+                    className="font-semibold text-[var(--admin-accent)] underline"
                   >
                     New quote
                   </button>
                   .
                 </p>
                 {savedLoading ? (
-                  <p className="text-sm text-[color:var(--color-medium)]">Loading…</p>
+                  <p className="text-sm text-[var(--admin-text-muted)]">Loading…</p>
                 ) : savedQuotes.length === 0 ? (
-                  <p className="text-sm text-[color:var(--color-medium)]">
+                  <p className="text-sm text-[var(--admin-text-muted)]">
                     No saved quotes yet. Use <strong>Save quote</strong> from the live quote panel.
                   </p>
                 ) : (
@@ -526,18 +547,18 @@ export default function AdQuoterPage() {
                               setDocumentQuote(row);
                             }
                           }}
-                          className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-slate-50/80 px-4 py-3 text-left outline-none transition-colors hover:border-[color:var(--color-riviera-blue)]/35 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-[color:var(--color-riviera-blue)]"
+                          className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-4 py-3 text-left outline-none transition-colors hover:border-[var(--admin-accent)]/40 hover:bg-[var(--admin-table-row-hover)] focus-visible:ring-2 focus-visible:ring-[var(--admin-accent)]"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="font-bold text-[color:var(--color-dark)]">{row.name}</p>
-                            <p className="mt-1 text-xs text-[color:var(--color-medium)] leading-relaxed">
-                              <span className="font-medium text-[color:var(--color-dark)]">
+                            <p className="font-semibold text-[var(--admin-text)]">{row.name}</p>
+                            <p className="mt-1 text-xs text-[var(--admin-text-muted)] leading-relaxed">
+                              <span className="font-medium text-[var(--admin-text)]">
                                 {row.client_name?.trim() || "—"}
                               </span>
                               {" · "}
                               {formatCampaignRange(row.start_date, row.end_date)}
                               {" · "}
-                              <span className="font-semibold text-[color:var(--color-dark)]">
+                              <span className="font-semibold text-[var(--admin-text)]">
                                 ${(row.total_usd ?? 0).toLocaleString()}
                               </span>
                               {" · "}
@@ -552,21 +573,21 @@ export default function AdQuoterPage() {
                             <button
                               type="button"
                               onClick={() => loadSavedQuote(row)}
-                              className="rounded-lg border border-[color:var(--color-riviera-blue)]/50 bg-white px-3 py-2 text-xs font-bold text-[color:var(--color-riviera-blue)] hover:bg-[color:var(--color-riviera-blue)]/5"
+                              className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-3 py-2 text-xs font-semibold text-[var(--admin-accent)] hover:bg-[var(--admin-table-row-hover)]"
                             >
                               Load
                             </button>
                             <button
                               type="button"
                               onClick={() => openEditQuoteModal(row)}
-                              className="rounded-lg bg-[color:var(--color-riviera-blue)] px-3 py-2 text-xs font-bold text-white hover:opacity-95"
+                              className="rounded-lg bg-[var(--admin-accent)] px-3 py-2 text-xs font-semibold text-black hover:opacity-95"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDeleteSavedQuote(row)}
-                              className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50"
+                              className="rounded-lg border border-red-800/50 bg-red-950/30 px-3 py-2 text-xs font-semibold text-red-400 hover:bg-red-950/50"
                             >
                               Delete
                             </button>
@@ -580,11 +601,11 @@ export default function AdQuoterPage() {
             )}
 
             {tab === "budget" && (
-              <section className="rounded-2xl border border-white/80 bg-white p-6 shadow-lg">
-                <h2 className="text-lg font-bold text-[color:var(--color-dark)] mb-2">
+              <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6">
+                <h2 className="text-lg font-semibold text-white mb-2">
                   They gave you a number
                 </h2>
-                <p className="text-sm text-[color:var(--color-medium)] mb-4">
+                <p className="text-sm text-[var(--admin-text-muted)] mb-4">
                   Enter their budget and campaign length. We&apos;ll fill a package that uses most of
                   that budget (after the traffic multiplier), then show the breakdown below—without
                   leaving this tab.
@@ -597,7 +618,7 @@ export default function AdQuoterPage() {
                       min={0}
                       max={999_999_999}
                       emptyFallback={0}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold text-lg"
+                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold text-lg"
                     />
                   </Field>
                   <Field label="Campaign length (months)">
@@ -607,27 +628,27 @@ export default function AdQuoterPage() {
                       min={1}
                       max={24}
                       emptyFallback={1}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold"
+                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
                     />
                   </Field>
                 </div>
-                <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm">
+                <div className="mt-4 rounded-lg bg-[var(--admin-table-header-bg)] p-4 text-sm">
                   <p>
-                    <span className="font-semibold text-[color:var(--color-dark)]">
+                    <span className="font-semibold text-[var(--admin-text)]">
                       “Baseline” dollars (before traffic):
                     </span>{" "}
-                    <strong className="text-[color:var(--color-riviera-blue)]">
+                    <strong className="text-[var(--admin-accent)]">
                       ${baselineEquivalentUsd(budgetUsd, monthlyViews).toLocaleString()}
                     </strong>
                   </p>
-                  <p className="mt-2 text-xs text-[color:var(--color-medium)]">
+                  <p className="mt-2 text-xs text-[var(--admin-text-muted)]">
                     We divide by ×{mult.toFixed(2)} so the final total can land near ${budgetUsd.toLocaleString()}.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={applyBudgetSuggestion}
-                  className="mt-4 w-full rounded-xl bg-[color:var(--color-riviera-blue)] py-3 text-sm font-bold text-white shadow-md hover:opacity-95 transition-opacity"
+                  className="mt-4 w-full rounded-lg bg-[var(--admin-accent)] py-3 text-sm font-semibold text-black hover:opacity-95 transition-opacity"
                 >
                   Suggest package
                 </button>
@@ -635,41 +656,41 @@ export default function AdQuoterPage() {
                 {budgetPlanOpen && (
                   <details
                     open
-                    className="mt-6 rounded-xl border-2 border-dashed border-[color:var(--color-riviera-blue)]/40 bg-white p-4 transition-all"
+                    className="mt-6 rounded-lg border border-dashed border-[var(--admin-accent)]/40 bg-[var(--admin-table-header-bg)] p-4 transition-all"
                   >
-                    <summary className="cursor-pointer text-sm font-bold text-[color:var(--color-dark)]">
+                    <summary className="cursor-pointer text-sm font-semibold text-[var(--admin-text)]">
                       Suggested mix (edit in &quot;Build a package&quot; anytime)
                     </summary>
-                    <dl className="mt-3 grid gap-2 text-sm text-[color:var(--color-dark)]">
-                      <div className="flex justify-between border-b border-gray-100 py-1">
+                    <dl className="mt-3 grid gap-2 text-sm text-[var(--admin-text)]">
+                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
                         <dt>Campaign months</dt>
                         <dd className="font-semibold">{pkg.durationMonths}</dd>
                       </div>
-                      <div className="flex justify-between border-b border-gray-100 py-1">
+                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
                         <dt>Sponsored articles</dt>
                         <dd className="font-semibold">{pkg.sponsoredArticleCount}</dd>
                       </div>
-                      <div className="flex justify-between border-b border-gray-100 py-1">
+                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
                         <dt>Newsletter sends / mo</dt>
                         <dd className="font-semibold">{pkg.newsletterSendsPerMonth}</dd>
                       </div>
-                      <div className="flex justify-between border-b border-gray-100 py-1">
+                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
                         <dt>Newsletter spotlights</dt>
                         <dd className="font-semibold">{pkg.newsletterSpotlightCount}</dd>
                       </div>
-                      <div className="flex justify-between border-b border-gray-100 py-1">
+                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
                         <dt>Desktop main page</dt>
                         <dd className="font-semibold">{pkg.includeDesktopMainSite ? "Yes" : "No"}</dd>
                       </div>
-                      <div className="flex justify-between border-b border-gray-100 py-1">
+                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
                         <dt>Mobile main page</dt>
                         <dd className="font-semibold">{pkg.includeMobileMainSite ? "Yes" : "No"}</dd>
                       </div>
-                      <div className="flex justify-between border-b border-gray-100 py-1">
+                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
                         <dt>Desktop articles</dt>
                         <dd className="font-semibold">{pkg.includeDesktopArticle ? "Yes" : "No"}</dd>
                       </div>
-                      <div className="flex justify-between border-b border-gray-100 py-1">
+                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
                         <dt>Mobile articles</dt>
                         <dd className="font-semibold">{pkg.includeMobileArticle ? "Yes" : "No"}</dd>
                       </div>
@@ -678,13 +699,13 @@ export default function AdQuoterPage() {
                         <dd className="font-semibold">{pkg.facebookBoostCount}</dd>
                       </div>
                     </dl>
-                    <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                    <p className="mt-4 rounded-lg bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] px-3 py-2 text-sm text-[var(--admin-text-muted)]">
                       <strong>Target budget:</strong> ${budgetUsd.toLocaleString()} ·{" "}
                       <strong>Quoted total:</strong> ${quote.totalUsd.toLocaleString()}
                       {Math.abs(budgetDelta) <= 2 ? (
-                        <span className="text-green-800"> — on target</span>
+                        <span className="text-green-400"> — on target</span>
                       ) : (
-                        <span className="text-amber-800">
+                        <span className="text-amber-400">
                           {" "}
                           (off by ${Math.abs(budgetDelta).toLocaleString()}
                           {budgetDelta > 0 ? ", over" : ", under"} — small leftovers happen when
@@ -702,14 +723,14 @@ export default function AdQuoterPage() {
             <button
               type="button"
               onClick={() => setShowFormula((s) => !s)}
-              className="w-full rounded-xl border border-dashed border-[color:var(--color-riviera-blue)]/40 bg-white/50 px-4 py-3 text-left text-sm font-semibold text-[color:var(--color-riviera-blue)] hover:bg-white transition-colors"
+              className="w-full rounded-lg border border-dashed border-[var(--admin-accent)]/40 bg-[var(--admin-table-header-bg)] px-4 py-3 text-left text-sm font-semibold text-[var(--admin-accent)] hover:bg-[var(--admin-table-row-hover)] transition-colors"
             >
               {showFormula ? "▼" : "▶"} Simple explanation: how we get the number
             </button>
             {showFormula && (
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-[color:var(--color-medium)] leading-relaxed space-y-3">
+              <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6 text-sm text-[var(--admin-text-muted)] leading-relaxed space-y-3">
                 <p>
-                  <strong className="text-[color:var(--color-dark)]">Do rates change every day?</strong>{" "}
+                  <strong className="text-[var(--admin-text)]">Do rates change every day?</strong>{" "}
                   The <strong>rate card</strong> (each line item&apos;s base dollars) is{" "}
                   <strong>stable</strong> until you change it in code. What moves with traffic is{" "}
                   <strong>one overall multiplier</strong> (the traffic index) applied to the{" "}
@@ -717,28 +738,28 @@ export default function AdQuoterPage() {
                   dozens of different rates from scratch each month.
                 </p>
                 <p>
-                  <strong className="text-[color:var(--color-dark)]">Step 1 — Line items.</strong> Each
+                  <strong className="text-[var(--admin-text)]">Step 1 — Line items.</strong> Each
                   thing you add (article, newsletter send, site placements for the campaign, etc.) has a{" "}
                   <em>base</em> dollar amount in the rate card below. Article placements are priced
                   higher than main-page; mobile article higher than desktop article.
                 </p>
                 <p>
-                  <strong className="text-[color:var(--color-dark)]">Step 2 — Traffic index.</strong> We
+                  <strong className="text-[var(--admin-text)]">Step 2 — Traffic index.</strong> We
                   look at total <strong>page views</strong> (last 30 days). Versus baseline (
                   {BASELINE_MONTHLY_SITE_VIEWS.toLocaleString()}), we apply one multiplier to the
                   subtotal.
                 </p>
                 <p>
-                  <strong className="text-[color:var(--color-dark)]">Step 3 — Optional mix nudge.</strong>{" "}
+                  <strong className="text-[var(--admin-text)]">Step 3 — Optional mix nudge.</strong>{" "}
                   If we have homepage vs article view counts, <strong>article placement</strong> line
                   rates can get a <strong>small</strong> extra bump when article traffic dominates—on
                   top of the main index, not instead of it.
                 </p>
                 <p>
-                  <strong className="text-[color:var(--color-dark)]">Step 4 — Total.</strong> Baseline
+                  <strong className="text-[var(--admin-text)]">Step 4 — Total.</strong> Baseline
                   subtotal × traffic index → rounded total.
                 </p>
-                <div className="rounded-lg bg-gray-50 p-3 text-xs overflow-x-auto space-y-1">
+                <div className="rounded-lg bg-[var(--admin-table-header-bg)] p-3 text-xs overflow-x-auto space-y-1 text-[var(--admin-text-muted)]">
                   {Object.entries(RATES_USD).map(([k, v]) => (
                     <div key={k}>
                       {k}: ${v}
@@ -751,68 +772,6 @@ export default function AdQuoterPage() {
             )}
           </div>
 
-          {/* Live quote + reference — only on Build a package / Budget → plan */}
-          {tab !== "saved" && (
-          <div className="lg:col-span-2 lg:sticky lg:top-6 lg:self-start flex flex-col gap-4">
-            <div className="rounded-2xl border-2 border-[color:var(--color-riviera-blue)]/40 bg-white p-6 shadow-2xl">
-              <h3 className="text-sm font-bold uppercase tracking-wide text-[color:var(--color-medium)]">
-                Live quote
-              </h3>
-              <p className="mt-1 text-4xl font-black text-[color:var(--color-dark)] tabular-nums transition-all duration-300">
-                ${quote.totalUsd.toLocaleString()}
-              </p>
-              <p className="mt-2 text-xs text-[color:var(--color-medium)]">
-                ×{quote.viewershipMultiplier.toFixed(3)} traffic index · $
-                {quote.subtotalBaselineUsd.toLocaleString()} before index
-              </p>
-              {quote.viewMixNote && (
-                <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-[color:var(--color-dark)]">
-                  {quote.viewMixNote}
-                </p>
-              )}
-              <ul className="mt-4 max-h-80 space-y-2 overflow-y-auto text-sm border-t border-gray-100 pt-4">
-                {quote.lineItems.map((row) => (
-                  <li
-                    key={row.id}
-                    className="flex justify-between gap-2 rounded-lg bg-slate-50/80 px-3 py-2 text-[color:var(--color-dark)]"
-                  >
-                    <span>
-                      <span className="font-semibold">{row.label}</span>
-                      <span className="block text-xs text-[color:var(--color-medium)]">
-                        {row.detail}
-                      </span>
-                    </span>
-                    <span className="shrink-0 font-bold tabular-nums">
-                      ×{row.quantity} → ${row.lineSubtotalUsd.toLocaleString()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-4 flex flex-col gap-2 border-t border-gray-100 pt-4">
-                <button
-                  type="button"
-                  onClick={openSaveModal}
-                  className="w-full rounded-lg bg-[color:var(--color-riviera-blue)] py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-95"
-                >
-                  Save quote
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-sm shadow-sm">
-              <p className="font-bold text-amber-900">Reference bundle at today&apos;s traffic</p>
-              <p className="mt-1 text-amber-950/90">
-                The classic 3-month package (1 article, 6 newsletter sends, desktop main page on for
-                the full campaign, + social extras) would price at{" "}
-                <strong>${referenceAtCurrent.totalUsd.toLocaleString()}</strong> with{" "}
-                {monthlyViews.toLocaleString()} views/mo (index ×
-                {referenceAtCurrent.viewershipMultiplier.toFixed(2)}).
-              </p>
-            </div>
-          </div>
-          )}
-        </div>
-
         {saveModalOpen && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -823,13 +782,13 @@ export default function AdQuoterPage() {
               if (e.target === e.currentTarget) setSaveModalOpen(false);
             }}
           >
-            <div className="w-full max-w-md rounded-2xl border border-white/80 bg-white p-6 shadow-2xl">
-              <h2 id="save-quote-title" className="text-lg font-black text-[color:var(--color-dark)]">
+            <div className="w-full max-w-md rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6 shadow-2xl">
+              <h2 id="save-quote-title" className="text-lg font-semibold text-white">
                 {loadedQuote ? "Update saved quote" : "Save quote"}
               </h2>
-              <p className="mt-1 text-sm text-[color:var(--color-medium)]">
+              <p className="mt-1 text-sm text-[var(--admin-text-muted)]">
                 Name this quote and add client / campaign dates. You can open it later from{" "}
-                <strong>Saved quotes</strong>.
+                <strong className="text-[var(--admin-text)]">Saved quotes</strong>.
               </p>
               <div className="mt-4 space-y-3">
                 <Field label="Quote name *">
@@ -837,7 +796,7 @@ export default function AdQuoterPage() {
                     type="text"
                     value={saveName}
                     onChange={(e) => setSaveName(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold"
+                    className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
                     placeholder="e.g. Acme — Spring drive"
                   />
                 </Field>
@@ -846,7 +805,7 @@ export default function AdQuoterPage() {
                     type="text"
                     value={saveClient}
                     onChange={(e) => setSaveClient(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold"
+                    className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
                     placeholder="Company or contact"
                   />
                 </Field>
@@ -856,7 +815,7 @@ export default function AdQuoterPage() {
                       type="date"
                       value={saveStart}
                       onChange={(e) => setSaveStart(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold"
+                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
                     />
                   </Field>
                   <Field label="End date">
@@ -864,7 +823,7 @@ export default function AdQuoterPage() {
                       type="date"
                       value={saveEnd}
                       onChange={(e) => setSaveEnd(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold"
+                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
                     />
                   </Field>
                 </div>
@@ -873,20 +832,20 @@ export default function AdQuoterPage() {
                 <div className="mt-3 space-y-2">
                   <p className="text-sm font-semibold text-red-700 whitespace-pre-wrap">{saveError}</p>
                   {/does not exist|schema cache|Could not find/i.test(saveError) && (
-                    <p className="text-xs text-[color:var(--color-medium)] leading-relaxed">
-                      The <code className="rounded bg-gray-100 px-1">saved_ad_quotes</code> table may
+                    <p className="text-xs text-[var(--admin-text-muted)] leading-relaxed">
+                      The <code className="rounded bg-[var(--admin-table-header-bg)] px-1">saved_ad_quotes</code> table may
                       not be applied yet. Run{" "}
-                      <code className="rounded bg-gray-100 px-1">supabase db push</code> or execute{" "}
-                      <code className="rounded bg-gray-100 px-1">
+                      <code className="rounded bg-[var(--admin-table-header-bg)] px-1">supabase db push</code> or execute{" "}
+                      <code className="rounded bg-[var(--admin-table-header-bg)] px-1">
                         supabase/migrations/20260325000000_saved_ad_quotes.sql
                       </code>{" "}
                       in the SQL editor.
                     </p>
                   )}
                   {/row-level security|RLS|policy/i.test(saveError) && (
-                    <p className="text-xs text-[color:var(--color-medium)]">
+                    <p className="text-xs text-[var(--admin-text-muted)]">
                       Check that your account has <strong>is_admin</strong> or{" "}
-                      <strong>is_super_admin</strong> in <code className="rounded bg-gray-100 px-1">user_profiles</code>.
+                      <strong>is_super_admin</strong> in <code className="rounded bg-[var(--admin-table-header-bg)] px-1">user_profiles</code>.
                     </p>
                   )}
                 </div>
@@ -895,7 +854,7 @@ export default function AdQuoterPage() {
                 <button
                   type="button"
                   onClick={() => setSaveModalOpen(false)}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold hover:bg-gray-50"
+                  className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-4 py-2 text-sm font-semibold hover:bg-[var(--admin-table-row-hover)]"
                 >
                   Cancel
                 </button>
@@ -903,7 +862,7 @@ export default function AdQuoterPage() {
                   type="button"
                   disabled={saveSubmitting}
                   onClick={() => void submitSaveQuote()}
-                  className="rounded-lg bg-[color:var(--color-riviera-blue)] px-4 py-2 text-sm font-bold text-white hover:opacity-95 disabled:opacity-50"
+                  className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-black hover:opacity-95 disabled:opacity-50"
                 >
                   {saveSubmitting ? "Saving…" : loadedQuote ? "Update" : "Save"}
                 </button>
@@ -922,13 +881,13 @@ export default function AdQuoterPage() {
               if (e.target === e.currentTarget) setEditQuoteModal(null);
             }}
           >
-            <div className="w-full max-w-md rounded-2xl border border-white/80 bg-white p-6 shadow-2xl">
-              <h2 id="edit-quote-title" className="text-lg font-black text-[color:var(--color-dark)]">
+            <div className="w-full max-w-md rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6 shadow-2xl">
+              <h2 id="edit-quote-title" className="text-lg font-semibold text-white">
                 Edit quote details
               </h2>
-              <p className="mt-1 text-sm text-[color:var(--color-medium)]">
+              <p className="mt-1 text-sm text-[var(--admin-text-muted)]">
                 Update the name, client, campaign dates, or saved total. To change the package
-                contents, use <strong>Load</strong> and edit in Build a package.
+                contents, use <strong className="text-[var(--admin-text)]">Load</strong> and edit in Build a package.
               </p>
               <div className="mt-4 space-y-3">
                 <Field label="Quote name *">
@@ -936,7 +895,7 @@ export default function AdQuoterPage() {
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold"
+                    className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
                   />
                 </Field>
                 <Field label="Client">
@@ -944,7 +903,7 @@ export default function AdQuoterPage() {
                     type="text"
                     value={editClient}
                     onChange={(e) => setEditClient(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold"
+                    className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
                   />
                 </Field>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -953,7 +912,7 @@ export default function AdQuoterPage() {
                       type="date"
                       value={editStart}
                       onChange={(e) => setEditStart(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold"
+                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
                     />
                   </Field>
                   <Field label="End date">
@@ -961,7 +920,7 @@ export default function AdQuoterPage() {
                       type="date"
                       value={editEnd}
                       onChange={(e) => setEditEnd(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold"
+                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
                     />
                   </Field>
                 </div>
@@ -972,9 +931,9 @@ export default function AdQuoterPage() {
                     min={0}
                     max={999_999_999}
                     emptyFallback={0}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 font-semibold"
+                    className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
                   />
-                  <p className="mt-1 text-xs text-[color:var(--color-medium)]">
+                  <p className="mt-1 text-xs text-[var(--admin-text-muted)]">
                     If this differs from the calculator by more than $2, the quote is marked as a
                     custom total (document view hides package math).
                   </p>
@@ -987,7 +946,7 @@ export default function AdQuoterPage() {
                 <button
                   type="button"
                   onClick={() => setEditQuoteModal(null)}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold hover:bg-gray-50"
+                  className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-4 py-2 text-sm font-semibold hover:bg-[var(--admin-table-row-hover)]"
                 >
                   Cancel
                 </button>
@@ -995,7 +954,7 @@ export default function AdQuoterPage() {
                   type="button"
                   disabled={editSubmitting}
                   onClick={() => void submitEditQuote()}
-                  className="rounded-lg bg-[color:var(--color-riviera-blue)] px-4 py-2 text-sm font-bold text-white hover:opacity-95 disabled:opacity-50"
+                  className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-black hover:opacity-95 disabled:opacity-50"
                 >
                   {editSubmitting ? "Saving…" : "Save changes"}
                 </button>
@@ -1011,15 +970,15 @@ export default function AdQuoterPage() {
             onDelete={performDeleteSavedQuote}
           />
         )}
-      </div>
-    </div>
+      </AdminPageLayout>
+    </>
   );
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[color:var(--color-medium)]">
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
         {label}
       </span>
       {children}

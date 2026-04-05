@@ -317,11 +317,11 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   return (
     <div className="relative">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded-t-md border border-gray-300 border-b-0">
+      <div className="flex items-center gap-2 mb-2 p-2 bg-[var(--admin-table-header-bg)] rounded-t-md border border-[var(--admin-border)] border-b-0">
         <button
           type="button"
           onClick={() => applyFormatting("bold")}
-          className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 font-bold"
+          className="px-3 py-1 bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded hover:bg-[var(--admin-table-row-hover)] text-[var(--admin-text)] font-bold"
           title="Bold (Ctrl+B)"
         >
           B
@@ -329,7 +329,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         <button
           type="button"
           onClick={() => applyFormatting("italic")}
-          className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 italic"
+          className="px-3 py-1 bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded hover:bg-[var(--admin-table-row-hover)] text-[var(--admin-text)] italic"
           title="Italic (Ctrl+I)"
         >
           I
@@ -337,7 +337,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         <button
           type="button"
           onClick={insertLink}
-          className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100"
+          className="px-3 py-1 bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded hover:bg-[var(--admin-table-row-hover)] text-[var(--admin-text)]"
           title="Insert Link"
         >
           🔗 Link
@@ -345,14 +345,14 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         <button
           type="button"
           onClick={insertBulletList}
-          className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 flex items-center gap-1"
+          className="px-3 py-1 bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded hover:bg-[var(--admin-table-row-hover)] text-[var(--admin-text)] flex items-center gap-1"
           title="Bullet list (prefix line or selection with -)"
         >
           <span className="text-lg leading-none">•</span>
           <span className="text-sm">Bullets</span>
         </button>
-        <div className="text-sm text-gray-500 ml-auto">
-          Type <kbd className="px-1 py-0.5 bg-gray-200 rounded text-xs">@</kbd> to reference articles
+        <div className="text-sm text-[var(--admin-text-muted)] ml-auto">
+          Type <kbd className="px-1 py-0.5 bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded text-xs text-[var(--admin-text)]">@</kbd> to reference articles
         </div>
       </div>
 
@@ -364,21 +364,21 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         spellCheck={true}
-        className="w-full min-h-[300px] px-4 py-3 border border-gray-300 rounded-b-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+        className="w-full min-h-[300px] px-4 py-3 border border-[var(--admin-border)] rounded-b-md focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-[var(--admin-accent)] focus:border-[var(--admin-accent)] text-base bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)]"
         style={{ fontFamily: 'inherit' }}
       />
 
       {/* Link Modal */}
       {showLinkModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-lg font-bold mb-4">Insert Link</h3>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded-lg p-6 w-96">
+            <h3 className="text-lg font-bold mb-4 text-[var(--admin-text)]">Insert Link</h3>
             <input
               type="url"
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}
               placeholder="https://example.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded mb-4"
+              className="w-full px-3 py-2 border border-[var(--admin-border)] rounded mb-4 bg-[var(--admin-table-header-bg)] text-[var(--admin-text)]"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -393,13 +393,13 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
                   setShowLinkModal(false);
                   setLinkUrl("");
                 }}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded"
+                className="px-4 py-2 text-[var(--admin-text-muted)] hover:bg-[var(--admin-table-header-bg)] rounded"
               >
                 Cancel
               </button>
               <button
                 onClick={applyLink}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="px-4 py-2 bg-[var(--admin-accent)] text-black rounded hover:opacity-90 font-semibold"
               >
                 Insert Link
               </button>
@@ -410,18 +410,18 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
 
       {/* Article Search Dropdown */}
       {showArticleSearch && (
-        <div className="absolute z-10 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto w-96">
+        <div className="absolute z-10 bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded-lg shadow-lg max-h-64 overflow-y-auto w-96">
           {filteredArticles.length === 0 ? (
-            <div className="p-3 text-sm text-gray-500">No articles found</div>
+            <div className="p-3 text-sm text-[var(--admin-text-muted)]">No articles found</div>
           ) : (
             filteredArticles.map((article) => (
               <button
                 key={article.id}
                 onClick={() => insertArticleReference(article)}
-                className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100 last:border-0"
+                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-table-header-bg)] border-b border-[var(--admin-border)] last:border-0"
               >
-                <div className="text-sm font-medium text-gray-900">{article.title}</div>
-                <div className="text-xs text-gray-500">/{article.slug}</div>
+                <div className="text-sm font-medium text-[var(--admin-text)]">{article.title}</div>
+                <div className="text-xs text-[var(--admin-text-muted)]">/{article.slug}</div>
               </button>
             ))
           )}
@@ -429,14 +429,14 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       )}
 
       {/* Markdown Guide */}
-      <div className="mt-2 p-3 bg-blue-50 rounded text-xs text-gray-600">
-        <strong>Formatting Guide:</strong>
+      <div className="mt-2 p-3 bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] rounded text-xs text-[var(--admin-text-muted)]">
+        <strong className="text-[var(--admin-text)]">Formatting Guide:</strong>
         <ul className="mt-1 space-y-1">
-          <li>• <strong>Bold:</strong> Select text and click B button or use **text**</li>
-          <li>• <strong>Italic:</strong> Select text and click I button or use *text*</li>
-          <li>• <strong>Link:</strong> Select text, click Link button, enter URL</li>
-          <li>• <strong>Bullets:</strong> Click Bullets to start a list. Enter = new bullet line; Shift+Enter = new line without bullet (like Google Docs).</li>
-          <li>• <strong>Reference Article:</strong> Type @ and select from list</li>
+          <li>• <strong className="text-[var(--admin-text)]">Bold:</strong> Select text and click B button or use **text**</li>
+          <li>• <strong className="text-[var(--admin-text)]">Italic:</strong> Select text and click I button or use *text*</li>
+          <li>• <strong className="text-[var(--admin-text)]">Link:</strong> Select text, click Link button, enter URL</li>
+          <li>• <strong className="text-[var(--admin-text)]">Bullets:</strong> Click Bullets to start a list. Enter = new bullet line; Shift+Enter = new line without bullet (like Google Docs).</li>
+          <li>• <strong className="text-[var(--admin-text)]">Reference Article:</strong> Type @ and select from list</li>
         </ul>
       </div>
     </div>

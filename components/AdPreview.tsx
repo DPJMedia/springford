@@ -1,6 +1,9 @@
 "use client";
 
 import type { Article } from "@/lib/types/database";
+import { getAdSlotTableLabel } from "@/lib/advertising/adSlots";
+
+export type AdOccupant = { id: string; title: string };
 
 type AdPreviewProps = {
   selectedSlots: string[];
@@ -9,8 +12,10 @@ type AdPreviewProps = {
     image_url: string;
     title: string | null;
   };
-  /** For each slot id, list of ad titles currently in that slot (so preview can show "Currently: X, Y") */
-  adsBySlot?: Record<string, string[]>;
+  /** For each slot id, ads currently assigned (for “currently in slot” + remove). */
+  adsBySlot?: Record<string, AdOccupant[]>;
+  /** Remove another ad’s assignment from this slot (does not delete the ad). */
+  onRemoveAdFromSlot?: (adId: string, slotId: string) => void;
   currentTab?: "homepage-desktop" | "homepage-mobile" | "article-desktop" | "article-mobile";
   onTabChange?: (tab: "homepage-desktop" | "homepage-mobile" | "article-desktop" | "article-mobile") => void;
 };
@@ -53,11 +58,68 @@ const mockArticle: Article = {
   visibility: "public",
 };
 
+function SlotOccupantList({
+  ads,
+  slotId,
+  onRemove,
+  className = "",
+  variant = "default",
+}: {
+  ads: AdOccupant[];
+  slotId: string;
+  onRemove?: (adId: string, slotId: string) => void;
+  className?: string;
+  /** `overlay`: semi-opaque panel on top of ad image for readable gray text */
+  variant?: "default" | "overlay";
+}) {
+  if (ads.length === 0) return null;
+  const panel =
+    variant === "overlay"
+      ? "rounded-md bg-white/95 px-3 py-2 shadow-md ring-1 ring-black/5"
+      : "";
+
+  return (
+    <div
+      className={`flex w-full flex-col items-center gap-2 text-center ${panel} ${className}`}
+      onClick={(e) => e.stopPropagation()}
+      role="presentation"
+    >
+      <p className="text-xs font-semibold text-gray-600">Currently in this slot:</p>
+      <div className="w-full space-y-1">
+        {ads.map((a) => (
+          <div key={a.id} className="truncate text-xs font-medium text-gray-700">
+            {a.title}
+          </div>
+        ))}
+      </div>
+      {onRemove && (
+        <div className="flex w-full flex-wrap items-center justify-center gap-2">
+          {ads.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              className="rounded-md bg-gray-200 px-2.5 py-1 text-[10px] font-semibold text-gray-600 shadow-sm transition hover:bg-gray-300"
+              aria-label={`Remove “${a.title}” from this slot`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove(a.id, slotId);
+              }}
+            >
+              Remove
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AdPreview({
   selectedSlots,
   onSlotClick,
   previewAd,
   adsBySlot = {},
+  onRemoveAdFromSlot,
   currentTab = "homepage-desktop",
   onTabChange,
 }: AdPreviewProps) {
@@ -72,7 +134,7 @@ export function AdPreview({
           onClick={() => onTabChange?.("homepage-desktop")}
           className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
             currentTab === "homepage-desktop"
-              ? "bg-[color:var(--color-riviera-blue)] text-white"
+              ? "bg-[color:var(--admin-accent)] text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
           }`}
         >
@@ -82,7 +144,7 @@ export function AdPreview({
           onClick={() => onTabChange?.("homepage-mobile")}
           className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
             currentTab === "homepage-mobile"
-              ? "bg-[color:var(--color-riviera-blue)] text-white"
+              ? "bg-[color:var(--admin-accent)] text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
           }`}
         >
@@ -92,7 +154,7 @@ export function AdPreview({
           onClick={() => onTabChange?.("article-desktop")}
           className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
             currentTab === "article-desktop"
-              ? "bg-[color:var(--color-riviera-blue)] text-white"
+              ? "bg-[color:var(--admin-accent)] text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
           }`}
         >
@@ -102,7 +164,7 @@ export function AdPreview({
           onClick={() => onTabChange?.("article-mobile")}
           className={`px-4 py-2 rounded-md text-sm font-semibold transition ${
             currentTab === "article-mobile"
-              ? "bg-[color:var(--color-riviera-blue)] text-white"
+              ? "bg-[color:var(--admin-accent)] text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
           }`}
         >
@@ -117,6 +179,7 @@ export function AdPreview({
           isSlotSelected={isSlotSelected}
           previewAd={previewAd}
           adsBySlot={adsBySlot}
+          onRemoveAdFromSlot={onRemoveAdFromSlot}
         />
       ) : currentTab === "homepage-mobile" ? (
         <HomepageMobilePreview
@@ -125,6 +188,7 @@ export function AdPreview({
           isSlotSelected={isSlotSelected}
           previewAd={previewAd}
           adsBySlot={adsBySlot}
+          onRemoveAdFromSlot={onRemoveAdFromSlot}
         />
       ) : currentTab === "article-desktop" ? (
         <ArticlePreview
@@ -133,6 +197,7 @@ export function AdPreview({
           isSlotSelected={isSlotSelected}
           previewAd={previewAd}
           adsBySlot={adsBySlot}
+          onRemoveAdFromSlot={onRemoveAdFromSlot}
         />
       ) : (
         <ArticleMobilePreview
@@ -141,6 +206,7 @@ export function AdPreview({
           isSlotSelected={isSlotSelected}
           previewAd={previewAd}
           adsBySlot={adsBySlot}
+          onRemoveAdFromSlot={onRemoveAdFromSlot}
         />
       )}
     </div>
@@ -153,38 +219,34 @@ function HomepagePreview({
   isSlotSelected,
   previewAd,
   adsBySlot,
+  onRemoveAdFromSlot,
 }: {
   selectedSlots: string[];
   onSlotClick: (slot: string) => void;
   isSlotSelected: (slot: string) => boolean;
   previewAd?: { image_url: string; title: string | null };
-  adsBySlot: Record<string, string[]>;
+  adsBySlot: Record<string, AdOccupant[]>;
+  onRemoveAdFromSlot?: (adId: string, slotId: string) => void;
 }) {
   const currentInSlot = (slotId: string) => adsBySlot[slotId] ?? [];
 
-  const renderAdSlot = (
-    slotId: string,
-    sectionNumber: number,
-    label: string,
-    recommendedSize: string,
-    heightClass: string
-  ) => {
+  const renderAdSlot = (slotId: string, recommendedSize: string, heightClass: string) => {
     const currentAds = currentInSlot(slotId);
     return (
       <div
         onClick={() => onSlotClick(slotId)}
         className={`mb-6 p-4 border-2 rounded-lg transition cursor-pointer ${
           isSlotSelected(slotId)
-            ? "border-[color:var(--color-riviera-blue)] bg-blue-50"
+            ? "border-[color:var(--admin-accent)] bg-black"
             : "border-dashed border-gray-300 hover:border-gray-400"
         }`}
       >
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs font-bold text-blue-700">SECTION {sectionNumber}: {label}</div>
-          <div className="text-xs font-medium text-blue-600">Size: {recommendedSize}</div>
+        <div className="mb-2 text-xs font-bold text-[color:var(--admin-accent)]">
+          {getAdSlotTableLabel(slotId)}
+          <span className="font-normal"> ({recommendedSize})</span>
         </div>
         {previewAd && isSlotSelected(slotId) ? (
-          <div className={`relative w-full ${heightClass} bg-gray-100 rounded overflow-hidden`}>
+          <div className={`relative w-full ${heightClass} bg-black rounded overflow-hidden`}>
             <img
               src={previewAd.image_url}
               alt={previewAd.title || "Ad preview"}
@@ -192,20 +254,29 @@ function HomepagePreview({
               draggable={false}
             />
             {currentAds.length > 0 && (
-              <p className="absolute bottom-1 left-2 right-2 text-[10px] text-white bg-black/60 rounded px-2 py-1 truncate">
-                Also in slot: {currentAds.join(", ")}
-              </p>
+              <div className="absolute bottom-1 left-2 right-2 max-h-32 overflow-y-auto">
+                <SlotOccupantList
+                  ads={currentAds}
+                  slotId={slotId}
+                  onRemove={onRemoveAdFromSlot}
+                  variant="overlay"
+                />
+              </div>
             )}
           </div>
         ) : (
-          <div className={`w-full ${heightClass} bg-gray-100 rounded flex flex-col items-center justify-center text-gray-400 text-sm p-2`}>
+          <div
+            className={`flex w-full flex-col ${heightClass} items-center justify-center rounded bg-gray-100 p-2 text-gray-400`}
+          >
             {currentAds.length > 0 ? (
-              <>
-                <span className="text-xs font-medium text-gray-600 mb-1">Currently in this slot:</span>
-                <span className="text-xs text-gray-700 text-center">{currentAds.join(", ")}</span>
-              </>
+              <SlotOccupantList
+                ads={currentAds}
+                slotId={slotId}
+                onRemove={onRemoveAdFromSlot}
+                className="w-full justify-center px-1"
+              />
             ) : (
-              "Click to add ad here"
+              <span className="text-sm">Click to add ad here</span>
             )}
           </div>
         )}
@@ -220,8 +291,7 @@ function HomepagePreview({
         <h1 className="text-2xl font-bold">Spring-Ford Press</h1>
       </div>
 
-      {/* AD SECTION 1: Banner Below Hero */}
-      {renderAdSlot("homepage-banner-top", 1, "Banner Below Hero", "3880×360 (10.8:1)", "h-24")}
+      {renderAdSlot("homepage-banner-top", "3880×360 px", "h-24")}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -233,23 +303,23 @@ function HomepagePreview({
           </div>
 
           {/* AD SECTION 5: Main Content Top */}
-          {renderAdSlot("homepage-content-top", 5, "Main Content Top", "2912×360 (8:1)", "h-24")}
+          {renderAdSlot("homepage-content-top", "2912×360 px", "h-24")}
 
           <p className="text-gray-500 text-sm">Latest News section...</p>
 
           {/* AD SECTION 6: Main Content Middle 1 */}
-          {renderAdSlot("homepage-content-middle-1", 6, "Main Content Middle 1", "2912×360 (8:1)", "h-24")}
+          {renderAdSlot("homepage-content-middle-1", "2912×360 px", "h-24")}
 
           <p className="text-gray-500 text-sm">Business section...</p>
 
           {/* AD SECTION 7: Main Content Middle 2 */}
-          {renderAdSlot("homepage-content-middle-2", 7, "Main Content Middle 2", "2912×360 (8:1)", "h-24")}
+          {renderAdSlot("homepage-content-middle-2", "2912×360 px", "h-24")}
         </div>
 
         {/* Sidebar */}
         <div className="lg:col-span-4 space-y-6">
           {/* AD SECTION 2: Sidebar Top (Static Box) */}
-          {renderAdSlot("homepage-sidebar-top", 2, "Sidebar Top (Above Trending)", "1200×1200 (1:1)", "h-64")}
+          {renderAdSlot("homepage-sidebar-top", "1200×1200 px", "h-64")}
 
           <div className="bg-gray-50 p-4 rounded">
             <h3 className="text-sm font-bold mb-2">Trending Now</h3>
@@ -257,7 +327,7 @@ function HomepagePreview({
           </div>
 
           {/* AD SECTION 3: Sidebar Middle */}
-          {renderAdSlot("homepage-sidebar-middle", 3, "Sidebar Middle", "1200×1000 (1.2:1)", "h-48")}
+          {renderAdSlot("homepage-sidebar-middle", "1200×1000 px", "h-48")}
 
           <div className="bg-gray-50 p-4 rounded">
             <h3 className="text-sm font-bold mb-2">Editor's Picks</h3>
@@ -265,13 +335,13 @@ function HomepagePreview({
           </div>
 
           {/* AD SECTION 4: Sidebar Bottom */}
-          {renderAdSlot("homepage-sidebar-bottom", 4, "Sidebar Bottom", "1200×1000 (1.2:1)", "h-48")}
+          {renderAdSlot("homepage-sidebar-bottom", "1200×1000 px", "h-48")}
         </div>
       </div>
 
       {/* AD SECTION 8: Banner Bottom */}
       <div className="mt-6">
-        {renderAdSlot("homepage-banner-bottom", 8, "Banner Bottom", "3880×360 (10.8:1)", "h-24")}
+        {renderAdSlot("homepage-banner-bottom", "3880×360 px", "h-24")}
       </div>
     </div>
   );
@@ -283,54 +353,63 @@ function HomepageMobilePreview({
   isSlotSelected,
   previewAd,
   adsBySlot,
+  onRemoveAdFromSlot,
 }: {
   selectedSlots: string[];
   onSlotClick: (slot: string) => void;
   isSlotSelected: (slot: string) => boolean;
   previewAd?: { image_url: string; title: string | null };
-  adsBySlot: Record<string, string[]>;
+  adsBySlot: Record<string, AdOccupant[]>;
+  onRemoveAdFromSlot?: (adId: string, slotId: string) => void;
 }) {
   const currentInSlot = (slotId: string) => adsBySlot[slotId] ?? [];
-  const size = "1200×600 (2:1)";
+  const size = "1200×600 px";
 
-  const renderMobileSlot = (slotId: string, sectionNumber: number, label: string) => {
+  const renderMobileSlot = (slotId: string) => {
     const currentAds = currentInSlot(slotId);
     return (
       <div
         onClick={() => onSlotClick(slotId)}
         className={`mb-6 p-4 border-2 rounded-lg transition cursor-pointer ${
           isSlotSelected(slotId)
-            ? "border-[color:var(--color-riviera-blue)] bg-blue-50"
+            ? "border-[color:var(--admin-accent)] bg-black"
             : "border-dashed border-gray-300 hover:border-gray-400"
         }`}
       >
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs font-bold text-blue-700">MOBILE SECTION {sectionNumber}: {label}</div>
-          <div className="text-xs font-medium text-blue-600">Size: {size}</div>
+        <div className="mb-2 text-xs font-bold text-[color:var(--admin-accent)]">
+          {getAdSlotTableLabel(slotId)}
+          <span className="font-normal"> ({size})</span>
         </div>
         {previewAd && isSlotSelected(slotId) ? (
-          <div className="relative w-full aspect-[2/1] bg-gray-100 rounded overflow-hidden">
+          <div className="relative aspect-[2/1] w-full overflow-hidden rounded bg-black">
             <img
               src={previewAd.image_url}
               alt={previewAd.title || "Ad preview"}
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover"
               draggable={false}
             />
             {currentAds.length > 0 && (
-              <p className="absolute bottom-1 left-2 right-2 text-[10px] text-white bg-black/60 rounded px-2 py-1 truncate">
-                Also in slot: {currentAds.join(", ")}
-              </p>
+              <div className="absolute bottom-1 left-2 right-2 max-h-32 overflow-y-auto">
+                <SlotOccupantList
+                  ads={currentAds}
+                  slotId={slotId}
+                  onRemove={onRemoveAdFromSlot}
+                  variant="overlay"
+                />
+              </div>
             )}
           </div>
         ) : (
-          <div className="w-full aspect-[2/1] bg-gray-100 rounded flex flex-col items-center justify-center text-gray-400 text-sm p-2">
+          <div className="flex aspect-[2/1] w-full flex-col items-center justify-center rounded bg-gray-100 p-2 text-gray-400">
             {currentAds.length > 0 ? (
-              <>
-                <span className="text-xs font-medium text-gray-600 mb-1">Currently in this slot:</span>
-                <span className="text-xs text-gray-700 text-center">{currentAds.join(", ")}</span>
-              </>
+              <SlotOccupantList
+                ads={currentAds}
+                slotId={slotId}
+                onRemove={onRemoveAdFromSlot}
+                className="w-full justify-center px-1"
+              />
             ) : (
-              "Click to add ad here"
+              <span className="text-sm">Click to add ad here</span>
             )}
           </div>
         )}
@@ -350,14 +429,14 @@ function HomepageMobilePreview({
         <div className="h-3 bg-gray-200 rounded w-1/2" />
       </div>
 
-      {renderMobileSlot("homepage-banner-top-mobile", 1, "Below Hero")}
+      {renderMobileSlot("homepage-banner-top-mobile")}
 
       <div className="mb-4">
         <h2 className="text-lg font-bold mb-2">Latest News</h2>
         <p className="text-xs text-gray-500">Stories…</p>
       </div>
 
-      {renderMobileSlot("homepage-mobile-above-most-read", 2, "Above Trending Now")}
+      {renderMobileSlot("homepage-mobile-above-most-read")}
 
       <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
         <h3 className="text-sm font-bold text-gray-700 mb-2">Trending Now</h3>
@@ -368,7 +447,7 @@ function HomepageMobilePreview({
         </div>
       </div>
 
-      {renderMobileSlot("homepage-mobile-above-editors-picks", 3, "Above Editor’s Picks")}
+      {renderMobileSlot("homepage-mobile-above-editors-picks")}
 
       <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
         <h3 className="text-sm font-bold text-gray-700 mb-2">Editor’s Picks</h3>
@@ -379,7 +458,7 @@ function HomepageMobilePreview({
         </div>
       </div>
 
-      {renderMobileSlot("homepage-mobile-between-editors-picks-footer", 4, "Between Editor’s Picks & Footer")}
+      {renderMobileSlot("homepage-mobile-between-editors-picks-footer")}
 
       <div className="mt-8 pt-6 border-t border-gray-200 text-xs text-gray-500">Footer</div>
     </div>
@@ -392,12 +471,14 @@ function ArticlePreview({
   isSlotSelected,
   previewAd,
   adsBySlot = {},
+  onRemoveAdFromSlot,
 }: {
   selectedSlots: string[];
   onSlotClick: (slot: string) => void;
   isSlotSelected: (slot: string) => boolean;
   previewAd?: { image_url: string; title: string | null };
-  adsBySlot?: Record<string, string[]>;
+  adsBySlot?: Record<string, AdOccupant[]>;
+  onRemoveAdFromSlot?: (adId: string, slotId: string) => void;
 }) {
   const currentInSlot = (slotId: string) => adsBySlot[slotId] ?? [];
 
@@ -405,32 +486,41 @@ function ArticlePreview({
     const currentAds = currentInSlot(slotId);
     if (previewAd && isSlotSelected(slotId)) {
       return (
-        <>
-          <div className={`relative w-full ${heightClass} bg-gray-100 rounded overflow-hidden`}>
-            <img
-              src={previewAd.image_url}
-              alt={previewAd.title || "Ad preview"}
-              className="w-full h-full object-cover"
-              draggable={false}
-            />
-            {currentAds.length > 0 && (
-              <p className="absolute bottom-1 left-2 right-2 text-[10px] text-white bg-black/60 rounded px-2 py-1 truncate">
-                Also in slot: {currentAds.join(", ")}
-              </p>
-            )}
-          </div>
-        </>
+        <div className={`relative w-full ${heightClass} overflow-hidden rounded bg-black`}>
+          <img
+            src={previewAd.image_url}
+            alt={previewAd.title || "Ad preview"}
+            className="h-full w-full object-cover"
+            draggable={false}
+          />
+          {currentAds.length > 0 && (
+            <div className="absolute bottom-1 left-2 right-2 max-h-32 overflow-y-auto">
+              <SlotOccupantList
+                ads={currentAds}
+                slotId={slotId}
+                onRemove={onRemoveAdFromSlot}
+                variant="overlay"
+              />
+            </div>
+          )}
+        </div>
       );
     }
     return (
-      <div className={`w-full ${heightClass} bg-gray-100 rounded flex flex-col items-center justify-center text-gray-400 text-sm p-2`}>
+      <div
+        className={`flex w-full flex-col ${heightClass} items-center justify-center rounded bg-gray-100 p-2 text-gray-400`}
+      >
         {currentAds.length > 0 ? (
-          <>
-            <span className="text-xs font-medium text-gray-600 mb-1">Currently in this slot:</span>
-            <span className="text-xs text-gray-700 text-center">{currentAds.join(", ")}</span>
-          </>
+          <SlotOccupantList
+            ads={currentAds}
+            slotId={slotId}
+            onRemove={onRemoveAdFromSlot}
+            className="w-full justify-center px-1"
+          />
+        ) : isSlotSelected(slotId) ? (
+          <span className="text-sm">Ad Preview</span>
         ) : (
-          isSlotSelected(slotId) ? "Ad Preview" : "Click to add ad here"
+          <span className="text-sm">Click to add ad here</span>
         )}
       </div>
     );
@@ -458,13 +548,13 @@ function ArticlePreview({
             onClick={() => onSlotClick("article-inline-1")}
             className={`p-4 border-2 rounded-lg transition cursor-pointer ${
               isSlotSelected("article-inline-1")
-                ? "border-[color:var(--color-riviera-blue)] bg-blue-50"
+                ? "border-[color:var(--admin-accent)] bg-black"
                 : "border-dashed border-gray-300 hover:border-gray-400"
             }`}
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold text-gray-500">INLINE AD SLOT 1</div>
-              <div className="text-xs font-medium text-blue-600">Size: 2912×360 (8:1)</div>
+            <div className="mb-2 text-xs font-bold text-[color:var(--admin-accent)]">
+              {getAdSlotTableLabel("article-inline-1")}
+              <span className="font-normal"> (2912×360 px)</span>
             </div>
             {renderSlotContent("article-inline-1", "h-32")}
           </div>
@@ -478,13 +568,13 @@ function ArticlePreview({
             onClick={() => onSlotClick("article-inline-2")}
             className={`p-4 border-2 rounded-lg transition cursor-pointer ${
               isSlotSelected("article-inline-2")
-                ? "border-[color:var(--color-riviera-blue)] bg-blue-50"
+                ? "border-[color:var(--admin-accent)] bg-black"
                 : "border-dashed border-gray-300 hover:border-gray-400"
             }`}
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold text-gray-500">INLINE AD SLOT 2</div>
-              <div className="text-xs font-medium text-blue-600">Size: 2912×360 (8:1)</div>
+            <div className="mb-2 text-xs font-bold text-[color:var(--admin-accent)]">
+              {getAdSlotTableLabel("article-inline-2")}
+              <span className="font-normal"> (2912×360 px)</span>
             </div>
             {renderSlotContent("article-inline-2", "h-32")}
           </div>
@@ -501,13 +591,13 @@ function ArticlePreview({
             onClick={() => onSlotClick("article-sidebar-top")}
             className={`p-4 border-2 rounded-lg transition cursor-pointer ${
               isSlotSelected("article-sidebar-top")
-                ? "border-[color:var(--color-riviera-blue)] bg-blue-50"
+                ? "border-[color:var(--admin-accent)] bg-black"
                 : "border-dashed border-gray-300 hover:border-gray-400"
             }`}
           >
-            <div className="flex flex-col gap-1 mb-2">
-              <div className="text-xs font-semibold text-gray-500">TOP SIDEBAR AD (Static)</div>
-              <div className="text-xs font-medium text-blue-600">Size: 1600×2000 (Large Rectangle)</div>
+            <div className="mb-2 text-xs font-bold text-[color:var(--admin-accent)]">
+              {getAdSlotTableLabel("article-sidebar-top")}
+              <span className="font-normal"> (1600×2000 px)</span>
             </div>
             {renderSlotContent("article-sidebar-top", "h-[500px]")}
           </div>
@@ -530,13 +620,13 @@ function ArticlePreview({
             onClick={() => onSlotClick("article-sidebar-bottom")}
             className={`p-4 border-2 rounded-lg transition cursor-pointer ${
               isSlotSelected("article-sidebar-bottom")
-                ? "border-[color:var(--color-riviera-blue)] bg-blue-50"
+                ? "border-[color:var(--admin-accent)] bg-black"
                 : "border-dashed border-gray-300 hover:border-gray-400"
             }`}
           >
-            <div className="flex flex-col gap-1 mb-2">
-              <div className="text-xs font-semibold text-gray-500">BOTTOM SIDEBAR AD (Sticky)</div>
-              <div className="text-xs font-medium text-blue-600">Size: 1600×2000 (Large Rectangle)</div>
+            <div className="mb-2 text-xs font-bold text-[color:var(--admin-accent)]">
+              {getAdSlotTableLabel("article-sidebar-bottom")}
+              <span className="font-normal"> (1600×2000 px)</span>
             </div>
             {renderSlotContent("article-sidebar-bottom", "h-[500px]")}
           </div>
@@ -552,54 +642,63 @@ function ArticleMobilePreview({
   isSlotSelected,
   previewAd,
   adsBySlot = {},
+  onRemoveAdFromSlot,
 }: {
   selectedSlots: string[];
   onSlotClick: (slot: string) => void;
   isSlotSelected: (slot: string) => boolean;
   previewAd?: { image_url: string; title: string | null };
-  adsBySlot?: Record<string, string[]>;
+  adsBySlot?: Record<string, AdOccupant[]>;
+  onRemoveAdFromSlot?: (adId: string, slotId: string) => void;
 }) {
   const currentInSlot = (slotId: string) => adsBySlot[slotId] ?? [];
-  const size = "1200×600 (2:1)";
+  const size = "1200×600 px";
 
-  const renderMobileSlot = (slotId: string, sectionNumber: number, label: string) => {
+  const renderMobileSlot = (slotId: string) => {
     const currentAds = currentInSlot(slotId);
     return (
       <div
         onClick={() => onSlotClick(slotId)}
         className={`mb-6 p-4 border-2 rounded-lg transition cursor-pointer ${
           isSlotSelected(slotId)
-            ? "border-[color:var(--color-riviera-blue)] bg-blue-50"
+            ? "border-[color:var(--admin-accent)] bg-black"
             : "border-dashed border-gray-300 hover:border-gray-400"
         }`}
       >
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs font-bold text-blue-700">MOBILE SECTION {sectionNumber}: {label}</div>
-          <div className="text-xs font-medium text-blue-600">Size: {size}</div>
+        <div className="mb-2 text-xs font-bold text-[color:var(--admin-accent)]">
+          {getAdSlotTableLabel(slotId)}
+          <span className="font-normal"> ({size})</span>
         </div>
         {previewAd && isSlotSelected(slotId) ? (
-          <div className="relative w-full aspect-[2/1] bg-gray-100 rounded overflow-hidden">
+          <div className="relative aspect-[2/1] w-full overflow-hidden rounded bg-black">
             <img
               src={previewAd.image_url}
               alt={previewAd.title || "Ad preview"}
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover"
               draggable={false}
             />
             {currentAds.length > 0 && (
-              <p className="absolute bottom-1 left-2 right-2 text-[10px] text-white bg-black/60 rounded px-2 py-1 truncate">
-                Also in slot: {currentAds.join(", ")}
-              </p>
+              <div className="absolute bottom-1 left-2 right-2 max-h-32 overflow-y-auto">
+                <SlotOccupantList
+                  ads={currentAds}
+                  slotId={slotId}
+                  onRemove={onRemoveAdFromSlot}
+                  variant="overlay"
+                />
+              </div>
             )}
           </div>
         ) : (
-          <div className="w-full aspect-[2/1] bg-gray-100 rounded flex flex-col items-center justify-center text-gray-400 text-sm p-2">
+          <div className="flex aspect-[2/1] w-full flex-col items-center justify-center rounded bg-gray-100 p-2 text-gray-400">
             {currentAds.length > 0 ? (
-              <>
-                <span className="text-xs font-medium text-gray-600 mb-1">Currently in this slot:</span>
-                <span className="text-xs text-gray-700 text-center">{currentAds.join(", ")}</span>
-              </>
+              <SlotOccupantList
+                ads={currentAds}
+                slotId={slotId}
+                onRemove={onRemoveAdFromSlot}
+                className="w-full justify-center px-1"
+              />
             ) : (
-              "Click to add ad here"
+              <span className="text-sm">Click to add ad here</span>
             )}
           </div>
         )}
@@ -622,7 +721,7 @@ function ArticleMobilePreview({
         </div>
       </div>
 
-      {renderMobileSlot("article-mobile-inline", 1, "Between Content Blocks")}
+      {renderMobileSlot("article-mobile-inline")}
 
       <div className="mb-6 space-y-2">
         <div className="h-3 bg-gray-200 rounded w-full" />
@@ -630,7 +729,7 @@ function ArticleMobilePreview({
         <div className="h-3 bg-gray-200 rounded w-9/12" />
       </div>
 
-      {renderMobileSlot("article-mobile-end", 2, "End of Article")}
+      {renderMobileSlot("article-mobile-end")}
 
       <div className="mb-4 pb-4 border-b border-gray-200">
         <div className="flex flex-wrap gap-2">
@@ -642,7 +741,7 @@ function ArticleMobilePreview({
         </div>
       </div>
 
-      {renderMobileSlot("article-mobile-below-tags", 3, "Below Tags")}
+      {renderMobileSlot("article-mobile-below-tags")}
     </div>
   );
 }

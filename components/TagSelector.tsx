@@ -139,14 +139,14 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
   return (
     <div className="space-y-4">
       {/* Mode Selector */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <button
           type="button"
           onClick={() => setMode("existing")}
           className={`px-4 py-2 rounded-md font-semibold transition ${
             mode === "existing"
-              ? "bg-[color:var(--color-riviera-blue)] text-white"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              ? "bg-[var(--admin-accent)] text-black"
+              : "bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] border border-[var(--admin-border)] hover:border-[var(--admin-accent)]/50"
           }`}
         >
           Use Existing Tag
@@ -156,8 +156,8 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
           onClick={() => setMode("new")}
           className={`px-4 py-2 rounded-md font-semibold transition ${
             mode === "new"
-              ? "bg-[color:var(--color-riviera-blue)] text-white"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              ? "bg-[var(--admin-accent)] text-black"
+              : "bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] border border-[var(--admin-border)] hover:border-[var(--admin-accent)]/50"
           }`}
         >
           Create New Tag
@@ -167,8 +167,8 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
           onClick={() => setMode("hidden")}
           className={`px-4 py-2 rounded-md font-semibold transition ${
             mode === "hidden"
-              ? "bg-[color:var(--color-riviera-blue)] text-white"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              ? "bg-[var(--admin-accent)] text-black"
+              : "bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] border border-[var(--admin-border)] hover:border-[var(--admin-accent)]/50"
           }`}
         >
           Hidden Tags {hiddenTags.length > 0 && `(${hiddenTags.length})`}
@@ -177,19 +177,19 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
 
       {/* Selected Tags Display */}
       {selectedTags.length > 0 && (
-        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-          <p className="text-sm font-semibold text-gray-700 mb-2">Selected Tags:</p>
+        <div className="bg-[var(--admin-table-header-bg)] rounded-lg p-4 border border-[var(--admin-border)]">
+          <p className="text-sm font-semibold text-[var(--admin-text)] mb-2">Selected Tags:</p>
           <div className="flex flex-wrap gap-2">
             {selectedTags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-2 px-3 py-1 bg-[color:var(--color-riviera-blue)] text-white text-sm font-medium rounded-full"
+                className="inline-flex items-center gap-2 px-3 py-1 bg-[var(--admin-accent)] text-black text-sm font-medium rounded-full"
               >
                 {tag}
                 <button
                   type="button"
                   onClick={() => handleRemoveTag(tag)}
-                  className="hover:bg-white/20 rounded-full p-0.5 transition"
+                  className="hover:bg-black/15 rounded-full p-0.5 transition"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -205,14 +205,14 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
       {mode === "existing" && (
         <div>
           {loading ? (
-            <p className="text-sm text-gray-500">Loading existing tags...</p>
+            <p className="text-sm text-[var(--admin-text-muted)]">Loading existing tags...</p>
           ) : existingTags.length === 0 ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-[var(--admin-text-muted)]">
               No existing tags found. Create a new tag to get started.
             </p>
           ) : (
-            <div className="border border-gray-300 rounded-lg p-4 max-h-64 overflow-y-auto">
-              <p className="text-sm font-semibold text-gray-700 mb-3">
+            <div className="border border-[var(--admin-border)] rounded-lg p-4 max-h-64 overflow-y-auto bg-[var(--admin-table-header-bg)]">
+              <p className="text-sm font-semibold text-[var(--admin-text)] mb-3">
                 Click to add existing tags (hover to hide):
               </p>
               <div className="flex flex-wrap gap-2">
@@ -227,8 +227,8 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
                       disabled={processingTag === tag}
                       className={`px-3 py-1 pr-8 text-sm font-medium rounded-full transition ${
                         selectedTags.includes(tag)
-                          ? "bg-[color:var(--color-riviera-blue)] text-white"
-                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                          ? "bg-[var(--admin-accent)] text-black"
+                          : "bg-[var(--admin-card-bg)] text-[var(--admin-text)] border border-[var(--admin-border)] hover:border-[var(--admin-accent)]/50"
                       } ${processingTag === tag ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
                       {tag}
@@ -240,7 +240,7 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
                         handleHideTag(tag);
                       }}
                       disabled={processingTag === tag}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 hover:bg-orange-500 text-gray-600 hover:text-white rounded-full p-1 transition-all"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 hover:bg-[var(--admin-accent-hover)] text-[var(--admin-text-muted)] hover:text-black rounded-full p-1 transition-all"
                       title="Hide this tag from the list"
                     >
                       {processingTag === tag ? (
@@ -274,18 +274,18 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
                 }
               }}
               placeholder="Enter new tag name..."
-              className="flex-1 border border-gray-300 rounded-md px-4 py-2"
+              className="flex-1 border border-[var(--admin-border)] rounded-md px-4 py-2 bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)]"
             />
             <button
               type="button"
               onClick={handleAddNewTag}
               disabled={!newTagInput.trim()}
-              className="px-4 py-2 bg-[color:var(--color-riviera-blue)] text-white rounded-md font-semibold hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="px-4 py-2 bg-[var(--admin-accent)] text-black rounded-md font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               Add Tag
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-[var(--admin-text-muted)] mt-2">
             Press Enter or click "Add Tag" to add the new tag
           </p>
         </div>
@@ -295,14 +295,14 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
       {mode === "hidden" && (
         <div>
           {loading ? (
-            <p className="text-sm text-gray-500">Loading hidden tags...</p>
+            <p className="text-sm text-[var(--admin-text-muted)]">Loading hidden tags...</p>
           ) : hiddenTags.length === 0 ? (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-[var(--admin-text-muted)]">
               No hidden tags. Tags you hide will appear here.
             </p>
           ) : (
-            <div className="border border-orange-300 bg-orange-50 rounded-lg p-4 max-h-64 overflow-y-auto">
-              <p className="text-sm font-semibold text-gray-700 mb-3">
+            <div className="border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] rounded-lg p-4 max-h-64 overflow-y-auto">
+              <p className="text-sm font-semibold text-[var(--admin-text)] mb-3">
                 Click to unhide tags:
               </p>
               <div className="flex flex-wrap gap-2">
@@ -312,7 +312,7 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
                     type="button"
                     onClick={() => handleUnhideTag(tag)}
                     disabled={processingTag === tag}
-                    className="inline-flex items-center gap-2 px-3 py-1 text-sm font-medium bg-orange-200 text-orange-800 hover:bg-orange-300 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 px-3 py-1 text-sm font-medium bg-[var(--admin-card-bg)] text-[var(--admin-accent)] border border-[var(--admin-accent)]/40 hover:bg-[var(--admin-accent)]/15 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {processingTag === tag ? (
                       <div className="w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>

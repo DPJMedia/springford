@@ -13,9 +13,11 @@ type AvatarProps = {
   email?: string | null;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   className?: string;
+  /** Initials-only fallback background: site blue (default) or admin accent orange */
+  fallbackTone?: "brand" | "accent";
 };
 
-export function Avatar({ src, name, email, size = "md", className = "" }: AvatarProps) {
+export function Avatar({ src, name, email, size = "md", className = "", fallbackTone = "brand" }: AvatarProps) {
   const [imgError, setImgError] = useState(false);
   const sizeClasses = {
     xs: "w-6 h-6 text-xs",
@@ -44,7 +46,9 @@ export function Avatar({ src, name, email, size = "md", className = "" }: Avatar
 
   const bgColor = isDiffuseAI
     ? "bg-gradient-to-br from-[#ff9628] to-[#ff7300]"
-    : "bg-[color:var(--color-riviera-blue)]";
+    : fallbackTone === "accent"
+      ? "bg-[var(--admin-accent)]"
+      : "bg-[color:var(--color-riviera-blue)]";
 
   return (
     <div

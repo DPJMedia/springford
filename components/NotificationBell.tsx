@@ -132,7 +132,7 @@ export function NotificationBell({ embedded = false, isOpen = false, onClose, on
     if (notification.target_type === "ad" || notification.type?.includes("ad")) {
       return "/admin/ads";
     }
-    return "/admin";
+    return "/admin/articles";
   }
 
   function getDisplayType(notification: Notification): "Article" | "Ad" {

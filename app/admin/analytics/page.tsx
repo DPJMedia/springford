@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
+import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
 import dynamic from "next/dynamic";
+import { compareAdSlotsForTable, formatAdSlotDisplayName } from "@/lib/analytics/adSlotDisplay";
 
 // Dynamically import Chart components with no SSR
 const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
@@ -38,33 +41,70 @@ if (typeof window !== 'undefined') {
   });
 }
 
-/** Y-axis max options — zoom out extends further so high-traffic days stay visible */
-const Y_AXIS_MAX_STEPS = [
-  10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000,
-] as const;
-
-/** Geographic lists: 10 collapsed, max 50 when expanded (avoids rendering hundreds of rows) */
-const GEO_LIST_COLLAPSED = 10;
+/** Geographic lists: top 5 visible; expand shows up to max (avoids rendering hundreds of rows) */
+const GEO_LIST_COLLAPSED = 5;
 const GEO_LIST_EXPANDED_MAX = 50;
 
+/** Diffuse admin UI / Chart.js — Space Grotesk (see app/layout.tsx --font-space-grotesk) */
+const CHART_FONT_FAMILY = '"Space Grotesk", system-ui, sans-serif';
+
+const navItemActive = "bg-[var(--admin-accent)]/20 text-[var(--admin-accent)]";
+const navItemInactive =
+  "text-[var(--admin-text)] hover:bg-[var(--admin-card-bg)]";
+
+/** Revenue potential: 6 advertisers × $150/mo each, scaled to last-30-day page views vs 10k baseline. */
+const REVENUE_BASELINE_MONTHLY_VIEWS = 10_000;
+const REVENUE_ADVERTISERS = 6;
+const REVENUE_MONTHLY_PER_ADVERTISER_USD = 150;
+
+type DashboardTimeRange = "7d" | "30d" | "90d" | "all";
+/** Chart window: independent from dashboard metrics when changed from the chart control only. */
+type ChartTimeRange = "24h" | "7d" | "30d" | "90d" | "all";
+
+function chartRangeFromSidebar(tr: DashboardTimeRange): ChartTimeRange {
+  switch (tr) {
+    case "7d":
+      return "7d";
+    case "30d":
+      return "30d";
+    case "90d":
+      return "90d";
+    case "all":
+      return "all";
+  }
+}
+
+/** Y max: peak of visible series for the chart time range, rounded up to the next 500 views (min 500). */
+function computeFitYAxisMaxFromSeries(
+  series: { homepage: number; article: number }[],
+  showHomepage: boolean,
+  showArticle: boolean,
+): number | null {
+  const all: number[] = [];
+  if (showHomepage) for (const p of series) all.push(p.homepage);
+  if (showArticle) for (const p of series) all.push(p.article);
+  if (all.length === 0) return null;
+  const maxVal = Math.max(...all);
+  return Math.max(500, Math.ceil(maxVal / 500) * 500);
+}
+
 export default function AnalyticsPage() {
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+  const [timeRange, setTimeRange] = useState<DashboardTimeRange>("30d");
   
   // Executive metrics
   const [totalPageViews, setTotalPageViews] = useState(0);
+  const [allTimePageViews, setAllTimePageViews] = useState(0);
   const [avgSessionDuration, setAvgSessionDuration] = useState(0);
   const [totalAdImpressions, setTotalAdImpressions] = useState(0);
   const [engagementRate, setEngagementRate] = useState(0);
-  const [revenueEst, setRevenueEst] = useState(0);
+  const [pageViewsLast30Days, setPageViewsLast30Days] = useState(0);
   
   // Content metrics
   const [topArticles, setTopArticles] = useState<any[]>([]);
   const [sectionPerformance, setSectionPerformance] = useState<any[]>([]);
   const [authorPerformance, setAuthorPerformance] = useState<any[]>([]);
   const [avgReadingTime, setAvgReadingTime] = useState(0);
-  const [completionRate, setCompletionRate] = useState(0);
   const [publishedArticleCount, setPublishedArticleCount] = useState(0);
 
   // Ad metrics
@@ -90,30 +130,33 @@ export default function AnalyticsPage() {
   const [trafficChartData, setTrafficChartData] = useState<any>(null);
   const [deviceChartData, setDeviceChartData] = useState<any>(null);
   
-  // Chart controls
-  const [chartTimeRange, setChartTimeRange] = useState<'24h' | '7d' | '30d' | '90d'>('7d');
+  // Chart controls (defaults match sidebar so the chart uses the same window until overridden in-chart)
+  const [chartTimeRange, setChartTimeRange] = useState<ChartTimeRange>("30d");
   const [yAxisMax, setYAxisMax] = useState(1000);
   const [showHomepageViews, setShowHomepageViews] = useState(true);
   const [showArticleViews, setShowArticleViews] = useState(true);
-  const [showTrafficChart, setShowTrafficChart] = useState(false);
-  const [showDeviceChart, setShowDeviceChart] = useState(false);
   
   // View more controls
   const [showAllCities, setShowAllCities] = useState(false);
   const [showAllStates, setShowAllStates] = useState(false);
   
-  const router = useRouter();
   const supabase = createClient();
 
-  useEffect(() => {
-    checkUser();
-  }, []);
+  const isInitialAnalyticsLoad = useRef(true);
+  const prevDashboardTimeRangeRef = useRef<DashboardTimeRange>(timeRange);
 
   useEffect(() => {
-    if (user) {
-      void loadDashboard();
-    }
-  }, [user, timeRange, chartTimeRange]);
+    const dashboardRangeChanged =
+      isInitialAnalyticsLoad.current || prevDashboardTimeRangeRef.current !== timeRange;
+    isInitialAnalyticsLoad.current = false;
+    prevDashboardTimeRangeRef.current = timeRange;
+    void loadDashboard(dashboardRangeChanged);
+  }, [timeRange, chartTimeRange]);
+
+  function applySidebarTimeRange(next: DashboardTimeRange) {
+    setTimeRange(next);
+    setChartTimeRange(chartRangeFromSidebar(next));
+  }
 
   /** Rebuild Chart.js config when toggles or series change (no extra network). */
   useEffect(() => {
@@ -136,8 +179,8 @@ export default function AnalyticsPage() {
       datasets.push({
         label: "Homepage Views",
         data: chartSeriesRaw.map((p) => p.homepage),
-        borderColor: "rgb(59, 130, 246)",
-        backgroundColor: "rgba(59, 130, 246, 0.1)",
+        borderColor: "rgb(209, 213, 219)",
+        backgroundColor: "rgba(209, 213, 219, 0.1)",
         fill: true,
         tension: 0.4,
         borderWidth: 2,
@@ -147,8 +190,8 @@ export default function AnalyticsPage() {
       datasets.push({
         label: "Article Views",
         data: chartSeriesRaw.map((p) => p.article),
-        borderColor: "rgb(16, 185, 129)",
-        backgroundColor: "rgba(16, 185, 129, 0.1)",
+        borderColor: "rgb(255, 150, 40)",
+        backgroundColor: "rgba(255, 150, 40, 0.1)",
         fill: true,
         tension: 0.4,
         borderWidth: 2,
@@ -157,18 +200,19 @@ export default function AnalyticsPage() {
     setPageViewsOverTime({ labels, datasets });
   }, [chartSeriesRaw, serverChartGranularity, showHomepageViews, showArticleViews]);
 
-  async function checkUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-    setUser(user);
-  }
+  /** Y-axis fits the visible chart series for the selected chart time range */
+  useEffect(() => {
+    const next = computeFitYAxisMaxFromSeries(
+      chartSeriesRaw,
+      showHomepageViews,
+      showArticleViews,
+    );
+    if (next != null) setYAxisMax(next);
+  }, [chartSeriesRaw, showHomepageViews, showArticleViews, chartTimeRange]);
 
-  async function loadDashboard() {
+  async function loadDashboard(showFullPageLoading: boolean) {
     try {
-      setLoading(true);
+      if (showFullPageLoading) setLoading(true);
       const res = await fetch(
         `/api/admin/analytics-dashboard?timeRange=${encodeURIComponent(timeRange)}&chartTimeRange=${encodeURIComponent(chartTimeRange)}`,
         { credentials: "include" },
@@ -181,17 +225,16 @@ export default function AnalyticsPage() {
       const d = await res.json();
 
       setTotalPageViews(d.totalPageViews ?? 0);
+      setAllTimePageViews(d.allTimePageViews ?? 0);
       setAvgSessionDuration(d.avgSessionSeconds ?? 0);
       setTotalAdImpressions(d.totalAdImpressions ?? 0);
-      const impressions = d.totalAdImpressions ?? 0;
-      setRevenueEst((impressions / 1000) * 5);
+      setPageViewsLast30Days(d.pageViewsLast30Days ?? 0);
       const pv = d.totalPageViews ?? 0;
       const clicks = d.adClicksInRange ?? 0;
       setEngagementRate(pv > 0 ? (clicks / pv) * 100 : 0);
 
       setPublishedArticleCount(d.publishedArticleCount ?? 0);
       setTopArticles(Array.isArray(d.topArticles) ? d.topArticles : []);
-      setCompletionRate(Number(d.completionRatePercent) || 0);
       setAvgReadingTime(d.avgReadingTimeSeconds ?? 0);
 
       setSectionPerformance(Array.isArray(d.sectionPerformance) ? d.sectionPerformance : []);
@@ -212,7 +255,7 @@ export default function AnalyticsPage() {
           datasets: [
             {
               data: traffic.map((s: { count: number }) => s.count),
-              backgroundColor: ["rgba(59, 130, 246, 0.8)", "rgba(16, 185, 129, 0.8)"],
+              backgroundColor: ["rgba(209, 213, 219, 0.8)", "rgba(255, 150, 40, 0.8)"],
             },
           ],
         });
@@ -229,9 +272,9 @@ export default function AnalyticsPage() {
             {
               data: devices.map((x: { count: number }) => x.count),
               backgroundColor: [
-                "rgba(16, 185, 129, 0.8)",
-                "rgba(59, 130, 246, 0.8)",
-                "rgba(245, 158, 11, 0.8)",
+                "rgba(255, 150, 40, 0.8)",
+                "rgba(209, 213, 219, 0.8)",
+                "rgba(156, 163, 175, 0.8)",
               ],
             },
           ],
@@ -248,221 +291,207 @@ export default function AnalyticsPage() {
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
-      setLoading(false);
+      if (showFullPageLoading) setLoading(false);
     }
   }
 
-  function zoomIn() {
-    setYAxisMax((prev) => {
-      const idx = Y_AXIS_MAX_STEPS.findIndex((x) => x === prev);
-      if (idx > 0) return Y_AXIS_MAX_STEPS[idx - 1];
-      const smaller = [...Y_AXIS_MAX_STEPS].filter((x) => x < prev).pop();
-      return smaller ?? Y_AXIS_MAX_STEPS[0];
-    });
-  }
+  const revenueEst = useMemo(
+    () =>
+      (pageViewsLast30Days / REVENUE_BASELINE_MONTHLY_VIEWS) *
+      REVENUE_ADVERTISERS *
+      REVENUE_MONTHLY_PER_ADVERTISER_USD,
+    [pageViewsLast30Days],
+  );
 
-  function zoomOut() {
-    setYAxisMax((prev) => {
-      const idx = Y_AXIS_MAX_STEPS.findIndex((x) => x === prev);
-      if (idx >= 0 && idx < Y_AXIS_MAX_STEPS.length - 1) return Y_AXIS_MAX_STEPS[idx + 1];
-      const larger = Y_AXIS_MAX_STEPS.find((x) => x > prev);
-      return larger ?? Y_AXIS_MAX_STEPS[Y_AXIS_MAX_STEPS.length - 1];
-    });
-  }
+  const sortedAdSlotPerformance = useMemo(
+    () =>
+      [...adSlotPerformance].sort((a, b) =>
+        compareAdSlotsForTable(String(a.slot), String(b.slot)),
+      ),
+    [adSlotPerformance],
+  );
 
-  /** Set Y max so the tallest series fits (~10% headroom) */
-  function fitYAxisToData() {
-    if (!pageViewsOverTime?.datasets?.length) return;
-    const all: number[] = [];
-    for (const ds of pageViewsOverTime.datasets as { data?: number[] }[]) {
-      for (const n of ds.data ?? []) {
-        if (typeof n === "number") all.push(n);
-      }
-    }
-    if (all.length === 0) return;
-    const maxVal = Math.max(...all);
-    const target = Math.max(10, Math.ceil(maxVal * 1.1));
-    const next =
-      Y_AXIS_MAX_STEPS.find((x) => x >= target) ?? Y_AXIS_MAX_STEPS[Y_AXIS_MAX_STEPS.length - 1];
-    setYAxisMax(next);
-  }
+  const sortedCurrentAdsStats = useMemo(
+    () =>
+      [...currentAdsStats].sort((a, b) => {
+        const bySlot = compareAdSlotsForTable(String(a.ad_slot), String(b.ad_slot));
+        return bySlot !== 0 ? bySlot : String(a.name ?? "").localeCompare(String(b.name ?? ""));
+      }),
+    [currentAdsStats],
+  );
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[color:var(--color-riviera-blue)] border-r-transparent"></div>
-          <p className="mt-4 text-[color:var(--color-medium)]">Loading analytics...</p>
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[var(--admin-accent)] border-r-transparent"></div>
+          <p className="mt-4 text-[var(--admin-text-muted)]">Loading analytics...</p>
         </div>
       </div>
     );
   }
 
+  const timeRangeLabels = {
+    '7d': 'Last 7 Days',
+    '30d': 'Last 30 Days',
+    '90d': 'Last 90 Days',
+    'all': 'All Time'
+  };
+
+  const actionsPanel = (
+    <AdminActionsPanel
+      sections={[
+        {
+          title: "Time Period",
+          customContent: (
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => applySidebarTimeRange("7d")}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all ${
+                  timeRange === "7d" ? navItemActive : navItemInactive
+                }`}
+              >
+                Last 7 Days
+              </button>
+              <button
+                type="button"
+                onClick={() => applySidebarTimeRange("30d")}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all ${
+                  timeRange === "30d" ? navItemActive : navItemInactive
+                }`}
+              >
+                Last 30 Days
+              </button>
+              <button
+                type="button"
+                onClick={() => applySidebarTimeRange("90d")}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all ${
+                  timeRange === "90d" ? navItemActive : navItemInactive
+                }`}
+              >
+                Last 90 Days
+              </button>
+              <button
+                type="button"
+                onClick={() => applySidebarTimeRange("all")}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all ${
+                  timeRange === "all" ? navItemActive : navItemInactive
+                }`}
+              >
+                All Time
+              </button>
+            </div>
+          ),
+        },
+        {
+          title: "Actions",
+          items: [
+            {
+              icon: (
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              ),
+              label: "Export Data",
+              onClick: () => alert("Export functionality coming soon"),
+            },
+            {
+              icon: (
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              ),
+              label: "Refresh Data",
+              onClick: () => window.location.reload(),
+            },
+          ],
+        },
+      ]}
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-[color:var(--color-surface)]">
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-[color:var(--color-dark)] mb-2">Analytics Dashboard</h1>
-            <p className="text-[color:var(--color-medium)]">Comprehensive performance metrics and insights</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value as any)}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]"
-            >
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last 30 Days</option>
-              <option value="90d">Last 90 Days</option>
-              <option value="all">All Time</option>
-            </select>
-            <Link
-              href="/admin"
-              className="px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-gray-100 rounded-md transition"
-            >
-              ← Back
-            </Link>
-          </div>
-        </div>
+    <>
+      <AdminPageHeader 
+        title="Analytics"
+      />
 
-        {/* === EXECUTIVE SUMMARY === */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Executive Summary</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <MetricCard
-              title="Total Page Views"
+      <AdminPageLayout
+        actionsColumnClassName="xl:pt-11"
+        actionsPanel={actionsPanel}
+      >
+
+      {/* === CONTENT PERFORMANCE === */}
+      <div className="mb-8">
+          <h2 className="text-xl font-semibold text-white mb-4">Content Performance</h2>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+            <CompactStatCard
+              label="Published articles"
+              value={publishedArticleCount.toLocaleString()}
+              tooltip='Total number of articles with status "published" in article management (matches the CMS).'
+            />
+            <CompactStatCard
+              label={`${timeRangeLabels[timeRange]} views`}
               value={totalPageViews.toLocaleString()}
-              tooltip="Total number of pages viewed across your site. Each page load counts as one view, including multiple views from the same visitor."
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              }
-              color="blue"
+              tooltip="Total page views within the selected time period. Each page load counts as one view, including multiple views from the same visitor."
             />
-            <MetricCard
-              title="Avg Session Duration"
-              value={`${Math.floor(avgSessionDuration / 60)}:${String(avgSessionDuration % 60).padStart(2, '0')}`}
-              subtitle="minutes"
+            <CompactStatCard
+              label="All-time views"
+              value={allTimePageViews.toLocaleString()}
+              tooltip="Total number of pages viewed across your site since tracking began. Each page load counts as one view."
+            />
+            <CompactStatCard
+              label="Avg session duration"
+              value={`${Math.floor(avgSessionDuration / 60)}:${String(avgSessionDuration % 60).padStart(2, "0")}`}
               tooltip="Average time per session (sum of time-on-page with scroll activity ÷ unique sessions). Development / localhost geolocation and localhost referrers are excluded so local testing does not inflate this number."
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              }
-              color="green"
             />
-            <MetricCard
-              title="Revenue Potential"
-              value={`$${revenueEst.toFixed(2)}`}
-              subtitle={`${totalAdImpressions.toLocaleString()} impressions`}
-              tooltip="Estimated ad revenue based on $5 CPM (cost per 1,000 impressions). Actual revenue depends on your ad network and rates."
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              }
-              color="purple"
-            />
-            <MetricCard
-              title="Engagement Rate"
+            <CompactStatCard
+              label="Engagement rate"
               value={`${engagementRate.toFixed(2)}%`}
-              subtitle="clicks/views"
               tooltip="Percentage of page views that result in ad clicks. Higher rates indicate more engaged readers and better ad placement."
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              }
-              color="orange"
             />
-          </div>
-        </div>
-
-        {/* === CONTENT PERFORMANCE === */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Content Performance</h2>
-          </div>
-
-          {/* Quick stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-blue-500">
-              <div className="text-2xl font-black text-blue-600 mb-1">
-                {avgReadingTime > 0 ? `${Math.floor(avgReadingTime / 60)}:${String(avgReadingTime % 60).padStart(2, '0')}` : '0:00'}
-              </div>
-              <div className="text-sm font-semibold text-gray-600 flex items-center">
-                Avg Reading Time
-                <InfoTooltip text="Average time readers spend on articles, tracked from when they start reading until they navigate away. Calculated from article_scroll_data." />
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-green-500">
-              <div className="text-2xl font-black text-green-600 mb-1">
-                {completionRate.toFixed(1)}%
-              </div>
-              <div className="text-sm font-semibold text-gray-600 flex items-center">
-                Article Completion Rate
-                <InfoTooltip text="Percentage of readers who scroll to at least 90% of an article. Higher rates indicate engaging content that readers finish." />
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-purple-500">
-              <div className="text-2xl font-black text-purple-600 mb-1">
-                {publishedArticleCount.toLocaleString()}
-              </div>
-              <div className="text-sm font-semibold text-gray-600 flex items-center">
-                Published Articles
-                <InfoTooltip text="Total number of articles with status “published” in article management (matches the CMS)." />
-              </div>
-            </div>
+            <CompactStatCard
+              label="Revenue potential"
+              value={`$${revenueEst.toFixed(2)}`}
+              tooltip={`Estimated monthly revenue from last 30 days of page views: ${REVENUE_ADVERTISERS} advertisers × $${REVENUE_MONTHLY_PER_ADVERTISER_USD}/mo at ${REVENUE_BASELINE_MONTHLY_VIEWS.toLocaleString()} views (${(REVENUE_ADVERTISERS * REVENUE_MONTHLY_PER_ADVERTISER_USD).toLocaleString()} total at baseline). Scales linearly with views. Not actual billings.`}
+            />
           </div>
 
           {/* Top Articles Table */}
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-              <h3 className="text-lg font-bold text-[color:var(--color-dark)]">Top Articles</h3>
-            </div>
+          <h3 className="text-lg font-semibold text-white mb-3">Top Articles</h3>
+          <div className="bg-[var(--admin-card-bg)] rounded-lg overflow-hidden mb-6 border border-[var(--admin-border)]">
             {topArticles.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">No article data available</div>
+              <div className="p-8 text-center text-[var(--admin-text-muted)]">No article data available</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-[var(--admin-table-header-bg)]">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Views</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Time</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shares</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Rank</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Title</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Views</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Avg Time</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Shares</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-[var(--admin-border)]">
                     {topArticles.slice(0, 5).map((article, i) => (
-                      <tr key={article.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-bold text-gray-900">#{i + 1}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900 max-w-md">
-                          <Link href={`/article/${article.slug}`} target="_blank" className="hover:text-blue-600 hover:underline">
+                      <tr key={article.id} className="hover:bg-[var(--admin-table-row-hover)]">
+                        <td className="px-4 py-3 text-sm font-semibold text-[var(--admin-text)]">#{i + 1}</td>
+                        <td className="px-4 py-3 text-sm text-[var(--admin-text)] max-w-md">
+                          <Link href={`/article/${article.slug}`} target="_blank" className="hover:text-[var(--admin-accent)] hover:underline">
                             {article.title}
                           </Link>
                         </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                        <td className="px-4 py-3 text-sm font-semibold text-[var(--admin-text)]">
                           {article.view_count.toLocaleString()}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
+                        <td className="px-4 py-3 text-sm text-[var(--admin-text)]">
                           {article.avgTimeSpent > 0 ? `${Math.floor(article.avgTimeSpent / 60)}:${String(article.avgTimeSpent % 60).padStart(2, '0')}` : '-'}
                         </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                        <td className="px-4 py-3 text-sm font-semibold text-[var(--admin-text)]">
                           {article.share_count}
                         </td>
                       </tr>
@@ -474,118 +503,102 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Section & Author Performance */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">Top Sections</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-start">
+            <div className="flex flex-col">
+              <h3 className="text-lg font-semibold text-white mb-3">Top Sections</h3>
+              <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6">
               {sectionPerformance.length === 0 ? (
-                <p className="text-sm text-gray-500">No section data yet</p>
+                <p className="text-sm text-[var(--admin-text-muted)]">No section data yet</p>
               ) : (
                 <div className="space-y-3">
                   {sectionPerformance.map((section) => (
                     <div key={section.name} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700 capitalize">{section.name}</span>
-                      <div className="text-sm text-gray-600">
-                        {section.clicks} clicks • {section.views} views
+                      <span className="text-sm font-medium text-[var(--admin-text)] capitalize">{section.name}</span>
+                      <div className="text-sm font-semibold text-[var(--admin-text)]">
+                        {Number(section.views ?? 0).toLocaleString()} views
                       </div>
                     </div>
                   ))}
                 </div>
               )}
+              </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-bold text-[color:var(--color-dark)] mb-4">Top Authors</h3>
+            <div className="flex flex-col">
+              <h3 className="text-lg font-semibold text-white mb-3">Top Authors</h3>
+              <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6">
               {authorPerformance.length === 0 ? (
-                <p className="text-sm text-gray-500">No author click data yet</p>
+                <p className="text-sm text-[var(--admin-text-muted)]">No author click data yet</p>
               ) : (
                 <div className="space-y-3">
                   {authorPerformance.map((author) => (
                     <div key={author.name} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">{author.name}</span>
-                      <span className="text-sm font-semibold text-gray-900">{author.clicks} clicks</span>
+                      <span className="text-sm font-medium text-[var(--admin-text)]">{author.name}</span>
+                      <span className="text-sm font-semibold text-[var(--admin-text)]">{author.clicks} clicks</span>
                     </div>
                   ))}
                 </div>
               )}
+              </div>
             </div>
           </div>
-        </div>
+      </div>
 
-        {/* === AD PERFORMANCE === */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-            </svg>
-            <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Advertisement Performance</h2>
-          </div>
-
-          {/* Ad quick stat: revenue only */}
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
-            <div className="bg-white rounded-lg p-5 shadow-sm border-l-4 border-green-500 max-w-xs">
-              <div className="text-2xl font-black text-green-600 mb-1">
-                ${revenueEst.toFixed(2)}
-              </div>
-              <div className="text-sm font-semibold text-gray-600 flex items-center">
-                Est. Revenue (CPM $5)
-                <InfoTooltip text="Estimated advertising revenue calculated at $5 per 1,000 impressions (CPM). Actual rates vary by ad network and demand." />
-              </div>
-              <div className="text-xs text-gray-500 mt-1">Based on impressions (selected time range)</div>
+      {/* === AD PERFORMANCE === */}
+      <div className="mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="text-xl font-semibold text-white min-w-0">Advertisement Performance</h2>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setAdStatsView("all-time")}
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                  adStatsView === "all-time"
+                    ? "bg-[var(--admin-accent)] text-black"
+                    : "bg-[var(--admin-card-bg)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)] border border-[var(--admin-border)]"
+                }`}
+              >
+                All-Time by Slot
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdStatsView("current")}
+                className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
+                  adStatsView === "current"
+                    ? "bg-[var(--admin-accent)] text-black"
+                    : "bg-[var(--admin-card-bg)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)] border border-[var(--admin-border)]"
+                }`}
+              >
+                Current Ads
+              </button>
             </div>
           </div>
 
-          {/* Performance by ad slot: toggle between All-Time and Current Ad Stats */}
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              type="button"
-              onClick={() => setAdStatsView('all-time')}
-              className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
-                adStatsView === 'all-time'
-                  ? 'bg-[color:var(--color-riviera-blue)] text-white'
-                  : 'bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200'
-              }`}
-            >
-              All-Time Performance by Ad Slot
-            </button>
-            <button
-              type="button"
-              onClick={() => setAdStatsView('current')}
-              className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
-                adStatsView === 'current'
-                  ? 'bg-[color:var(--color-riviera-blue)] text-white'
-                  : 'bg-gray-100 text-[color:var(--color-dark)] hover:bg-gray-200'
-              }`}
-            >
-              Current Ad Stats
-            </button>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="bg-[var(--admin-card-bg)] rounded-lg overflow-hidden border border-[var(--admin-border)]">
             {adStatsView === 'all-time' ? (
               <>
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                  <h3 className="text-lg font-bold text-[color:var(--color-dark)]">All-Time Performance by Ad Slot</h3>
-                  <p className="text-xs text-gray-500 mt-1">Cumulative impressions and clicks per slot (no reset).</p>
-                </div>
                 {adSlotPerformance.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">No ad impression data yet</div>
+                  <div className="p-8 text-center text-[var(--admin-text-muted)]">No ad impression data yet</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-[var(--admin-table-header-bg)]">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Slot</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Impressions</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Clicks</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CTR</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Slot</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Impressions</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Clicks</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">CTR</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {adSlotPerformance.map((slot) => (
-                          <tr key={slot.slot} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{slot.slot}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{slot.impressions}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{slot.clicks}</td>
-                            <td className="px-4 py-3 text-sm font-semibold text-green-600">{slot.ctr}%</td>
+                      <tbody className="divide-y divide-[var(--admin-border)]">
+                        {sortedAdSlotPerformance.map((slot) => (
+                          <tr key={slot.slot} className="hover:bg-[var(--admin-table-row-hover)]">
+                            <td className="px-4 py-3 text-sm font-medium text-[var(--admin-text)]">
+                              {formatAdSlotDisplayName(String(slot.slot))}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-[var(--admin-text)]">{slot.impressions}</td>
+                            <td className="px-4 py-3 text-sm text-[var(--admin-text)]">{slot.clicks}</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-[var(--admin-text)]">{slot.ctr}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -595,32 +608,30 @@ export default function AnalyticsPage() {
               </>
             ) : (
               <>
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                  <h3 className="text-lg font-bold text-[color:var(--color-dark)]">Current Ad Stats</h3>
-                  <p className="text-xs text-gray-500 mt-1">Active ads on the site and their performance since being published.</p>
-                </div>
                 {currentAdsStats.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">No active ads right now</div>
+                  <div className="p-8 text-center text-[var(--admin-text-muted)]">No active ads right now</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-[var(--admin-table-header-bg)]">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ad Name</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ad Slot</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Impressions</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Clicks</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CTR</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Ad Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Ad Slot</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Impressions</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">Clicks</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--admin-text)] uppercase">CTR</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {currentAdsStats.map((row, idx) => (
-                          <tr key={`${row.ad_slot}-${row.name}-${idx}`} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.name}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{row.ad_slot}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{row.impressions}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{row.clicks}</td>
-                            <td className="px-4 py-3 text-sm font-semibold text-green-600">{row.ctr}%</td>
+                      <tbody className="divide-y divide-[var(--admin-border)]">
+                        {sortedCurrentAdsStats.map((row, idx) => (
+                          <tr key={`${row.ad_slot}-${row.name}-${idx}`} className="hover:bg-[var(--admin-table-row-hover)]">
+                            <td className="px-4 py-3 text-sm font-medium text-[var(--admin-text)]">{row.name}</td>
+                            <td className="px-4 py-3 text-sm text-[var(--admin-text)]">
+                              {formatAdSlotDisplayName(String(row.ad_slot))}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-[var(--admin-text)]">{row.impressions}</td>
+                            <td className="px-4 py-3 text-sm text-[var(--admin-text)]">{row.clicks}</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-[var(--admin-text)]">{row.ctr}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -630,99 +641,57 @@ export default function AnalyticsPage() {
               </>
             )}
           </div>
-        </div>
+      </div>
 
-        {/* === PAGE VIEWS CHART === */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Page Views Chart</h2>
+      {/* === PAGE VIEWS CHART === */}
+      <div className="mb-8">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="min-w-0 text-xl font-semibold text-white">Page Views Chart</h2>
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 [font-family:var(--font-space-grotesk),system-ui,sans-serif]">
+              <label className="sr-only" htmlFor="chart-time-range">
+                Chart time period
+              </label>
+              <select
+                id="chart-time-range"
+                value={chartTimeRange}
+                onChange={(e) => setChartTimeRange(e.target.value as ChartTimeRange)}
+                className="min-w-0 max-w-full cursor-pointer rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-card-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]/40 [font-family:inherit] [color-scheme:dark]"
+              >
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="90d">Last 90 Days</option>
+                <option value="all">All Time</option>
+              </select>
+              <button
+                type="button"
+                aria-pressed={showHomepageViews}
+                onClick={() => setShowHomepageViews((v) => !v)}
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                  showHomepageViews
+                    ? "bg-[var(--admin-accent)] text-black hover:opacity-90"
+                    : "border border-[var(--admin-border)] bg-[var(--admin-card-bg)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                }`}
+              >
+                Homepage views
+              </button>
+              <button
+                type="button"
+                aria-pressed={showArticleViews}
+                onClick={() => setShowArticleViews((v) => !v)}
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                  showArticleViews
+                    ? "bg-[var(--admin-accent)] text-black hover:opacity-90"
+                    : "border border-[var(--admin-border)] bg-[var(--admin-card-bg)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                }`}
+              >
+                Article views
+              </button>
             </div>
           </div>
 
-          {/* Chart Controls */}
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex flex-wrap items-center gap-4 mb-6">
-              {/* Time Period Selector */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">Time Period:</label>
-                <select
-                  value={chartTimeRange}
-                  onChange={(e) => setChartTimeRange(e.target.value as any)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="24h">Last 24 Hours</option>
-                  <option value="7d">Last 7 Days</option>
-                  <option value="30d">Last 30 Days</option>
-                  <option value="90d">Last 90 Days</option>
-                </select>
-              </div>
-
-              {/* Zoom Controls */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">Y-Axis:</label>
-                <button
-                  type="button"
-                  onClick={zoomOut}
-                  disabled={yAxisMax >= Y_AXIS_MAX_STEPS[Y_AXIS_MAX_STEPS.length - 1]}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-sm font-medium rounded-md transition"
-                >
-                  Zoom Out
-                </button>
-                <span className="text-sm font-semibold text-gray-700 min-w-[100px] text-center">
-                  0 – {yAxisMax.toLocaleString()}
-                </span>
-                <button
-                  type="button"
-                  onClick={zoomIn}
-                  disabled={yAxisMax <= Y_AXIS_MAX_STEPS[0]}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-sm font-medium rounded-md transition"
-                >
-                  Zoom In
-                </button>
-                <button
-                  type="button"
-                  onClick={fitYAxisToData}
-                  className="px-3 py-1.5 bg-[color:var(--color-riviera-blue)] text-white hover:opacity-90 text-sm font-medium rounded-md transition"
-                  title="Set vertical scale to fit the highest point in the chart"
-                >
-                  Fit to data
-                </button>
-              </div>
-
-              {/* View Type Checkboxes */}
-              <div className="flex items-center gap-4 ml-auto">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showHomepageViews}
-                    onChange={(e) => setShowHomepageViews(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
-                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                    Homepage Views
-                  </span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showArticleViews}
-                    onChange={(e) => setShowArticleViews(e.target.checked)}
-                    className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
-                  />
-                  <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
-                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                    Article Views
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* Chart */}
+          <div className="overflow-hidden rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)]">
+            <div className="p-4 sm:p-6">
             {pageViewsOverTime && (showHomepageViews || showArticleViews) ? (
               <div className="h-96">
                 <Line 
@@ -741,10 +710,10 @@ export default function AnalyticsPage() {
                       tooltip: {
                         enabled: true,
                         backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleFont: { size: 14, weight: 'bold' },
-                        bodyFont: { size: 13 },
+                        titleFont: { family: CHART_FONT_FAMILY, size: 14, weight: 'bold' },
+                        bodyFont: { family: CHART_FONT_FAMILY, size: 13 },
                         padding: 12,
-                        displayColors: true,
+                        displayColors: false,
                         callbacks: {
                           label: function(context: any) {
                             return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} views`;
@@ -757,7 +726,7 @@ export default function AnalyticsPage() {
                         beginAtZero: true,
                         max: yAxisMax,
                         ticks: {
-                          font: { size: 12 },
+                          font: { family: CHART_FONT_FAMILY, size: 12 },
                           maxTicksLimit: 12,
                           callback: function(value: any) {
                             return value.toLocaleString();
@@ -769,7 +738,7 @@ export default function AnalyticsPage() {
                       },
                       x: {
                         ticks: {
-                          font: { size: 12 },
+                          font: { family: CHART_FONT_FAMILY, size: 12 },
                           maxRotation: 45,
                           minRotation: 0,
                         },
@@ -782,35 +751,25 @@ export default function AnalyticsPage() {
                 />
               </div>
             ) : (
-              <div className="h-96 flex items-center justify-center text-gray-500">
+              <div className="h-96 flex items-center justify-center text-[var(--admin-text-muted)]">
                 <p>Please select at least one view type to display the chart</p>
               </div>
             )}
+            </div>
           </div>
-        </div>
+      </div>
 
-        {/* === LOCATION INSIGHTS === */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Geographic Insights</h2>
-          </div>
+      {/* === LOCATION INSIGHTS === */}
+      <div className="mb-8">
+          <h2 className="text-xl font-semibold text-white mb-4">Geographic Insights</h2>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Top Cities */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-[color:var(--color-dark)] flex items-center">
-                  Top Cities
-                  <span className="text-xs font-normal text-gray-500 ml-2">(Unique Visitors)</span>
-                  <InfoTooltip text="Cities where your visitors are located, based on IP geolocation. Each unique session ID is counted once per city." />
-                </h3>
-              </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-3">Top Cities</h3>
+              <div className="bg-[var(--admin-card-bg)] rounded-lg p-6 border border-[var(--admin-border)]">
               {topCities.length === 0 ? (
-                <p className="text-sm text-gray-500">No city data available yet</p>
+                <p className="text-sm text-[var(--admin-text-muted)]">No city data available yet</p>
               ) : (
                 <>
                   <div className="space-y-3">
@@ -824,14 +783,14 @@ export default function AnalyticsPage() {
                       return (
                         <div key={city.city}>
                           <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium text-gray-700">
+                            <span className="font-medium text-[var(--admin-text)]">
                               #{index + 1} {city.city}
                             </span>
-                            <span className="text-gray-900 font-semibold">{city.count} {visitorLabel} ({percentage}%)</span>
+                            <span className="text-[var(--admin-text)] font-semibold">{city.count} {visitorLabel} ({percentage}%)</span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-[var(--admin-content-bg)] rounded-full h-2">
                             <div 
-                              className="bg-blue-500 h-2 rounded-full transition-all"
+                              className="bg-[var(--admin-accent)] h-2 rounded-full transition-all"
                               style={{ width: `${percentage}%` }}
                             />
                           </div>
@@ -844,14 +803,12 @@ export default function AnalyticsPage() {
                       <button
                         type="button"
                         onClick={() => setShowAllCities(!showAllCities)}
-                        className="mt-4 w-full px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition border border-blue-200"
+                        className="mt-4 w-full px-4 py-2 text-sm font-medium text-[var(--admin-accent)] hover:opacity-80 hover:bg-[var(--admin-content-bg)] rounded-md transition border border-[var(--admin-border)]"
                       >
-                        {showAllCities
-                          ? "Show less"
-                          : `View more (${Math.min(GEO_LIST_EXPANDED_MAX, topCities.length) - GEO_LIST_COLLAPSED} more cities)`}
+                        {showAllCities ? "Show less" : "View more"}
                       </button>
                       {showAllCities && topCities.length > GEO_LIST_EXPANDED_MAX && (
-                        <p className="mt-2 text-center text-xs text-gray-500">
+                        <p className="mt-2 text-center text-xs text-[var(--admin-text-muted)]">
                           Showing top {GEO_LIST_EXPANDED_MAX} of {topCities.length.toLocaleString()} cities.
                         </p>
                       )}
@@ -859,19 +816,15 @@ export default function AnalyticsPage() {
                   )}
                 </>
               )}
+              </div>
             </div>
 
             {/* Top States */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-[color:var(--color-dark)] flex items-center">
-                  Top States/Regions
-                  <span className="text-xs font-normal text-gray-500 ml-2">(Unique Visitors)</span>
-                  <InfoTooltip text="States/regions where your visitors are located, based on IP geolocation. Each unique session ID is counted once per state." />
-                </h3>
-              </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-3">Top States/Regions</h3>
+              <div className="bg-[var(--admin-card-bg)] rounded-lg p-6 border border-[var(--admin-border)]">
               {topStates.length === 0 ? (
-                <p className="text-sm text-gray-500">No state data available yet</p>
+                <p className="text-sm text-[var(--admin-text-muted)]">No state data available yet</p>
               ) : (
                 <>
                   <div className="space-y-3">
@@ -885,14 +838,14 @@ export default function AnalyticsPage() {
                       return (
                         <div key={state.state}>
                           <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium text-gray-700">
+                            <span className="font-medium text-[var(--admin-text)]">
                               #{index + 1} {state.state}
                             </span>
-                            <span className="text-gray-900 font-semibold">{state.count} {visitorLabel} ({percentage}%)</span>
+                            <span className="text-[var(--admin-text)] font-semibold">{state.count} {visitorLabel} ({percentage}%)</span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-[var(--admin-content-bg)] rounded-full h-2">
                             <div 
-                              className="bg-green-500 h-2 rounded-full transition-all"
+                              className="bg-[var(--admin-accent)] h-2 rounded-full transition-all"
                               style={{ width: `${percentage}%` }}
                             />
                           </div>
@@ -905,14 +858,12 @@ export default function AnalyticsPage() {
                       <button
                         type="button"
                         onClick={() => setShowAllStates(!showAllStates)}
-                        className="mt-4 w-full px-4 py-2 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md transition border border-green-200"
+                        className="mt-4 w-full px-4 py-2 text-sm font-medium text-[var(--admin-accent)] hover:opacity-80 hover:bg-[var(--admin-content-bg)] rounded-md transition border border-[var(--admin-border)]"
                       >
-                        {showAllStates
-                          ? "Show less"
-                          : `View more (${Math.min(GEO_LIST_EXPANDED_MAX, topStates.length) - GEO_LIST_COLLAPSED} more states)`}
+                        {showAllStates ? "Show less" : "View more"}
                       </button>
                       {showAllStates && topStates.length > GEO_LIST_EXPANDED_MAX && (
-                        <p className="mt-2 text-center text-xs text-gray-500">
+                        <p className="mt-2 text-center text-xs text-[var(--admin-text-muted)]">
                           Showing top {GEO_LIST_EXPANDED_MAX} of {topStates.length.toLocaleString()} states/regions.
                         </p>
                       )}
@@ -920,36 +871,26 @@ export default function AnalyticsPage() {
                   )}
                 </>
               )}
+              </div>
             </div>
           </div>
-        </div>
+      </div>
 
-        {/* === TRAFFIC QUALITY === */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h2 className="text-xl font-bold text-[color:var(--color-dark)]">Traffic Quality</h2>
-          </div>
+      {/* === TRAFFIC QUALITY === */}
+      <div className="mb-8">
+          <h2 className="text-xl font-semibold text-white mb-4">Traffic Quality</h2>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Traffic Sources */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-[color:var(--color-dark)] flex items-center">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-white flex items-center">
                   Traffic Sources
-                  <InfoTooltip text="Where visitors came from before landing on your site: Search Engines (Google, Bing, etc.) or External Sources (social media, other websites, direct visits, etc.)." />
                 </h3>
-                <button
-                  onClick={() => setShowTrafficChart(!showTrafficChart)}
-                  className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition"
-                >
-                  {showTrafficChart ? 'Hide Chart' : 'View Chart'}
-                </button>
               </div>
+              <div className="bg-[var(--admin-card-bg)] rounded-lg p-6 border border-[var(--admin-border)]">
               
-              {showTrafficChart && trafficChartData ? (
+              {trafficChartData ? (
                 <div className="h-80 flex items-center justify-center mb-4">
                   <Doughnut 
                     data={trafficChartData}
@@ -958,12 +899,7 @@ export default function AnalyticsPage() {
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { 
-                          position: 'bottom',
-                          labels: {
-                            font: { size: 12 },
-                            padding: 15,
-                            usePointStyle: true,
-                          },
+                          display: false,
                         },
                         tooltip: {
                           enabled: true,
@@ -984,21 +920,32 @@ export default function AnalyticsPage() {
                   />
                 </div>
               ) : null}
+
+              {trafficChartData?.labels?.length ? (
+                <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
+                    {trafficChartData.labels.map((label: string, idx: number) => {
+                      const colors = trafficChartData.datasets?.[0]?.backgroundColor ?? [];
+                      const color = colors[idx] || "rgba(255, 150, 40, 0.8)";
+                      return (
+                        <span
+                          key={label}
+                          className="inline-flex items-center gap-2 rounded-full border border-[var(--admin-border)] px-3 py-1 text-xs font-medium text-[var(--admin-text)]"
+                        >
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+                          {label}
+                        </span>
+                      );
+                    })}
+                </div>
+              ) : null}
               
               {trafficSources.length === 0 ? (
-                <p className="text-sm text-gray-500">No traffic data yet</p>
+                <p className="text-sm text-[var(--admin-text-muted)]">No traffic data yet</p>
               ) : (
                 <div className="space-y-3">
                   {trafficSources.map((source) => {
                     const total = trafficSources.reduce((sum, s) => sum + s.count, 0);
                     const percentage = ((source.count / total) * 100).toFixed(1);
-                    
-                    // Simplified tooltip text
-                    const sourceTooltips: Record<string, string> = {
-                      'search': 'Visitors who found your site through search engines (Google, Bing, Yahoo, DuckDuckGo, etc.). These are people actively searching for news or topics.',
-                      'external': 'Visitors from all other sources: social media (Facebook, Twitter), other websites linking to you, shared links, direct visits (typing URL or bookmarks), email links, etc.'
-                    };
-                    
                     // Display names
                     const displayNames: Record<string, string> = {
                       'search': 'Search Engines',
@@ -1008,15 +955,14 @@ export default function AnalyticsPage() {
                     return (
                       <div key={source.source}>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-gray-700 flex items-center">
+                          <span className="font-medium text-[var(--admin-text)] flex items-center">
                             {displayNames[source.source] || source.source}
-                            <InfoTooltip text={sourceTooltips[source.source] || 'Traffic from this source.'} />
                           </span>
-                          <span className="text-gray-900 font-semibold">{source.count} ({percentage}%)</span>
+                          <span className="text-[var(--admin-text)] font-semibold">{source.count} ({percentage}%)</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-[var(--admin-content-bg)] rounded-full h-2">
                           <div 
-                            className="bg-blue-500 h-2 rounded-full transition-all"
+                            className="bg-[var(--admin-accent)] h-2 rounded-full transition-all"
                             style={{ width: `${percentage}%` }}
                           />
                         </div>
@@ -1025,24 +971,19 @@ export default function AnalyticsPage() {
                   })}
                 </div>
               )}
+              </div>
             </div>
 
             {/* Device Breakdown */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-[color:var(--color-dark)] flex items-center">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-white flex items-center">
                   Device Distribution
-                  <InfoTooltip text="Types of devices visitors use to access your site. Detected from the browser's user agent string." />
                 </h3>
-                <button
-                  onClick={() => setShowDeviceChart(!showDeviceChart)}
-                  className="px-3 py-1.5 text-sm font-medium text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md transition"
-                >
-                  {showDeviceChart ? 'Hide Chart' : 'View Chart'}
-                </button>
               </div>
+              <div className="bg-[var(--admin-card-bg)] rounded-lg p-6 border border-[var(--admin-border)]">
               
-              {showDeviceChart && deviceChartData ? (
+              {deviceChartData ? (
                 <div className="h-80 flex items-center justify-center mb-4">
                   <Doughnut 
                     data={deviceChartData}
@@ -1051,12 +992,7 @@ export default function AnalyticsPage() {
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { 
-                          position: 'bottom',
-                          labels: {
-                            font: { size: 12 },
-                            padding: 15,
-                            usePointStyle: true,
-                          },
+                          display: false,
                         },
                         tooltip: {
                           enabled: true,
@@ -1077,34 +1013,44 @@ export default function AnalyticsPage() {
                   />
                 </div>
               ) : null}
+
+              {deviceChartData?.labels?.length ? (
+                <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
+                    {deviceChartData.labels.map((label: string, idx: number) => {
+                      const colors = deviceChartData.datasets?.[0]?.backgroundColor ?? [];
+                      const color = colors[idx] || "rgba(255, 150, 40, 0.8)";
+                      return (
+                        <span
+                          key={label}
+                          className="inline-flex items-center gap-2 rounded-full border border-[var(--admin-border)] px-3 py-1 text-xs font-medium text-[var(--admin-text)]"
+                        >
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+                          {label}
+                        </span>
+                      );
+                    })}
+                </div>
+              ) : null}
               
               {deviceBreakdown.length === 0 ? (
-                <p className="text-sm text-gray-500">No device data yet</p>
+                <p className="text-sm text-[var(--admin-text-muted)]">No device data yet</p>
               ) : (
                 <div className="space-y-3">
                   {deviceBreakdown.map((device) => {
                     const total = deviceBreakdown.reduce((sum, d) => sum + d.count, 0);
                     const percentage = ((device.count / total) * 100).toFixed(1);
                     
-                    // Get tooltip text for each device type
-                    const deviceTooltips: Record<string, string> = {
-                      'desktop': 'Desktop and laptop computers. Includes Windows, Mac, Linux, and Chromebook users.',
-                      'mobile': 'Smartphones. Includes iPhone, Android phones, and other mobile devices. Detected by screen size and user agent.',
-                      'tablet': 'Tablets like iPad, Android tablets, Surface, and Kindle. Larger than phones but not full desktop screens.'
-                    };
-                    
                     return (
                       <div key={device.device}>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-gray-700 capitalize flex items-center">
+                          <span className="font-medium text-[var(--admin-text)] capitalize flex items-center">
                             {device.device}
-                            <InfoTooltip text={deviceTooltips[device.device] || 'Traffic from this device type.'} />
                           </span>
-                          <span className="text-gray-900 font-semibold">{device.count} ({percentage}%)</span>
+                          <span className="text-[var(--admin-text)] font-semibold">{device.count} ({percentage}%)</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-[var(--admin-content-bg)] rounded-full h-2">
                           <div 
-                            className="bg-green-500 h-2 rounded-full transition-all"
+                            className="bg-[var(--admin-accent)] h-2 rounded-full transition-all"
                             style={{ width: `${percentage}%` }}
                           />
                         </div>
@@ -1113,85 +1059,49 @@ export default function AnalyticsPage() {
                   })}
                 </div>
               )}
+              </div>
             </div>
           </div>
         </div>
-
-      </div>
-    </div>
+      </AdminPageLayout>
+    </>
   );
 }
 
-// Info Tooltip Component
-function InfoTooltip({ text }: { text: string }) {
-  return (
-    <div className="group relative inline-block ml-2">
-      <svg 
-        className="w-5 h-5 text-blue-500 hover:text-blue-700 cursor-help inline-block transition-colors" 
-        fill="currentColor" 
-        viewBox="0 0 20 20"
-      >
-        <path 
-          fillRule="evenodd" 
-          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" 
-          clipRule="evenodd" 
-        />
-      </svg>
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block w-72 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl z-[9999] pointer-events-none">
-        {text}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-2 border-[6px] border-transparent border-t-gray-900"></div>
-      </div>
-    </div>
-  );
-}
 
-// Metric Card Component
-function MetricCard({ 
-  title, 
-  value, 
+function CompactStatCard({
+  label,
+  value,
   subtitle,
-  icon,
-  color,
-  tooltip
-}: { 
-  title: string; 
-  value: string; 
+  tooltip,
+}: {
+  label: string;
+  value: React.ReactNode;
   subtitle?: string;
-  icon: React.ReactNode;
-  color: 'blue' | 'green' | 'purple' | 'orange';
   tooltip?: string;
 }) {
-  const colorClasses = {
-    blue: 'from-blue-500 to-blue-600',
-    green: 'from-green-500 to-green-600',
-    purple: 'from-purple-500 to-purple-600',
-    orange: 'from-orange-500 to-orange-600',
-  };
-
-  const textColors = {
-    blue: 'text-blue-600',
-    green: 'text-green-600',
-    purple: 'text-purple-600',
-    orange: 'text-orange-600',
-  };
-
   return (
-    <div className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-      <div className={`inline-flex p-3 rounded-lg bg-gradient-to-br ${colorClasses[color]} text-white mb-3`}>
-        {icon}
-      </div>
-      <div className={`text-3xl font-black mb-1 ${textColors[color]}`}>
+    <div className="group relative min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
+      <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">
         {value}
       </div>
-      <div className="text-sm font-semibold text-gray-600 mb-1 flex items-center">
-        {title}
-        {tooltip && <InfoTooltip text={tooltip} />}
+      <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">
+        {label}
       </div>
-      {subtitle && (
-        <div className="text-xs text-gray-500">
-          {subtitle}
+      {subtitle ? (
+        <div className="mt-0.5 text-[10px] text-[var(--admin-text-muted)]/90 truncate">{subtitle}</div>
+      ) : null}
+      {tooltip ? (
+        <div className="pointer-events-none absolute left-1/2 top-full z-[9999] mt-2 hidden w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 group-hover:block">
+          <div className="relative rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-3 text-left text-sm leading-snug text-[var(--admin-text)] shadow-lg">
+            <div
+              className="absolute -top-2 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[7px] border-b-[8px] border-x-transparent border-b-[var(--admin-card-bg)]"
+              aria-hidden
+            />
+            {tooltip}
+          </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

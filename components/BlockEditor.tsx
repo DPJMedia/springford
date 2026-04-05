@@ -119,11 +119,11 @@ export function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       {blocks.map((block, index) => (
         <div
           key={block.id}
-          className="border-2 border-gray-300 rounded-lg p-4 bg-white relative"
+          className="border-2 border-[var(--admin-border)] rounded-lg p-4 bg-[var(--admin-table-header-bg)] relative"
         >
           {/* Block header with controls */}
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
-            <span className="text-sm font-semibold text-gray-700">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--admin-border)]">
+            <span className="text-sm font-semibold text-[var(--admin-text)]">
               {block.type === "text" ? "📝 Content Block" : "🖼️ Image Block"} #{index + 1}
             </span>
             <div className="flex gap-2">
@@ -131,7 +131,7 @@ export function BlockEditor({ blocks, onChange }: BlockEditorProps) {
                 <button
                   type="button"
                   onClick={() => moveBlock(block.id, "up")}
-                  className="p-1 text-gray-600 hover:text-gray-900 transition"
+                  className="p-1 text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition"
                   title="Move up"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,7 +143,7 @@ export function BlockEditor({ blocks, onChange }: BlockEditorProps) {
                 <button
                   type="button"
                   onClick={() => moveBlock(block.id, "down")}
-                  className="p-1 text-gray-600 hover:text-gray-900 transition"
+                  className="p-1 text-[var(--admin-text-muted)] hover:text-[var(--admin-text)] transition"
                   title="Move down"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -182,14 +182,14 @@ export function BlockEditor({ blocks, onChange }: BlockEditorProps) {
                 type="text"
                 value={block.caption || ""}
                 onChange={(e) => updateBlock(block.id, { caption: e.target.value })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                className="w-full border border-[var(--admin-border)] bg-[var(--admin-card-bg)] text-[var(--admin-text)] rounded-md px-3 py-2 text-sm"
                 placeholder="Image caption (optional)"
               />
               <input
                 type="text"
                 value={block.credit || ""}
                 onChange={(e) => updateBlock(block.id, { credit: e.target.value })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                className="w-full border border-[var(--admin-border)] bg-[var(--admin-card-bg)] text-[var(--admin-text)] rounded-md px-3 py-2 text-sm"
                 placeholder="Photo credit (optional)"
               />
             </div>
@@ -198,13 +198,13 @@ export function BlockEditor({ blocks, onChange }: BlockEditorProps) {
       ))}
 
       {/* Add block buttons */}
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50">
-        <p className="text-sm font-semibold text-gray-700 mb-3">Optional - Add More Content:</p>
+      <div className="border-2 border-dashed border-[var(--admin-border)] rounded-lg p-6 bg-[var(--admin-table-header-bg)]">
+        <p className="text-sm font-semibold text-[var(--admin-text)] mb-3">Optional - Add More Content:</p>
         <div className="flex gap-3">
           <button
             type="button"
             onClick={addTextBlock}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition font-semibold"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[var(--admin-card-bg)] border-2 border-[var(--admin-accent)] text-[var(--admin-accent)] rounded-lg hover:bg-[var(--admin-accent)]/10 transition font-semibold"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -215,7 +215,7 @@ export function BlockEditor({ blocks, onChange }: BlockEditorProps) {
             type="button"
             onClick={addImageBlock}
             disabled={uploading}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-green-500 text-green-600 rounded-lg hover:bg-green-50 transition font-semibold disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[var(--admin-card-bg)] border-2 border-[var(--admin-accent)] text-[var(--admin-accent)] rounded-lg hover:bg-[var(--admin-accent)]/10 transition font-semibold disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />

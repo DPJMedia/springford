@@ -141,7 +141,7 @@ export function AuthorSelector({ value, onChange }: AuthorSelectorProps) {
             // Delay hiding mentions to allow click events
             setTimeout(() => setShowMentions(false), 200)
           }}
-          className="w-full border border-gray-300 rounded-md px-4 py-2 pl-10"
+          className="w-full border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md px-4 py-2 pl-10 focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)] focus:border-[var(--admin-accent)]"
           placeholder="Type author name or @ to search admins"
           style={isDiffuseAI ? { fontFamily: 'var(--font-space-grotesk)' } : undefined}
         />

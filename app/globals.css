@@ -12,7 +12,7 @@
   --color-dusty-purple: #8d6fa2;
   --color-deep-purple: #300d57;
 
-  /* UI tokens */
+  /* UI tokens (public site: light surface; admin uses its own tokens) */
   --color-text: var(--color-dark);
   --color-surface: #ffffff;
   --color-panel: #ffffff;
@@ -22,6 +22,22 @@
   --radius-sm: 6px;
   --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+  /* Admin dark theme (DiffuseAI style) */
+  --admin-bg: #000000;
+  --admin-sidebar-bg: #0a0a0a;
+  /* Match menu bar / sidebar so main admin canvas is one surface */
+  --admin-content-bg: var(--admin-sidebar-bg);
+  --admin-card-bg: #1a1a1a;
+  --admin-text: #ffffff;
+  --admin-text-muted: #a0a0a0;
+  --admin-accent: #ff9628;
+  --admin-accent-hover: #ff7300;
+  --admin-border: rgba(255, 255, 255, 0.1);
+  --admin-sidebar-width: 240px;
+  /* Dark gray (not pure black) for all admin table header rows */
+  --admin-table-header-bg: #2d2d2d;
+  --admin-table-row-hover: #1f1f1f;
 }
 
 @theme inline {
@@ -98,6 +114,11 @@ a {
   outline: 2px solid var(--color-riviera-blue);
   outline-offset: 3px;
   border-radius: 8px;
+}
+
+/* Admin UI uses orange focus rings on inputs; suppress duplicate global blue outline */
+.admin-layout :where(a, button, input, select, textarea):focus-visible {
+  outline: none;
 }
 
 /* Markdown Content Styling */
@@ -192,4 +213,135 @@ a {
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+/* Admin Area Styles */
+.admin-layout {
+  font-family: var(--font-space-grotesk), system-ui, -apple-system, sans-serif;
+  /* Body uses --color-text (dark); admin surfaces use dark greys — inherit light text here */
+  color: var(--admin-text);
+}
+
+.admin-layout table {
+  background-color: var(--admin-card-bg);
+  border: 0;
+}
+
+.admin-layout table thead th {
+  color: var(--admin-text);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 1rem 1.5rem;
+}
+
+/* Native selects in admin: dark options list (matches card/surface) */
+.admin-layout select option {
+  background-color: var(--admin-card-bg);
+  color: var(--admin-text);
+}
+
+/*
+ * Custom chevron + inset from edge (native system arrow ignores padding-right in some browsers).
+ * Also kill global riviera-blue :focus-visible outline here — Tailwind ring alone is not enough
+ * to win the cascade against :where(select):focus-visible in globals.
+ */
+.admin-layout select.admin-native-select {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  padding-left: 0.75rem;
+  padding-right: 2.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a0a0a0'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem 1rem;
+}
+
+.admin-layout select.admin-native-select:focus,
+.admin-layout select.admin-native-select:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
+.admin-layout table tbody tr {
+  border-bottom: 1px solid var(--admin-border);
+  transition: background-color 0.15s ease;
+}
+
+.admin-layout table tbody tr:hover {
+  background-color: var(--admin-table-row-hover);
+}
+
+.admin-layout table tbody td {
+  color: var(--admin-text);
+  padding: 1rem 1.5rem;
+}
+
+.admin-layout .bg-white {
+  background-color: var(--admin-card-bg) !important;
+}
+
+.admin-layout .bg-gray-50,
+.admin-layout .bg-gray-100 {
+  background-color: var(--admin-content-bg) !important;
+}
+
+/* Table headers: dark gray, after .bg-gray-50 so thead rows beat content-bg */
+.admin-layout table thead,
+.admin-layout table thead.bg-gray-50,
+.admin-layout table thead.bg-gray-100 {
+  background-color: var(--admin-table-header-bg) !important;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-layout table thead tr {
+  background-color: var(--admin-table-header-bg) !important;
+}
+
+.admin-layout .bg-gray-200 {
+  background-color: var(--admin-table-header-bg) !important;
+}
+
+.admin-layout .text-gray-500,
+.admin-layout .text-gray-600,
+.admin-layout .text-gray-700 {
+  color: var(--admin-text-muted) !important;
+}
+
+.admin-layout .text-gray-900,
+.admin-layout .text-black {
+  color: var(--admin-text) !important;
+}
+
+.admin-layout .border-gray-200,
+.admin-layout .border-gray-300 {
+  border-color: var(--admin-border) !important;
+}
+
+.admin-layout .divide-gray-200 > * + * {
+  border-color: var(--admin-border) !important;
+}
+
+.admin-layout .hover\:bg-gray-50:hover,
+.admin-layout .hover\:bg-gray-100:hover {
+  background-color: var(--admin-table-row-hover) !important;
+}
+
+.admin-layout .hover\:bg-gray-200:hover {
+  background-color: var(--admin-card-bg) !important;
+}
+
+/* SendGrid HTML preview: don’t apply admin table row hover / gray hover utilities to email markup */
+.admin-layout .transactional-email-preview table tbody tr {
+  transition: none !important;
+}
+.admin-layout .transactional-email-preview table tbody tr:hover {
+  background-color: transparent !important;
+}
+.admin-layout .transactional-email-preview .hover\:bg-gray-50:hover,
+.admin-layout .transactional-email-preview .hover\:bg-gray-100:hover,
+.admin-layout .transactional-email-preview .hover\:bg-gray-200:hover {
+  background-color: unset !important;
 }

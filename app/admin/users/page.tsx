@@ -1,162 +1,40 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { createPortal } from "react-dom";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState, useRef, type RefObject } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import type { UserProfile } from "@/lib/types/database";
 import { Avatar } from "@/components/Avatar";
 import { EditUserModal } from "@/components/EditUserModal";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
+import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
 
-// Dropdown Menu Component with smart positioning
-function DropdownMenu({
-  userId,
-  position,
-  onClose,
-  onEdit,
-  onNewsletter,
-  onAdmin,
-  onSuperAdmin,
-  onRemoveSuperAdmin,
-  onRemoveUser,
-  user,
-  currentUser,
-}: {
-  userId: string;
-  position: 'up' | 'down';
-  onClose: () => void;
-  onEdit: () => void;
-  onNewsletter: () => void;
-  onAdmin: () => void;
-  onSuperAdmin: () => void;
-  onRemoveSuperAdmin: () => void;
-  onRemoveUser: () => void;
-  user: UserProfile;
-  currentUser: any;
-}) {
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [style, setStyle] = useState<React.CSSProperties>({});
-
-  useEffect(() => {
-    const button = document.querySelector(`[data-user-id="${userId}"]`) as HTMLElement;
-    if (button && dropdownRef.current) {
-      const rect = button.getBoundingClientRect();
-      if (position === 'up') {
-        setStyle({
-          bottom: `${window.innerHeight - rect.top + 4}px`,
-          right: `${window.innerWidth - rect.right}px`,
-        });
-      } else {
-        setStyle({
-          top: `${rect.bottom + 4}px`,
-          right: `${window.innerWidth - rect.right}px`,
-        });
-      }
-    }
-  }, [userId, position]);
-
-  return (
-    <div
-      ref={dropdownRef}
-      className="fixed w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50"
-      style={style}
-    >
-      <div className="py-1">
-        <button
-          onClick={onEdit}
-          className="w-full text-left px-4 py-2 text-sm text-[color:var(--color-dark)] hover:bg-gray-100 flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-          Edit Profile
-        </button>
-        <button
-          onClick={onNewsletter}
-          className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${
-            user.newsletter_subscribed ? "text-red-600" : "text-green-600"
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-          {user.newsletter_subscribed ? "Revoke Newsletter" : "Grant Newsletter"}
-        </button>
-        {user.id !== currentUser.id && (
-          <>
-            {!user.is_super_admin && (
-              <>
-                <button
-                  onClick={onAdmin}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${
-                    user.is_admin ? "text-red-600" : "text-[color:var(--color-riviera-blue)]"
-                  }`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                  {user.is_admin ? "Remove Admin" : "Make Admin"}
-                </button>
-                <button
-                  onClick={onSuperAdmin}
-                  className="w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-100 flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                  </svg>
-                  Make Super Admin
-                </button>
-              </>
-            )}
-            {user.is_super_admin && (
-              <button
-                onClick={onRemoveSuperAdmin}
-                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Remove Super Admin
-              </button>
-            )}
-            <div className="border-t border-gray-100 my-1"></div>
-            <button
-              onClick={onRemoveUser}
-              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Remove User
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
+function roleLabel(u: UserProfile): string {
+  if (u.is_super_admin) return "SUPER ADMIN";
+  if (u.is_admin) return "ADMIN";
+  return "USER";
 }
 
 const SORT_OPTIONS = [
-  { value: "default", label: "Default (newest first)" },
+  { value: "joined-desc", label: "Date joined (latest)" },
+  { value: "joined-asc", label: "Date joined (earliest)" },
   { value: "name-asc", label: "Name (A–Z)" },
   { value: "name-desc", label: "Name (Z–A)" },
   { value: "email-asc", label: "Email (A–Z)" },
   { value: "email-desc", label: "Email (Z–A)" },
   { value: "username-asc", label: "Username (A–Z)" },
   { value: "username-desc", label: "Username (Z–A)" },
-  { value: "joined-asc", label: "Date joined (earliest)" },
-  { value: "joined-desc", label: "Date joined (latest)" },
 ] as const;
 
 export default function UsersAdminPage() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{ [key: string]: 'up' | 'down' }>({});
-  const [sortOption, setSortOption] = useState<string>("default");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [sortOption, setSortOption] = useState<string>("joined-desc");
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -164,19 +42,11 @@ export default function UsersAdminPage() {
   const [newsletterFilter, setNewsletterFilter] = useState<string>("all");
   const [newsletterDropdownOpen, setNewsletterDropdownOpen] = useState(false);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
+  const filterDropdownMobileRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showActionsInfo, setShowActionsInfo] = useState(false);
-  const actionsInfoRef = useRef<HTMLDivElement>(null);
-  const actionsInfoButtonRef = useRef<HTMLButtonElement>(null);
-  const actionsInfoPopoverRef = useRef<HTMLDivElement>(null);
-  const [actionsInfoPosition, setActionsInfoPosition] = useState({ top: 0, left: 0 });
-  const router = useRouter();
   const supabase = createClient();
 
   const sortedUsers = [...users].sort((a, b) => {
-    if (sortOption === "default") {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    }
     const [key, dir] = sortOption.split("-") as [string, string];
     const mul = dir === "asc" ? 1 : -1;
     if (key === "name") {
@@ -226,41 +96,23 @@ export default function UsersAdminPage() {
     checkSuperAdmin();
   }, []);
 
-  const POPOVER_WIDTH = 288; // w-72 = 18rem
-  useEffect(() => {
-    if (!showActionsInfo || !actionsInfoButtonRef.current) return;
-    const btn = actionsInfoButtonRef.current;
-    const update = () => {
-      const r = btn.getBoundingClientRect();
-      const left = Math.max(8, r.left - POPOVER_WIDTH);
-      setActionsInfoPosition({ top: r.bottom + 4, left });
-    };
-    update();
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-    };
-  }, [showActionsInfo]);
-
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
-      if (showActionsInfo && !actionsInfoRef.current?.contains(target) && !actionsInfoPopoverRef.current?.contains(target)) {
-        setShowActionsInfo(false);
-      }
       if (sortDropdownOpen && sortDropdownRef.current && !sortDropdownRef.current.contains(target)) {
         setSortDropdownOpen(false);
       }
-      if (filterDropdownRef.current && !filterDropdownRef.current.contains(target)) {
+      const inFilter =
+        (filterDropdownRef.current?.contains(target) ?? false) ||
+        (filterDropdownMobileRef.current?.contains(target) ?? false);
+      if (!inFilter) {
         setRoleDropdownOpen(false);
         setNewsletterDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showActionsInfo, sortDropdownOpen]);
+  }, [sortDropdownOpen]);
 
   async function checkSuperAdmin() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -278,7 +130,7 @@ export default function UsersAdminPage() {
 
     if (!profileData?.is_super_admin) {
       alert("Only super admins can access this page!");
-      router.push("/admin");
+      router.push("/admin/articles");
       return;
     }
 
@@ -391,7 +243,7 @@ export default function UsersAdminPage() {
         alert("User removed successfully!");
       }
       
-      setOpenDropdown(null);
+      setSelectedUserId(null);
     } catch (err: any) {
       console.error("Error removing user:", err);
       alert("Error removing user: " + err.message);
@@ -400,10 +252,10 @@ export default function UsersAdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[color:var(--color-surface)] flex items-center justify-center">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[color:var(--color-riviera-blue)] border-r-transparent"></div>
-          <p className="mt-2 text-sm text-[color:var(--color-medium)]">Loading users...</p>
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[var(--admin-accent)] border-r-transparent" />
+          <p className="mt-4 text-sm text-[var(--admin-text-muted)]">Loading users…</p>
         </div>
       </div>
     );
@@ -411,60 +263,254 @@ export default function UsersAdminPage() {
 
   if (!currentUser) return null;
 
-  return (
-    <div className="min-h-screen bg-[color:var(--color-surface)]">
-      <header className="border-b border-[color:var(--color-border)] bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-[color:var(--color-dark)]">User Management</h1>
-              <p className="text-sm text-[color:var(--color-medium)]">
-                Manage admin privileges (Super Admin Only)
-              </p>
-            </div>
-            <Link
-              href="/admin"
-              className="rounded-full border border-[color:var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] hover:bg-gray-50"
+  const selectedUser = selectedUserId ? users.find((u) => u.id === selectedUserId) ?? null : null;
+
+  function userFilterCard(ref: RefObject<HTMLDivElement | null>, className: string) {
+    return (
+      <div ref={ref} className={className}>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--admin-text-muted)]">
+          Filter
+        </h3>
+        <div className="flex flex-col gap-2">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setRoleDropdownOpen(!roleDropdownOpen);
+                setNewsletterDropdownOpen(false);
+                setSortDropdownOpen(false);
+              }}
+              className="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm font-medium text-[var(--admin-text)] transition hover:bg-[var(--admin-table-row-hover)]"
             >
-              ← Back to Dashboard
-            </Link>
+              <span className="truncate">
+                Role:{" "}
+                {roleFilter === "all"
+                  ? "All"
+                  : roleFilter === "super_admin"
+                    ? "Super Admin"
+                    : roleFilter === "admin"
+                      ? "Admin"
+                      : "User"}
+              </span>
+              <svg
+                className={`h-4 w-4 shrink-0 text-[var(--admin-text-muted)] transition ${roleDropdownOpen ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {roleDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] py-1 shadow-lg">
+                {[
+                  { value: "all", label: "All roles" },
+                  { value: "super_admin", label: "Super Admin" },
+                  { value: "admin", label: "Admin" },
+                  { value: "user", label: "User" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setRoleFilter(opt.value);
+                      setRoleDropdownOpen(false);
+                    }}
+                    className={`block w-full px-4 py-2 text-left text-sm ${roleFilter === opt.value ? "bg-[var(--admin-accent)]/10 font-semibold text-[var(--admin-accent)]" : "text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setNewsletterDropdownOpen(!newsletterDropdownOpen);
+                setRoleDropdownOpen(false);
+                setSortDropdownOpen(false);
+              }}
+              className="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm font-medium text-[var(--admin-text)] transition hover:bg-[var(--admin-table-row-hover)]"
+            >
+              <span className="truncate">
+                Newsletter:{" "}
+                {newsletterFilter === "all"
+                  ? "All"
+                  : newsletterFilter === "subscribed"
+                    ? "Subscribed"
+                    : "Not subscribed"}
+              </span>
+              <svg
+                className={`h-4 w-4 shrink-0 text-[var(--admin-text-muted)] transition ${newsletterDropdownOpen ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {newsletterDropdownOpen && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] py-1 shadow-lg">
+                {[
+                  { value: "all", label: "All" },
+                  { value: "subscribed", label: "Subscribed" },
+                  { value: "not_subscribed", label: "Not subscribed" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setNewsletterFilter(opt.value);
+                      setNewsletterDropdownOpen(false);
+                    }}
+                    className={`block w-full px-4 py-2 text-left text-sm ${newsletterFilter === opt.value ? "bg-[var(--admin-accent)]/10 font-semibold text-[var(--admin-accent)]" : "text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+  const userActionsSections = selectedUser
+    ? [
+        {
+          title: "User",
+          items: [
+            {
+              icon: (
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              ),
+              label: "Edit profile",
+              onClick: () => setEditingUser(selectedUser),
+            },
+            {
+              icon: (
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              ),
+              label: selectedUser.newsletter_subscribed ? "Revoke newsletter" : "Grant newsletter",
+              onClick: () => toggleNewsletterStatus(selectedUser.id, selectedUser.newsletter_subscribed || false),
+            },
+            ...(selectedUser.id !== currentUser.id && !selectedUser.is_super_admin
+              ? [
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    ),
+                    label: selectedUser.is_admin ? "Remove admin" : "Make admin",
+                    onClick: () => toggleAdminStatus(selectedUser.id, selectedUser.is_admin),
+                  },
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                      </svg>
+                    ),
+                    label: "Make super admin",
+                    onClick: () => toggleSuperAdminStatus(selectedUser.id, selectedUser.is_super_admin),
+                  },
+                ]
+              : []),
+            ...(selectedUser.id !== currentUser.id && selectedUser.is_super_admin
+              ? [
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ),
+                    label: "Remove super admin",
+                    onClick: () => toggleSuperAdminStatus(selectedUser.id, true),
+                  },
+                ]
+              : []),
+            ...(selectedUser.id !== currentUser.id
+              ? [
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    ),
+                    label: "Remove user",
+                    variant: "danger" as const,
+                    onClick: () => removeUser(selectedUser.id, selectedUser.full_name || selectedUser.email),
+                  },
+                ]
+              : []),
+          ],
+        },
+      ]
+    : [
+        {
+          title: "User",
+          customContent: (
+            <p className="px-1 text-sm text-[var(--admin-text-muted)]">
+              Select a user in the list to change permissions or remove the account.
+            </p>
+          ),
+        },
+      ];
+
+  const actionsPanel = (
+    <div className="w-64 overflow-hidden rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)]">
+      {userFilterCard(filterDropdownRef, "border-b border-[var(--admin-border)] p-4")}
+      <AdminActionsPanel embedded sections={userActionsSections} />
+    </div>
+  );
+
+  return (
+    <>
+      <AdminPageHeader 
+        title="Users"
+        reserveActionsPanelSpace
+      />
+
+      <AdminPageLayout actionsColumnClassName="xl:pt-11" actionsPanel={actionsPanel}>
         {/* Stats */}
-        <div className="grid gap-3 mb-6 md:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg bg-blue-50 text-blue-700 p-3 border border-gray-200">
-            <p className="text-xs font-medium opacity-80">Total Users</p>
-            <p className="text-2xl font-bold mt-1">{users.length}</p>
-          </div>
-          <div className="rounded-lg bg-purple-50 text-purple-700 p-3 border border-gray-200">
-            <p className="text-xs font-medium opacity-80">Admins</p>
-            <p className="text-2xl font-bold mt-1">
-              {users.filter(u => u.is_admin || u.is_super_admin).length}
-            </p>
-          </div>
-          <div className="rounded-lg bg-green-50 text-green-700 p-3 border border-gray-200">
-            <p className="text-xs font-medium opacity-80">Regular Users</p>
-            <p className="text-2xl font-bold mt-1">
-              {users.filter(u => !u.is_admin && !u.is_super_admin).length}
-            </p>
-          </div>
-          <div className="rounded-lg bg-[#3391af]/10 text-[#3391af] p-3 border border-gray-200">
-            <p className="text-xs font-medium opacity-80">Newsletter Subscribers</p>
-            <p className="text-2xl font-bold mt-1">
-              {users.filter(u => u.newsletter_subscribed).length}
-            </p>
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-white mb-4">User Overview</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
+              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">{users.length}</div>
+              <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Total Users</div>
+            </div>
+            <div className="min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
+              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">{users.filter(u => u.is_admin || u.is_super_admin).length}</div>
+              <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Admins</div>
+            </div>
+            <div className="min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
+              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">{users.filter(u => !u.is_admin && !u.is_super_admin).length}</div>
+              <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Regular Users</div>
+            </div>
+            <div className="min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
+              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">{users.filter(u => u.newsletter_subscribed).length}</div>
+              <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Newsletter Subscribers</div>
+            </div>
           </div>
         </div>
 
-        {/* Search + Sort + Filter - above table */}
-        <div className="flex flex-wrap items-center gap-3 mb-3">
-          <div className="flex-1 min-w-[200px] max-w-md">
+        {/* Search (2/3) + Sort (1/3); filters + user actions in right column (mobile: card below) */}
+        <h2 className="text-xl font-semibold text-white mb-4">All Users</h2>
+        <div className="mb-3 flex w-full min-w-0 flex-row flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-[2] basis-0">
             <label htmlFor="user-search" className="sr-only">Search users</label>
             <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[color:var(--color-medium)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -473,279 +519,148 @@ export default function UsersAdminPage() {
                 placeholder="Search name, email, username..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-[color:var(--color-border)] bg-white pl-9 pr-3 py-2 text-sm text-[color:var(--color-dark)] placeholder-[color:var(--color-medium)] focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]/30 focus:border-[color:var(--color-riviera-blue)]"
+                className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] py-2 pl-9 pr-3 text-sm text-[var(--admin-text)] placeholder-[var(--admin-text-muted)] focus:border-[var(--admin-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]/30"
               />
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2" ref={filterDropdownRef}>
-            <div className="relative" ref={sortDropdownRef}>
-              <button
-                type="button"
-                onClick={() => {
-                  setSortDropdownOpen(!sortDropdownOpen);
-                  setRoleDropdownOpen(false);
-                  setNewsletterDropdownOpen(false);
-                }}
-                className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--color-dark)] hover:bg-gray-50 transition"
-              >
-                <svg className="w-4 h-4 text-[color:var(--color-medium)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                </svg>
-                Sort: {SORT_OPTIONS.find((o) => o.value === sortOption)?.label ?? "Default"}
-                <svg className={`w-4 h-4 text-[color:var(--color-medium)] transition ${sortDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {sortDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-56 rounded-lg border border-[color:var(--color-border)] bg-white py-1 shadow-lg z-50">
-                  {SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        setSortOption(opt.value);
-                        setSortDropdownOpen(false);
-                      }}
-                      className={`block w-full text-left px-4 py-2 text-sm ${sortOption === opt.value ? "bg-[color:var(--color-riviera-blue)]/10 text-[color:var(--color-riviera-blue)] font-semibold" : "text-[color:var(--color-dark)] hover:bg-gray-50"}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => { setRoleDropdownOpen(!roleDropdownOpen); setNewsletterDropdownOpen(false); setSortDropdownOpen(false); }}
-                className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--color-dark)] hover:bg-gray-50 transition"
-              >
-                Role: {roleFilter === "all" ? "All" : roleFilter === "super_admin" ? "Super Admin" : roleFilter === "admin" ? "Admin" : "User"}
-                <svg className={`w-4 h-4 text-[color:var(--color-medium)] transition ${roleDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {roleDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-[color:var(--color-border)] bg-white py-1 shadow-lg z-50">
-                  {[
-                    { value: "all", label: "All roles" },
-                    { value: "super_admin", label: "Super Admin" },
-                    { value: "admin", label: "Admin" },
-                    { value: "user", label: "User" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => { setRoleFilter(opt.value); setRoleDropdownOpen(false); }}
-                      className={`block w-full text-left px-4 py-2 text-sm ${roleFilter === opt.value ? "bg-[color:var(--color-riviera-blue)]/10 text-[color:var(--color-riviera-blue)] font-semibold" : "text-[color:var(--color-dark)] hover:bg-gray-50"}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => { setNewsletterDropdownOpen(!newsletterDropdownOpen); setRoleDropdownOpen(false); setSortDropdownOpen(false); }}
-                className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--color-dark)] hover:bg-gray-50 transition"
-              >
-                Newsletter: {newsletterFilter === "all" ? "All" : newsletterFilter === "subscribed" ? "Subscribed" : "Not subscribed"}
-                <svg className={`w-4 h-4 text-[color:var(--color-medium)] transition ${newsletterDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {newsletterDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-44 rounded-lg border border-[color:var(--color-border)] bg-white py-1 shadow-lg z-50">
-                  {[
-                    { value: "all", label: "All" },
-                    { value: "subscribed", label: "Subscribed" },
-                    { value: "not_subscribed", label: "Not subscribed" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => { setNewsletterFilter(opt.value); setNewsletterDropdownOpen(false); }}
-                      className={`block w-full text-left px-4 py-2 text-sm ${newsletterFilter === opt.value ? "bg-[color:var(--color-riviera-blue)]/10 text-[color:var(--color-riviera-blue)] font-semibold" : "text-[color:var(--color-dark)] hover:bg-gray-50"}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="relative min-w-0 flex-1 basis-0" ref={sortDropdownRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setSortDropdownOpen(!sortDropdownOpen);
+                setRoleDropdownOpen(false);
+                setNewsletterDropdownOpen(false);
+              }}
+              className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-3 py-2 text-sm font-medium text-[var(--admin-text)] transition hover:bg-[var(--admin-table-row-hover)]"
+            >
+              <svg className="w-4 h-4 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+              </svg>
+              Sort: {SORT_OPTIONS.find((o) => o.value === sortOption)?.label ?? "Date joined (latest)"}
+              <svg className={`w-4 h-4 text-[var(--admin-text-muted)] transition ${sortDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {sortDropdownOpen && (
+              <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] py-1 shadow-lg">
+                {SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setSortOption(opt.value);
+                      setSortDropdownOpen(false);
+                    }}
+                    className={`block w-full px-4 py-2 text-left text-sm ${sortOption === opt.value ? "bg-[var(--admin-accent)]/10 font-semibold text-[var(--admin-accent)]" : "text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+        </div>
+        <div className="mb-4 w-full max-w-md overflow-hidden rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] xl:hidden">
+          {userFilterCard(filterDropdownMobileRef, "border-b border-[var(--admin-border)] p-4")}
+          <AdminActionsPanel embedded sections={userActionsSections} />
         </div>
 
         {/* Users Table */}
-        <div className="bg-white rounded-lg border border-[color:var(--color-border)] overflow-hidden">
+        <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="min-w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-[var(--admin-table-header-bg)]">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">User</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Username</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Role</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Newsletter</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">Joined</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[color:var(--color-dark)]">
-                  <span
-                    className="inline-flex items-center gap-0.5"
-                    ref={actionsInfoRef}
-                    onMouseEnter={() => setShowActionsInfo(true)}
-                    onMouseLeave={(e) => {
-                      const related = e.relatedTarget as Node | null;
-                      if (related && actionsInfoPopoverRef.current?.contains(related)) return;
-                      setShowActionsInfo(false);
-                    }}
-                  >
-                    Actions
-                    <button
-                      ref={actionsInfoButtonRef}
-                      type="button"
-                      className="inline-flex items-center justify-center w-3.5 h-3.5 text-[10px] font-bold text-white bg-[color:var(--color-riviera-blue)] rounded-full hover:opacity-90 transition shrink-0 pointer-events-none"
-                      aria-label="Info about actions and roles"
-                    >
-                      i
-                    </button>
-                  </span>
+                <th className="pl-4 pr-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)]">User</th>
+                <th className="pl-2 pr-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)] min-w-[12rem]">Email</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)] whitespace-nowrap">Username</th>
+                <th className="px-4 py-3 text-left align-bottom">
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)]">SUBSCRIBED</span>
                 </th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.length === 0 && users.length > 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-[color:var(--color-medium)]">
+                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-[var(--admin-text-muted)]">
                     No users match your search or filters.
                   </td>
                 </tr>
               )}
               {filteredUsers.map((user) => (
-                <tr key={user.id} className="border-t border-[color:var(--color-border)]">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar src={user.avatar_url} name={user.full_name} email={user.email} size="sm" />
-                      <div>
-                        <div className="text-sm font-medium text-[color:var(--color-dark)]">
+                <tr
+                  key={user.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedUserId(user.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedUserId(user.id);
+                    }
+                  }}
+                  className={`border-t border-[var(--admin-border)] cursor-pointer transition ${
+                    selectedUserId === user.id
+                      ? "bg-[var(--admin-accent)]/10"
+                      : "hover:bg-[var(--admin-table-row-hover)]"
+                  }`}
+                >
+                  <td className="pl-4 pr-2 py-4 align-middle">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar
+                        src={user.avatar_url}
+                        name={user.full_name}
+                        email={user.email}
+                        size="sm"
+                        fallbackTone="accent"
+                        className="shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-[var(--admin-text)] leading-snug">
                           {user.full_name || "No name"}
                           {user.id === currentUser.id && (
-                            <span className="ml-2 text-xs text-[color:var(--color-medium)]">(You)</span>
+                            <span className="ml-2 text-xs text-[var(--admin-text-muted)]">(You)</span>
                           )}
+                        </div>
+                        <div className="mt-0.5 text-xs font-semibold tracking-wide text-[var(--admin-text-muted)]">
+                          {roleLabel(user)}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-[color:var(--color-medium)]">
-                    {user.username ? `@${user.username}` : "Not set"}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-[color:var(--color-medium)]">
+                  <td className="pl-2 pr-4 py-4 align-middle text-sm text-[var(--admin-text)] break-words max-w-md">
                     {user.email}
                   </td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                      user.is_super_admin ? "bg-purple-100 text-purple-700" :
-                      user.is_admin ? "bg-blue-100 text-blue-700" :
-                      "bg-gray-100 text-gray-700"
-                    }`}>
-                      {user.is_super_admin ? "Super Admin" : user.is_admin ? "Admin" : "User"}
+                  <td className="px-4 py-4 align-middle text-sm text-[var(--admin-text)] whitespace-nowrap">
+                    {user.username ? `@${user.username}` : <span className="text-[var(--admin-text-muted)]">Not set</span>}
+                  </td>
+                  <td className="px-4 py-4 align-middle">
+                    <span
+                      className="inline-flex items-center gap-2 whitespace-nowrap text-sm tabular-nums text-[var(--admin-text)]"
+                      aria-label={
+                        user.newsletter_subscribed
+                          ? `Newsletter subscribed, account joined ${new Date(user.created_at).toLocaleDateString()}`
+                          : `Not on newsletter, account joined ${new Date(user.created_at).toLocaleDateString()}`
+                      }
+                    >
+                      <span className={`font-semibold ${user.newsletter_subscribed ? "text-emerald-400" : "text-red-400/90"}`} aria-hidden>
+                        {user.newsletter_subscribed ? "✓" : "✕"}
+                      </span>
+                      <span className="text-[var(--admin-text-muted)]">{new Date(user.created_at).toLocaleDateString()}</span>
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {user.newsletter_subscribed ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-xs font-semibold">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Subscribed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 text-gray-600 px-2 py-0.5 text-xs font-semibold">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Not Subscribed
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-[color:var(--color-medium)]">
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3 text-left">
-                    <div className="relative">
-                      <button
-                        data-user-id={user.id}
-                        onClick={(e) => {
-                          const button = e.currentTarget;
-                          const rect = button.getBoundingClientRect();
-                          const spaceBelow = window.innerHeight - rect.bottom;
-                          const spaceAbove = rect.top;
-                          const dropdownHeight = 350; // Approximate dropdown height
-                          
-                          // Determine if dropdown should open upward
-                          const shouldOpenUp = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
-                          
-                          if (openDropdown === user.id) {
-                            setOpenDropdown(null);
-                          } else {
-                            setDropdownPosition({ ...dropdownPosition, [user.id]: shouldOpenUp ? 'up' : 'down' });
-                            setOpenDropdown(user.id);
-                          }
-                        }}
-                        className="px-3 py-1.5 text-xs font-semibold text-[color:var(--color-dark)] bg-gray-100 hover:bg-gray-200 rounded-md transition flex items-center gap-1"
-                      >
-                        Actions
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-
-                      {openDropdown === user.id && (
-                        <DropdownMenu
-                          userId={user.id}
-                          position={dropdownPosition[user.id] || 'down'}
-                          onClose={() => setOpenDropdown(null)}
-                          onEdit={() => {
-                            setEditingUser(user);
-                            setOpenDropdown(null);
-                          }}
-                          onNewsletter={() => {
-                            toggleNewsletterStatus(user.id, user.newsletter_subscribed || false);
-                            setOpenDropdown(null);
-                          }}
-                          onAdmin={() => {
-                            toggleAdminStatus(user.id, user.is_admin);
-                            setOpenDropdown(null);
-                          }}
-                          onSuperAdmin={() => {
-                            toggleSuperAdminStatus(user.id, user.is_super_admin);
-                            setOpenDropdown(null);
-                          }}
-                          onRemoveSuperAdmin={() => {
-                            toggleSuperAdminStatus(user.id, true);
-                            setOpenDropdown(null);
-                          }}
-                          onRemoveUser={() => {
-                            removeUser(user.id, user.full_name || user.email);
-                          }}
-                          user={user}
-                          currentUser={currentUser}
-                        />
-                      )}
-                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
 
           {users.length === 0 && (
-            <div className="py-12 text-center text-sm text-[color:var(--color-medium)]">
+            <div className="py-12 text-center text-sm text-[var(--admin-text-muted)]">
               No users found
             </div>
           )}
         </div>
-      </main>
 
       {/* Edit User Modal */}
       {editingUser && (
@@ -760,38 +675,8 @@ export default function UsersAdminPage() {
         />
       )}
 
-      {/* Close dropdown when clicking outside */}
-      {openDropdown && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setOpenDropdown(null)}
-        />
-      )}
-
-      {/* Actions info popover - portal so it positions under the (i) button */}
-      {showActionsInfo && typeof document !== "undefined" && createPortal(
-        <div
-          ref={actionsInfoPopoverRef}
-          className="fixed w-72 p-4 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-[100]"
-          style={{ top: actionsInfoPosition.top, left: actionsInfoPosition.left }}
-          onMouseLeave={() => setShowActionsInfo(false)}
-        >
-          <div className="absolute -right-2 top-4 w-4 h-4 bg-gray-900 transform rotate-45" />
-          <h4 className="font-semibold mb-2">Actions &amp; roles</h4>
-          <ul className="space-y-1.5 text-gray-200">
-            <li><strong>Edit Profile:</strong> Change name, username</li>
-            <li><strong>Grant/Revoke Newsletter:</strong> Toggle newsletter subscription</li>
-            <li><strong>Make/Remove Admin:</strong> Admin can create and manage articles</li>
-            <li><strong>Make/Remove Super Admin:</strong> Can also manage users and assign roles</li>
-            <li><strong>Remove User:</strong> Permanently delete the account</li>
-          </ul>
-          <p className="mt-2 pt-2 border-t border-gray-700 text-gray-300">
-            <strong>Admin</strong> = manage articles. <strong>Super Admin</strong> = everything + user management.
-          </p>
-        </div>,
-        document.body
-      )}
-    </div>
+      </AdminPageLayout>
+    </>
   );
 }
 

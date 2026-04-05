@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { createDiffuseClient, type DiffuseOutput, type DiffuseProject, type DiffuseProjectInput } from "@/lib/diffuse/client";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
+import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
 
 interface Connection {
   id: string;
@@ -43,6 +45,131 @@ interface ProjectWithWorkspace extends DiffuseProject {
   cover_image_file_name?: string | null;
 }
 
+const ORG_ARTICLE_PREVIEW = 3;
+
+function getLatestOutputArticleTitle(output: DiffuseOutput | undefined): string | null {
+  if (!output) return null;
+  try {
+    let parsedData = output.structured_data;
+    if (typeof parsedData === "string") {
+      try {
+        parsedData = JSON.parse(parsedData);
+      } catch {
+        parsedData = null;
+      }
+    }
+    if (parsedData && typeof parsedData === "object") {
+      const o = parsedData as { title?: string; name?: string };
+      const t = o.title || o.name;
+      if (t && typeof t === "string" && t.trim()) return t.trim();
+    }
+    if (output.content && typeof output.content === "string" && output.content.trim().startsWith("{")) {
+      try {
+        const contentJson = JSON.parse(output.content) as { title?: string; name?: string };
+        const t = contentJson.title || contentJson.name;
+        if (t && typeof t === "string" && t.trim()) return t.trim();
+      } catch {
+        /* ignore */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function sortProjectsByRecent(projects: ProjectWithWorkspace[]): ProjectWithWorkspace[] {
+  return [...projects].sort(
+    (a, b) =>
+      new Date(b.updated_at || b.created_at).getTime() -
+      new Date(a.updated_at || a.created_at).getTime(),
+  );
+}
+
+function OrgProjectsBlock({
+  title,
+  subtitle,
+  projects,
+  expanded,
+  onToggleExpand,
+  importingProjectId,
+  onImport,
+}: {
+  title: string;
+  subtitle?: string | null;
+  projects: ProjectWithWorkspace[];
+  expanded: boolean;
+  onToggleExpand: () => void;
+  importingProjectId: string | null;
+  onImport: (project: ProjectWithWorkspace) => void;
+}) {
+  const sorted = sortProjectsByRecent(projects);
+  const visible = expanded ? sorted : sorted.slice(0, ORG_ARTICLE_PREVIEW);
+  const hasMore = sorted.length > ORG_ARTICLE_PREVIEW;
+
+  return (
+    <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-4 sm:p-5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-semibold text-[var(--admin-text)]">{title}</h3>
+          {subtitle ? <p className="text-sm text-[var(--admin-text-muted)] mt-0.5">{subtitle}</p> : null}
+        </div>
+        {hasMore ? (
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            className="shrink-0 px-3 py-1.5 text-sm font-semibold rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)] transition"
+          >
+            {expanded ? "Show less" : `Show all (${sorted.length})`}
+          </button>
+        ) : null}
+      </div>
+      {sorted.length === 0 ? (
+        <p className="text-sm text-[var(--admin-text-muted)] py-1">No articles in this organization yet.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {visible.map((project) => {
+            const outputTitle = getLatestOutputArticleTitle(project.latest_output);
+            const dateStr = new Date(project.updated_at || project.created_at).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+            return (
+              <div
+                key={project.id}
+                className="flex h-full min-h-[200px] flex-col rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)]/40 p-4"
+              >
+                <p className="text-sm font-semibold text-[var(--admin-text)] leading-snug">{project.name}</p>
+                <p className="text-sm text-[var(--admin-text)] leading-snug line-clamp-3 mt-1 min-h-[2.75rem]">
+                  {outputTitle ?? (
+                    <span className="text-[var(--admin-text-muted)] italic">No output title yet</span>
+                  )}
+                </p>
+                <p className="text-xs text-[var(--admin-text-muted)] mt-2">Updated {dateStr}</p>
+                <div className="mt-auto pt-4">
+                  <button
+                    type="button"
+                    onClick={() => onImport(project)}
+                    disabled={!project.all_outputs || project.all_outputs.length === 0 || importingProjectId === project.id}
+                    className="w-full px-3 py-2 text-xs font-semibold rounded-md bg-[var(--admin-accent)] text-black hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {importingProjectId === project.id
+                      ? "Importing…"
+                      : !project.all_outputs || project.all_outputs.length === 0
+                        ? "No output"
+                        : "Import"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DiffuseIntegrationPage() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -62,7 +189,7 @@ export default function DiffuseIntegrationPage() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
-  const [collapsedWorkspaces, setCollapsedWorkspaces] = useState<Set<string>>(new Set());
+  const [expandedOrgIds, setExpandedOrgIds] = useState<Set<string>>(new Set());
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [showOutputSelector, setShowOutputSelector] = useState(false);
   const [outputSelectorData, setOutputSelectorData] = useState<{
@@ -760,15 +887,12 @@ export default function DiffuseIntegrationPage() {
     }
   }
 
-  function toggleWorkspaceCollapse(workspaceId: string) {
-    setCollapsedWorkspaces(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(workspaceId)) {
-        newSet.delete(workspaceId);
-      } else {
-        newSet.add(workspaceId);
-      }
-      return newSet;
+  function toggleOrgExpanded(orgId: string) {
+    setExpandedOrgIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(orgId)) next.delete(orgId);
+      else next.add(orgId);
+      return next;
     });
   }
 
@@ -799,15 +923,7 @@ export default function DiffuseIntegrationPage() {
     }
 
     // Single output - import directly
-    setConfirmModalData({
-      title: "Import Article",
-      message: `Import "${project.name}" as a draft article?`,
-      onConfirm: () => {
-        setShowConfirmModal(false);
-        performImport(project, outputs[0]);
-      }
-    });
-    setShowConfirmModal(true);
+    void performImport(project, outputs[0]);
   }
 
   async function performImport(project: ProjectWithWorkspace, selectedOutput?: DiffuseOutput) {
@@ -1287,15 +1403,7 @@ export default function DiffuseIntegrationPage() {
           imported_by: user.id,
         });
 
-      setConfirmModalData({
-        title: "Import Successful!",
-        message: "Successfully imported as draft! Redirecting to editor...",
-        onConfirm: () => {
-          setShowConfirmModal(false);
-          router.push(`/admin/articles/edit/${article.id}?fromDiffuse=true`);
-        }
-      });
-      setShowConfirmModal(true);
+      router.push(`/admin/articles/edit/${article.id}?fromDiffuse=true`);
     } catch (err: any) {
       setConfirmModalData({
         title: "Import Error",
@@ -1311,54 +1419,74 @@ export default function DiffuseIntegrationPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center antialiased" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
-          <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-[#ff9628] border-r-transparent"></div>
-          <p className="mt-4 text-[#dbdbdb] text-lg leading-[1.6]">Loading diffuse.ai...</p>
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[var(--admin-accent)] border-r-transparent" />
+          <p className="mt-4 text-sm text-[var(--admin-text-muted)]">Loading dashboard…</p>
         </div>
       </div>
     );
   }
 
+  const diffuseActionsPanel = connection ? (
+    <AdminActionsPanel
+      sections={[
+        {
+          title: "Actions",
+          items: [
+            {
+              icon: (
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              ),
+              label: "Refresh",
+              onClick: () => fetchWorkspacesAndProjects(),
+            },
+            {
+              icon: (
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              ),
+              label: "Visit Diffuse",
+              href: "https://www.diffuse.press",
+            },
+            {
+              icon: (
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              ),
+              label: "Disconnect",
+              variant: "danger",
+              onClick: handleDisconnect,
+            },
+          ],
+        },
+      ]}
+    />
+  ) : undefined;
+
   return (
-    <div className="min-h-screen bg-black antialiased" style={{ fontFamily: 'var(--font-space-grotesk)' }}>
-      <div className="mx-auto max-w-7xl px-6 md:px-12 lg:px-16 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              {/* diffuse.ai Logo */}
-              <h1 className="text-[48px] font-bold text-white leading-[1.2] tracking-[-0.01em] mb-4">
-                diffuse<span className="text-[#ff9628]">.ai</span>
-              </h1>
-              <p className="text-[#dbdbdb] text-[18px] leading-[1.6]">
-                Connect your diffuse.ai account to import generated articles
-              </p>
-            </div>
-            <Link
-              href="/admin"
-              className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all duration-300 backdrop-blur-[20px]"
-              style={{ color: 'white' }}
-            >
-              ← Back to Dashboard
-            </Link>
-          </div>
-        </div>
+    <>
+      <AdminPageHeader title="Dashboard" />
+      <AdminPageLayout actionsPanel={diffuseActionsPanel}>
 
         {/* Connection Status */}
         {!connection ? (
-          <div className="bg-white/5 backdrop-blur-[20px] border-2 border-[#ff9628]/50 rounded-xl p-6 md:p-8 max-w-2xl mx-auto">
+          <div className="bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded-lg p-6 md:p-8 max-w-2xl mx-auto">
             <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-gradient-to-r from-[#ff9628] to-[#ff7300] rounded-xl flex items-center justify-center mx-auto mb-6">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <div className="w-16 h-16 bg-[var(--admin-accent)]/20 rounded-lg flex items-center justify-center mx-auto mb-4 border border-[var(--admin-border)]">
+                <svg className="w-8 h-8 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h2 className="text-[36px] font-bold text-white mb-3 leading-[1.2] tracking-[-0.01em]">
-                Connect Your diffuse.ai Account
+              <h2 className="text-xl font-semibold text-white mb-2">
+                Connect your Diffuse.AI account
               </h2>
-              <p className="text-[#dbdbdb] text-[18px] leading-[1.6]">
-                Sign in with your diffuse.ai credentials to import your generated articles
+              <p className="text-sm text-[var(--admin-text-muted)]">
+                Sign in with your Diffuse.AI credentials to import generated articles.
               </p>
             </div>
 
@@ -1427,382 +1555,50 @@ export default function DiffuseIntegrationPage() {
             </div>
           </div>
         ) : (
-          <div>
-            {/* Connected Status */}
-            <div className="bg-white/5 backdrop-blur-[20px] rounded-xl p-6 mb-8 border border-white/10">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-5">
-                  {/* User Profile Picture */}
-                  <div className="relative w-14 h-14 rounded-xl overflow-hidden">
-                    {profile?.avatar_url ? (
-                      <img 
-                        src={profile.avatar_url} 
-                        alt="Profile" 
-                        className="w-full h-full object-cover scale-125"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-[#ff9628] to-[#c086fa] flex items-center justify-center">
-                        <span className="text-white font-bold text-[20px] leading-[1.4]">
-                          {profile?.full_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "?"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-[20px] leading-[1.4] font-bold text-white mb-1">
-                      Connected to <span className="text-white">diffuse<span className="text-[#ff9628]">.ai</span></span>
-                    </h3>
-                    <p className="text-[16px] leading-[1.6] text-[#dbdbdb]">
-                      {connection.diffuse_email || "Account connected"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <a
-                    href="https://www.diffuse.press"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#ff9628] rounded-xl transition-all duration-300 flex items-center gap-2 backdrop-blur-[20px]"
-                  >
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    <span className="text-white">Visit diffuse<span className="text-[#ff9628]">.press</span></span>
-                  </a>
-                  <button
-                    onClick={handleDisconnect}
-                    className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-red-400 hover:text-white bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition-all duration-300"
-                  >
-                    Disconnect
-                  </button>
-                </div>
+          <>
+            {loadingProjects ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="w-8 h-8 border-4 border-[var(--admin-accent)] border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-[var(--admin-text-muted)]">Loading projects…</p>
               </div>
-            </div>
-
-            {/* Organizations & Projects */}
-            <div className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl">
-              <div className="p-6 md:p-8 border-b border-white/10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-[32px] leading-[1.3] tracking-[-0.01em] font-bold text-white mb-2">
-                      Your diffuse.ai Organizations ({workspaces.length})
-                    </h2>
-                    <p className="text-[16px] leading-[1.6] text-[#dbdbdb]">
-                      View Projects and Import Their Outputs as Drafts
-                    </p>
-                  </div>
-                  <button
-                    onClick={fetchWorkspacesAndProjects}
-                    className="px-5 py-2.5 text-[14px] leading-[1.6] font-medium text-[#ff9628] hover:text-white bg-[#ff9628]/10 hover:bg-[#ff9628]/20 border border-[#ff9628]/30 hover:border-[#ff9628]/50 rounded-xl transition-all duration-300 flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                  </button>
-                </div>
+            ) : workspaces.length === 0 && (projectsByWorkspace["private"]?.length ?? 0) === 0 ? (
+              <div className="py-16 text-center rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-4">
+                <div className="text-7xl mb-6 opacity-50">🏢</div>
+                <h3 className="text-[24px] leading-[1.4] font-semibold text-[var(--admin-text)] mb-3">
+                  No organizations yet
+                </h3>
+                <p className="text-[18px] leading-[1.6] text-[var(--admin-text-muted)]">
+                  Create an organization in Diffuse and it will appear here
+                </p>
               </div>
-
-              {workspaces.length === 0 ? (
-                <div className="p-16 text-center">
-                  <div className="text-7xl mb-6 opacity-50">🏢</div>
-                  <h3 className="text-[24px] leading-[1.4] font-bold text-white mb-3">
-                    No Organizations Yet
-                  </h3>
-                  <p className="text-[18px] leading-[1.6] text-[#dbdbdb]">
-                    Create an organization in diffuse.ai and it will appear here
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-white/10">
-                  {workspaces.map((workspace) => {
-                    const projects = projectsByWorkspace[workspace.id] || [];
-                    return (
-                      <div key={workspace.id} className="p-8">
-                        {/* Workspace Header */}
-                        <div className="mb-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="w-14 h-14 bg-white/10 border border-white/20 backdrop-blur-[20px] rounded-xl flex items-center justify-center">
-                                <svg className="w-8 h-8 text-[#dbdbdb]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
-                              </div>
-                              <div>
-                                <h3 className="text-2xl font-bold text-white mb-1" style={{ letterSpacing: '-0.01em' }}>
-                                  {workspace.name}
-                                </h3>
-                                {workspace.description && (
-                                  <p className="text-base text-[#dbdbdb]" style={{ lineHeight: '1.6' }}>
-                                    {workspace.description}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            {/* Collapse Toggle Button */}
-                            <button
-                              onClick={() => toggleWorkspaceCollapse(workspace.id)}
-                              className="px-4 py-2 text-sm font-bold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-300 flex items-center gap-2"
-                            >
-                              <svg 
-                                className={`w-4 h-4 transition-transform duration-300 ${collapsedWorkspaces.has(workspace.id) ? 'rotate-180' : ''}`}
-                                fill="none" 
-                                stroke="currentColor" 
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
-                              </svg>
-                              {collapsedWorkspaces.has(workspace.id) ? 'Show' : 'Hide'}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Projects Grid */}
-                        {!collapsedWorkspaces.has(workspace.id) && (
-                          loadingProjects ? (
-                            <div className="ml-16 p-8 bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl flex items-center justify-center">
-                              <div className="flex flex-col items-center gap-3">
-                                <div className="w-8 h-8 border-4 border-[#ff9628] border-t-transparent rounded-full animate-spin"></div>
-                                <p className="text-sm text-[#dbdbdb]">Loading projects...</p>
-                              </div>
-                            </div>
-                          ) : projects.length === 0 ? (
-                            <div className="ml-16 p-6 bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl text-center">
-                              <p className="text-base text-[#dbdbdb]" style={{ lineHeight: '1.6' }}>
-                                No projects in this organization yet
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="ml-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                              {projects.map((project) => (
-                                <div
-                                  key={project.id}
-                                  className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-5 flex flex-col h-full"
-                                >
-                                  {/* Project Info - Grows to fill space */}
-                                  <div className="flex-1 mb-4">
-                                    <h4 className="font-bold text-white text-lg mb-2" style={{ letterSpacing: '-0.01em', lineHeight: '1.4' }}>
-                                      {project.name}
-                                    </h4>
-                                    {project.description && (
-                                      <p className="text-sm text-[#dbdbdb] line-clamp-2 mb-3" style={{ lineHeight: '1.6' }}>
-                                        {project.description}
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  {/* Metadata - Fixed position above button */}
-                                  <div className="space-y-2 mb-4">
-                                    <div className="flex items-center gap-3">
-                                      <span className="text-xs text-[#545454] font-medium">
-                                        {new Date(project.created_at).toLocaleDateString("en-US", {
-                                          month: "short",
-                                          day: "numeric",
-                                          year: "numeric",
-                                        })}
-                                      </span>
-                                      <span className="inline-flex items-center gap-1.5 rounded-full bg-[#c086fa]/20 border border-[#c086fa]/30 text-[#c086fa] px-3 py-1 text-xs font-semibold">
-                                        {project.status}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                      </svg>
-                                      <span className="text-xs text-[#dbdbdb] font-medium">
-                                        {project.creator_name || "Unknown"}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                      </svg>
-                                      <span className="text-xs text-[#dbdbdb] font-medium">
-                                        {project.cover_image_path ? "1 image" : "0 images"}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                      </svg>
-                                      <span className="text-xs text-[#dbdbdb] font-medium">
-                                        {project.all_outputs?.length || 0} output{project.all_outputs?.length !== 1 ? 's' : ''}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {/* Turn into Article Button */}
-                                  <button
-                                    onClick={() => handleImport(project)}
-                                    disabled={!project.all_outputs || project.all_outputs.length === 0 || importingProjectId === project.id}
-                                    className="w-full px-5 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white hover:scale-[1.03] rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                  >
-                                    {importingProjectId === project.id ? (
-                                      <>
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                        Importing...
-                                      </>
-                                    ) : !project.all_outputs || project.all_outputs.length === 0 ? (
-                                      <>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
-                                        No Output
-                                      </>
-                                    ) : (
-                                      <>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                        Turn into Article
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )
-                        )}
-                      </div>
-                    );
-                  })}
-                  
-                  {/* Private Projects Section */}
-                  {projectsByWorkspace["private"] && projectsByWorkspace["private"].length > 0 && (
-                    <div className="p-8 border-t border-[#ff9628]/30">
-                      {/* Private Section Header */}
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-gradient-to-br from-[#ff9628]/20 to-[#c086fa]/20 border border-[#ff9628]/40 backdrop-blur-[20px] rounded-xl flex items-center justify-center">
-                              <svg className="w-8 h-8 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                              </svg>
-                            </div>
-                            <div>
-                              <h3 className="text-2xl font-bold text-white mb-1" style={{ letterSpacing: '-0.01em' }}>
-                                Private Projects
-                              </h3>
-                              <p className="text-base text-[#dbdbdb]" style={{ lineHeight: '1.6' }}>
-                                Only visible to you
-                              </p>
-                            </div>
-                          </div>
-                          {/* Collapse Toggle Button */}
-                          <button
-                            onClick={() => toggleWorkspaceCollapse("private")}
-                            className="px-4 py-2 text-sm font-bold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-300 flex items-center gap-2"
-                          >
-                            <svg 
-                              className={`w-4 h-4 transition-transform duration-300 ${collapsedWorkspaces.has("private") ? 'rotate-180' : ''}`}
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
-                            </svg>
-                            {collapsedWorkspaces.has("private") ? 'Show' : 'Hide'}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Private Projects Grid */}
-                      {!collapsedWorkspaces.has("private") && (
-                        <div className="ml-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                          {projectsByWorkspace["private"].map((project) => (
-                            <div
-                              key={project.id}
-                              className="bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-xl p-5 flex flex-col h-full"
-                            >
-                              {/* Project Info - Grows to fill space */}
-                              <div className="flex-1 mb-4">
-                                <h4 className="font-bold text-white text-lg mb-2" style={{ letterSpacing: '-0.01em', lineHeight: '1.4' }}>
-                                  {project.name}
-                                </h4>
-                                {project.description && (
-                                  <p className="text-sm text-[#dbdbdb] line-clamp-2 mb-3" style={{ lineHeight: '1.6' }}>
-                                    {project.description}
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* Metadata - Fixed position above button */}
-                              <div className="space-y-2 mb-4">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-xs text-[#545454] font-medium">
-                                    {new Date(project.created_at).toLocaleDateString("en-US", {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric",
-                                    })}
-                                  </span>
-                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#c086fa]/20 border border-[#c086fa]/30 text-[#c086fa] px-3 py-1 text-xs font-semibold">
-                                    {project.status}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                  </svg>
-                                  <span className="text-xs text-[#dbdbdb] font-medium">
-                                    {project.creator_name || "Unknown"}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  <span className="text-xs text-[#dbdbdb] font-medium">
-                                    {project.cover_image_path ? "1 image" : "0 images"}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <svg className="w-3.5 h-3.5 text-[#ff9628]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                  </svg>
-                                  <span className="text-xs text-[#dbdbdb] font-medium">
-                                    {project.all_outputs?.length || 0} output{project.all_outputs?.length !== 1 ? 's' : ''}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Turn into Article Button */}
-                              <button
-                                onClick={() => handleImport(project)}
-                                disabled={!project.all_outputs || project.all_outputs.length === 0 || importingProjectId === project.id}
-                                className="w-full px-5 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white hover:scale-[1.03] rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                              >
-                                {importingProjectId === project.id ? (
-                                  <>
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    Importing...
-                                  </>
-                                ) : !project.all_outputs || project.all_outputs.length === 0 ? (
-                                  <>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    No Output
-                                  </>
-                                ) : (
-                                  <>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    Turn into Article
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+            ) : (
+              <div className="space-y-4">
+                {workspaces.map((workspace) => (
+                  <OrgProjectsBlock
+                    key={workspace.id}
+                    title={workspace.name}
+                    subtitle={workspace.description || null}
+                    projects={projectsByWorkspace[workspace.id] || []}
+                    expanded={expandedOrgIds.has(workspace.id)}
+                    onToggleExpand={() => toggleOrgExpanded(workspace.id)}
+                    importingProjectId={importingProjectId}
+                    onImport={handleImport}
+                  />
+                ))}
+                {(projectsByWorkspace["private"]?.length ?? 0) > 0 ? (
+                  <OrgProjectsBlock
+                    title="Private"
+                    subtitle="Only visible to you"
+                    projects={projectsByWorkspace["private"] || []}
+                    expanded={expandedOrgIds.has("private")}
+                    onToggleExpand={() => toggleOrgExpanded("private")}
+                    importingProjectId={importingProjectId}
+                    onImport={handleImport}
+                  />
+                ) : null}
+              </div>
+            )}
+          </>
         )}
 
         {/* Output Selector Modal */}
@@ -1822,7 +1618,7 @@ export default function DiffuseIntegrationPage() {
                     </svg>
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-white" style={{ letterSpacing: '-0.01em', lineHeight: '1.3' }}>
+                    <h2 className="text-2xl font-semibold text-white" style={{ letterSpacing: '-0.01em', lineHeight: '1.3' }}>
                       Select Output
                     </h2>
                     <p className="text-sm text-[#dbdbdb]">
@@ -1883,23 +1679,17 @@ export default function DiffuseIntegrationPage() {
                     <button
                       key={output.id}
                       onClick={() => {
+                        const proj = outputSelectorData.project;
                         setShowOutputSelector(false);
-                        setConfirmModalData({
-                          title: "Import Article",
-                          message: `Import output ${index + 1} as a draft article?`,
-                          onConfirm: () => {
-                            setShowConfirmModal(false);
-                            performImport(outputSelectorData.project, output);
-                          }
-                        });
-                        setShowConfirmModal(true);
+                        setOutputSelectorData(null);
+                        void performImport(proj, output);
                       }}
                       className="w-full p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#ff9628]/50 rounded-xl transition-all duration-200 text-left group"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-base font-bold text-white line-clamp-1">
+                            <h3 className="text-base font-semibold text-white line-clamp-1">
                               {title}
                             </h3>
                             {output.cover_photo_path && (
@@ -1940,7 +1730,7 @@ export default function DiffuseIntegrationPage() {
               {/* Cancel Button */}
               <button
                 onClick={() => setShowOutputSelector(false)}
-                className="w-full px-6 py-3 text-sm font-bold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-300"
+                className="w-full px-6 py-3 text-sm font-semibold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-300"
               >
                 Cancel
               </button>
@@ -1964,7 +1754,7 @@ export default function DiffuseIntegrationPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <h2 className="text-2xl font-bold text-white" style={{ letterSpacing: '-0.01em', lineHeight: '1.3' }}>
+                  <h2 className="text-2xl font-semibold text-white" style={{ letterSpacing: '-0.01em', lineHeight: '1.3' }}>
                     {confirmModalData.title}
                   </h2>
                 </div>
@@ -1977,13 +1767,13 @@ export default function DiffuseIntegrationPage() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowConfirmModal(false)}
-                  className="flex-1 px-6 py-3 text-sm font-bold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-300"
+                  className="flex-1 px-6 py-3 text-sm font-semibold text-[#dbdbdb] bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all duration-300"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmModalData.onConfirm}
-                  className="flex-1 px-6 py-3 text-sm font-bold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white rounded-xl transition-all duration-300"
+                  className="flex-1 px-6 py-3 text-sm font-semibold bg-gradient-to-r from-[#ff9628] to-[#ff7300] text-white rounded-xl transition-all duration-300"
                 >
                   OK
                 </button>
@@ -1991,7 +1781,7 @@ export default function DiffuseIntegrationPage() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </AdminPageLayout>
+    </>
   );
 }

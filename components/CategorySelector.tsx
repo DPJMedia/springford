@@ -31,13 +31,13 @@ const CATEGORIES = [
 export function CategorySelector({ value, onChange }: CategorySelectorProps) {
   return (
     <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-2">
+      <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2">
         Category
       </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="w-full px-4 py-2 border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)] focus:border-[var(--admin-accent)]"
       >
         {CATEGORIES.map((category) => (
           <option key={category.value} value={category.value}>
@@ -45,7 +45,7 @@ export function CategorySelector({ value, onChange }: CategorySelectorProps) {
           </option>
         ))}
       </select>
-      <p className="text-xs text-gray-500 mt-1">
+      <p className="text-xs text-[var(--admin-text-muted)] mt-1">
         Select the most appropriate category for this article
       </p>
     </div>

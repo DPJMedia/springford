@@ -47,6 +47,14 @@ function computeChart(chartTimeRange: string) {
       chartStartDate.setDate(now.getDate() - 90);
       bucketCount = 90;
       break;
+    case "all": {
+      chartStartDate.setTime(Date.UTC(2020, 0, 1, 0, 0, 0, 0));
+      const msPerDay = 86_400_000;
+      const days = Math.ceil((now.getTime() - chartStartDate.getTime()) / msPerDay);
+      bucketCount = Math.min(2000, Math.max(1, days));
+      granularity = "day";
+      break;
+    }
     default:
       chartStartDate.setDate(now.getDate() - 7);
       bucketCount = 7;
@@ -127,6 +135,71 @@ async function loadCurrentAdsStats(supabase: SupabaseClient, nowIso: string) {
   );
 }
 
+type SectionPerformanceItem = {
+  name: string;
+  views: number;
+  clicks: number;
+  avgTimeSpent: number;
+};
+
+async function loadSectionPerformance(
+  supabase: SupabaseClient,
+  rpcData: Record<string, unknown> | null,
+): Promise<SectionPerformanceItem[]> {
+  const { data: articleSections } = await supabase
+    .from("articles")
+    .select("section, view_count")
+    .eq("status", "published")
+    .not("section", "is", null);
+
+  const viewsBySection = new Map<string, { name: string; views: number }>();
+  for (const row of articleSections || []) {
+    const section = typeof row.section === "string" ? row.section.trim() : "";
+    if (!section) continue;
+    const key = section.toLowerCase();
+    const current = viewsBySection.get(key);
+    const addViews = Number(row.view_count) || 0;
+    if (!current) {
+      viewsBySection.set(key, { name: section, views: addViews });
+    } else {
+      current.views += addViews;
+      viewsBySection.set(key, current);
+    }
+  }
+
+  const fallback = Array.from(viewsBySection.values())
+    .sort((a, b) => b.views - a.views)
+    .slice(0, 5)
+    .map((x) => ({ name: x.name, views: x.views, clicks: 0, avgTimeSpent: 0 }));
+
+  const rpcSection = Array.isArray(rpcData?.sectionPerformance)
+    ? (rpcData.sectionPerformance as Record<string, unknown>[])
+    : [];
+
+  if (rpcSection.length === 0) return fallback;
+
+  const merged = rpcSection.map((item) => {
+    const rawName = typeof item.name === "string" ? item.name : "Unknown";
+    const key = rawName.toLowerCase();
+    const fallbackViews = viewsBySection.get(key)?.views ?? 0;
+    return {
+      name: rawName,
+      clicks: Number(item.clicks) || 0,
+      views: fallbackViews > 0 ? fallbackViews : Number(item.views) || 0,
+      avgTimeSpent: Number(item.avgTimeSpent) || 0,
+    };
+  });
+
+  const seen = new Set(merged.map((x) => x.name.toLowerCase()));
+  for (const item of fallback) {
+    if (seen.has(item.name.toLowerCase())) continue;
+    if (merged.length >= 5) break;
+    merged.push(item);
+  }
+
+  return merged;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -147,7 +220,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const timeRange = searchParams.get("timeRange") || "30d";
-    const chartTimeRange = searchParams.get("chartTimeRange") || "7d";
+    const chartTimeRange = searchParams.get("chartTimeRange") || "30d";
 
     const { rangeStartIso, rangeEndIso } = computeRange(timeRange);
     const { chartStartIso, chartEndIso, granularity, bucketCount } = computeChart(chartTimeRange);
@@ -168,11 +241,28 @@ export async function GET(request: NextRequest) {
     }
 
     const currentAdsStats = await loadCurrentAdsStats(admin, rangeEndIso);
+    const sectionPerformance = await loadSectionPerformance(admin, rpcData as Record<string, unknown> | null);
+
+    const { count: allTimePageViews } = await admin
+      .from("page_views")
+      .select("*", { count: "exact", head: true });
+
+    const now = new Date();
+    const thirtyDaysStart = new Date(now);
+    thirtyDaysStart.setDate(thirtyDaysStart.getDate() - 30);
+    const { count: pageViewsLast30Days } = await admin
+      .from("page_views")
+      .select("*", { count: "exact", head: true })
+      .gte("viewed_at", thirtyDaysStart.toISOString())
+      .lte("viewed_at", now.toISOString());
 
     return NextResponse.json({
       ...rpcData,
+      sectionPerformance,
       chartGranularity: granularity,
       currentAdsStats,
+      allTimePageViews: allTimePageViews ?? 0,
+      pageViewsLast30Days: pageViewsLast30Days ?? 0,
     });
   } catch (e) {
     console.error("[analytics-dashboard]", e);

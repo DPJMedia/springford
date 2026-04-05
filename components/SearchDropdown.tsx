@@ -108,7 +108,7 @@ export function SearchDropdown({ isOpen, onClose }: SearchDropdownProps) {
      */
     <div
       ref={wrapperRef}
-      className="relative border-b border-[color:var(--color-border)] bg-white"
+      className="relative z-20 border-b border-[color:var(--color-border)] bg-white"
       style={{ animation: "sfp-search-open 0.2s ease both" }}
     >
       <style>{`

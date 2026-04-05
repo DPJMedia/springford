@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
+import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
+import {
+  TransactionalEmailTypesList,
+  TransactionalEmailsMain,
+} from "@/components/admin/TransactionalEmailSection";
+import { getTransactionalEmailPreviews } from "@/lib/emails/transactionalPreviews";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,7 +38,7 @@ interface Template {
   updated_at: string;
 }
 
-type CampaignFilter = "all" | "draft" | "sent";
+type CampaignFilter = "draft" | "sent";
 
 // ─── Shared Modal Components ──────────────────────────────────────────────────
 
@@ -42,7 +50,7 @@ function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCance
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="px-6 pt-6 pb-4">
-          <h2 className="text-base font-bold text-[color:var(--color-dark)] mb-2">{title}</h2>
+          <h2 className="text-base font-semibold text-[color:var(--color-dark)] mb-2">{title}</h2>
           <p className="text-sm text-[color:var(--color-medium)]">{message}</p>
         </div>
         <div className="px-6 pb-6 flex gap-3">
@@ -52,7 +60,7 @@ function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCance
           </button>
           <button onClick={onConfirm}
             className={`flex-1 py-2.5 text-sm font-semibold rounded-xl transition ${
-              danger ? "bg-red-600 text-white hover:bg-red-700" : "bg-[color:var(--color-riviera-blue)] text-white hover:opacity-90"
+              danger ? "bg-red-600 text-white hover:bg-red-700" : "bg-[var(--admin-accent)] text-white hover:opacity-90"
             }`}>
             {confirmLabel || "Confirm"}
           </button>
@@ -73,10 +81,10 @@ function InputModal({ title, message, defaultValue, confirmLabel, onConfirm, onC
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="px-6 pt-6 pb-4">
-          <h2 className="text-base font-bold text-[color:var(--color-dark)] mb-1">{title}</h2>
+          <h2 className="text-base font-semibold text-[color:var(--color-dark)] mb-1">{title}</h2>
           <p className="text-sm text-[color:var(--color-medium)] mb-4">{message}</p>
           <input ref={inputRef} type="text" value={value} onChange={(e) => setValue(e.target.value)}
-            className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]"
+            className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]"
             onKeyDown={(e) => { if (e.key === "Enter" && value.trim()) onConfirm(value.trim()); if (e.key === "Escape") onCancel(); }} />
         </div>
         <div className="px-6 pb-6 flex gap-3">
@@ -85,7 +93,7 @@ function InputModal({ title, message, defaultValue, confirmLabel, onConfirm, onC
             Cancel
           </button>
           <button onClick={() => value.trim() && onConfirm(value.trim())} disabled={!value.trim()}
-            className="flex-1 py-2.5 text-sm font-semibold bg-[color:var(--color-riviera-blue)] text-white rounded-xl hover:opacity-90 transition disabled:opacity-40">
+            className="flex-1 py-2.5 text-sm font-semibold bg-[var(--admin-accent)] text-white rounded-xl hover:opacity-90 transition disabled:opacity-40">
             {confirmLabel || "Confirm"}
           </button>
         </div>
@@ -97,15 +105,19 @@ function InputModal({ title, message, defaultValue, confirmLabel, onConfirm, onC
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === "sent") return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700"><span className="w-1.5 h-1.5 rounded-full bg-green-500" />Sent</span>;
-  if (status === "scheduled") return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />Scheduled</span>;
-  return <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600"><span className="w-1.5 h-1.5 rounded-full bg-gray-400" />Draft</span>;
+  const label =
+    status === "sent" ? "Sent" : status === "scheduled" ? "Scheduled" : status === "draft" ? "Draft" : status;
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)]">
+      {label}
+    </span>
+  );
 }
 
 function RecipientsBadge({ type }: { type: string }) {
-  if (type === "all_users") return <span className="text-xs text-gray-500 flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>All Users</span>;
-  if (type === "super_admins") return <span className="text-xs text-gray-500 flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>Super Admins</span>;
-  return <span className="text-xs text-gray-500 flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>Subscribers</span>;
+  if (type === "all_users") return <span className="text-xs text-[var(--admin-text-muted)] flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>All Users</span>;
+  if (type === "super_admins") return <span className="text-xs text-[var(--admin-text-muted)] flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>Super Admins</span>;
+  return <span className="text-xs text-[var(--admin-text-muted)] flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>Subscribers</span>;
 }
 
 // ─── Main Inner ───────────────────────────────────────────────────────────────
@@ -116,6 +128,8 @@ function NewsletterInner() {
   const initialTab = (searchParams.get("tab") as "campaigns" | "templates") || "campaigns";
 
   const [tab, setTab] = useState<"campaigns" | "templates">(initialTab);
+  const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,17 +141,26 @@ function NewsletterInner() {
 
   // Filters
   const [campaignSearch, setCampaignSearch] = useState("");
-  const [campaignFilter, setCampaignFilter] = useState<CampaignFilter>("all");
+  const [campaignFilter, setCampaignFilter] = useState<CampaignFilter>("sent");
   const [templateSearch, setTemplateSearch] = useState("");
 
   const supabase = createClient();
+
+  const transactionalPreviews = useMemo(() => getTransactionalEmailPreviews(), []);
+  const [transactionalEmailId, setTransactionalEmailId] = useState(
+    () => transactionalPreviews[0]?.id ?? ""
+  );
+
+  useEffect(() => {
+    setSelectedCampaignId(null);
+  }, [tab, campaignFilter]);
 
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
       const { data: p } = await supabase.from("user_profiles").select("is_admin,is_super_admin").eq("id", user.id).single();
-      if (!p?.is_admin && !p?.is_super_admin) { router.push("/admin"); return; }
+      if (!p?.is_admin && !p?.is_super_admin) { router.push("/admin/articles"); return; }
       await loadData();
     }
     init();
@@ -174,6 +197,7 @@ function NewsletterInner() {
         setDeletingId(c.id);
         await supabase.from("newsletter_campaigns").delete().eq("id", c.id);
         setCampaigns((prev) => prev.filter((camp) => camp.id !== c.id));
+        setSelectedCampaignId((prev) => (prev === c.id ? null : prev));
         setDeletingId(null);
       },
     });
@@ -245,9 +269,13 @@ function NewsletterInner() {
     const matchesSearch = !campaignSearch ||
       c.name.toLowerCase().includes(campaignSearch.toLowerCase()) ||
       c.subject.toLowerCase().includes(campaignSearch.toLowerCase());
-    const matchesFilter = campaignFilter === "all" || c.status === campaignFilter;
+    const matchesFilter = c.status === campaignFilter;
     return matchesSearch && matchesFilter;
   });
+
+  const selectedCampaign = selectedCampaignId
+    ? campaigns.find((c) => c.id === selectedCampaignId) ?? null
+    : null;
 
   const filteredTemplates = templates.filter((t) =>
     !templateSearch || t.name.toLowerCase().includes(templateSearch.toLowerCase())
@@ -258,156 +286,339 @@ function NewsletterInner() {
   const sentCount = campaigns.filter((c) => c.status === "sent").length;
   const draftCount = campaigns.filter((c) => c.status === "draft").length;
 
-  if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--color-riviera-blue)] border-r-transparent" />
-    </div>
+  if (loading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
+      </div>
+    );
+  }
+
+  const campaignsAdminActionsPanel = (
+    <AdminActionsPanel
+      attachBelowCreateButton
+      sections={[
+        {
+          title: "Actions",
+          items: [
+            {
+              icon: (
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              ),
+              label: "New Campaign",
+              href: "/admin/newsletter/campaigns/new",
+            },
+          ],
+        },
+        ...(selectedCampaign
+          ? [
+              {
+                title: "Campaign",
+                items: [
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    ),
+                    label: selectedCampaign.status === "sent" ? "View" : "Edit",
+                    href: `/admin/newsletter/campaigns/new?id=${selectedCampaign.id}`,
+                  },
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    ),
+                    label: "Duplicate",
+                    onClick: () => duplicateCampaign(selectedCampaign),
+                  },
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    ),
+                    label: selectedCampaign.status === "sent" ? "Remove" : "Delete",
+                    variant: "danger" as const,
+                    onClick: () => deleteCampaign(selectedCampaign),
+                  },
+                ],
+              },
+            ]
+          : [
+              {
+                title: "Campaign",
+                customContent: (
+                  <p className="text-sm text-[var(--admin-text-muted)] px-1">Select a campaign in the table to edit, duplicate, or delete.</p>
+                ),
+              },
+            ]),
+        {
+          title: "Stats",
+          items: [],
+          customContent: (
+            <div className="space-y-2 px-1">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--admin-text-muted)]">Sent</span>
+                <span className="font-semibold text-[var(--admin-text)]">{sentCount}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--admin-text-muted)]">Drafts</span>
+                <span className="font-semibold text-[var(--admin-text)]">{draftCount}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--admin-text-muted)]">Templates</span>
+                <span className="font-semibold text-[var(--admin-text)]">{templates.length}</span>
+              </div>
+            </div>
+          ),
+        },
+      ]}
+    />
   );
 
+  const actionsPanel =
+    tab === "campaigns"
+      ? campaignsAdminActionsPanel
+      : tab === "templates"
+        ? (
+            <AdminActionsPanel
+              attachBelowCreateButton
+              sections={[
+                {
+                  title: "Actions",
+                  items: [
+                    {
+                      icon: (
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      ),
+                      label: "New Template",
+                      href: "/admin/newsletter/template-editor",
+                    },
+                  ],
+                },
+                {
+                  title: "Stats",
+                  items: [],
+                  customContent: (
+                    <div className="space-y-2 px-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-[var(--admin-text-muted)]">Templates</span>
+                        <span className="font-semibold text-[var(--admin-text)]">{templates.length}</span>
+                      </div>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          )
+        : null;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+      <AdminPageHeader title="Newsletter" />
+      <AdminPageLayout
+        createButton={
+          tab === "campaigns"
+            ? { label: "New Campaign", href: "/admin/newsletter/campaigns/new" }
+            : { label: "New Template", href: "/admin/newsletter/template-editor" }
+        }
+        actionsColumnClassName="xl:pt-28"
+        actionsPanel={actionsPanel}
+      >
       {confirmModal && <ConfirmModal {...confirmModal} onCancel={() => setConfirmModal(null)} />}
       {inputModal && <InputModal {...inputModal} onCancel={() => setInputModal(null)} />}
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 py-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Link href="/admin" className="text-sm text-[color:var(--color-medium)] hover:text-[color:var(--color-dark)] transition">← Dashboard</Link>
-              </div>
-              <h1 className="text-2xl font-bold text-[color:var(--color-dark)]">Newsletter</h1>
-              <p className="text-sm text-[color:var(--color-medium)] mt-0.5">
-                {sentCount} sent · {draftCount} draft · {templates.length} template{templates.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link href="/admin/newsletter/template-editor"
-                className="flex items-center gap-2 px-4 py-2 border border-blue-200 text-[color:var(--color-riviera-blue)] bg-blue-50 hover:bg-blue-100 rounded-xl font-semibold text-sm transition">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                New Template
-              </Link>
-              <Link href="/admin/newsletter/campaigns/new"
-                className="flex items-center gap-2 px-4 py-2 bg-[color:var(--color-riviera-blue)] text-white rounded-xl font-semibold text-sm hover:opacity-90 transition">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                New Campaign
-              </Link>
-            </div>
-          </div>
 
-          {/* Tabs */}
-          <div className="flex gap-0 mt-6 border-b border-gray-200 -mb-px">
-            {(["campaigns", "templates"] as const).map((t) => (
-              <button key={t} onClick={() => setTab(t)}
-                className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition capitalize ${
-                  tab === t
-                    ? "border-[color:var(--color-riviera-blue)] text-[color:var(--color-riviera-blue)]"
-                    : "border-transparent text-[color:var(--color-medium)] hover:text-[color:var(--color-dark)]"
-                }`}>
-                {t}
-                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-medium ${tab === t ? "bg-blue-100 text-[color:var(--color-riviera-blue)]" : "bg-gray-100 text-gray-500"}`}>
-                  {t === "campaigns" ? campaigns.length : templates.length}
-                </span>
+      <div className="relative mb-6">
+        <button
+          type="button"
+          onClick={() => setViewDropdownOpen((o) => !o)}
+          className="inline-flex items-center gap-2 text-xl font-semibold text-white hover:text-[var(--admin-accent)] transition"
+        >
+          {tab === "campaigns" ? "Campaigns" : "Templates"}
+          <svg
+            className={`w-5 h-5 text-[var(--admin-text-muted)] transition-transform ${viewDropdownOpen ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {viewDropdownOpen && (
+          <>
+            <button
+              type="button"
+              className="fixed inset-0 z-40 cursor-default"
+              aria-label="Close menu"
+              onClick={() => setViewDropdownOpen(false)}
+            />
+            <div className="absolute left-0 top-full z-50 mt-1 min-w-[12rem] rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] py-1 shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("campaigns");
+                  router.replace("/admin/newsletter?tab=campaigns");
+                  setViewDropdownOpen(false);
+                }}
+                className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-medium ${
+                  tab === "campaigns" ? "bg-[var(--admin-accent)]/15 text-[var(--admin-accent)]" : "text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                }`}
+              >
+                Campaigns
+                {tab === "campaigns" && <span className="text-xs">✓</span>}
               </button>
-            ))}
-          </div>
-        </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("templates");
+                  router.replace("/admin/newsletter?tab=templates");
+                  setViewDropdownOpen(false);
+                }}
+                className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-medium ${
+                  tab === "templates" ? "bg-[var(--admin-accent)]/15 text-[var(--admin-accent)]" : "text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                }`}
+              >
+                Templates
+                {tab === "templates" && <span className="text-xs">✓</span>}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-6">
-        {/* ── CAMPAIGNS TAB ── */}
+      <div>
         {tab === "campaigns" && (
-          <div>
-            {/* Search + Filter bar */}
-            <div className="flex items-center gap-3 mb-5 flex-wrap">
-              <div className="relative flex-1 min-w-0 max-w-sm">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                <input type="text" placeholder="Search campaigns…" value={campaignSearch} onChange={(e) => setCampaignSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)] bg-white" />
+          <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_16rem] xl:gap-x-6 xl:gap-y-16 xl:items-start">
+            <div className="min-w-0 space-y-5 xl:col-span-2">
+            <div className="flex flex-col sm:flex-row gap-3 mb-5 items-stretch">
+              <div className="relative min-w-0 sm:flex-[2]">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <input
+                  type="text"
+                  placeholder="Search campaigns…"
+                  value={campaignSearch}
+                  onChange={(e) => setCampaignSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 text-sm border border-[var(--admin-border)] rounded-lg bg-[var(--admin-card-bg)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]/30 focus:border-[var(--admin-accent)]"
+                />
               </div>
-              <div className="flex gap-1">
-                {(["all", "draft", "sent"] as CampaignFilter[]).map((f) => (
-                  <button key={f} onClick={() => setCampaignFilter(f)}
-                    className={`px-3 py-2 text-xs font-semibold rounded-lg capitalize transition ${
-                      campaignFilter === f
-                        ? "bg-[color:var(--color-riviera-blue)] text-white"
-                        : "bg-white border border-gray-200 text-gray-600 hover:border-gray-300"
-                    }`}>{f}</button>
-                ))}
+              <div className="flex gap-2 min-w-0 sm:flex-1">
+                <button
+                  type="button"
+                  onClick={() => setCampaignFilter("draft")}
+                  className={`flex-1 px-3 py-2.5 text-sm font-semibold rounded-lg transition ${
+                    campaignFilter === "draft"
+                      ? "bg-[var(--admin-accent)] text-black"
+                      : "bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                  }`}
+                >
+                  All drafts
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCampaignFilter("sent")}
+                  className={`flex-1 px-3 py-2.5 text-sm font-semibold rounded-lg transition ${
+                    campaignFilter === "sent"
+                      ? "bg-[var(--admin-accent)] text-black"
+                      : "bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                  }`}
+                >
+                  Sent
+                </button>
               </div>
             </div>
 
             {filteredCampaigns.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-2xl border border-gray-200">
-                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              <div className="text-center py-20 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)]">
+                <div className="w-16 h-16 bg-[var(--admin-accent)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                 </div>
-                <p className="text-lg font-semibold text-[color:var(--color-dark)] mb-2">
-                  {campaignSearch || campaignFilter !== "all" ? "No matching campaigns" : "No campaigns yet"}
+                <p className="text-lg font-semibold text-[var(--admin-text)] mb-2">
+                  {campaignSearch ? "No matching campaigns" : `No ${campaignFilter === "draft" ? "draft" : "sent"} campaigns`}
                 </p>
-                <p className="text-sm text-[color:var(--color-medium)] mb-6">
-                  {campaignSearch || campaignFilter !== "all" ? "Try adjusting your search or filter." : "Create your first campaign to start sending newsletters."}
+                <p className="text-sm text-[var(--admin-text-muted)] mb-6">
+                  {campaignSearch ? "Try adjusting your search." : "Create a campaign or switch between drafts and sent."}
                 </p>
-                {!campaignSearch && campaignFilter === "all" && (
+                {!campaignSearch && (
                   <Link href="/admin/newsletter/campaigns/new"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-[color:var(--color-riviera-blue)] text-white font-semibold rounded-lg hover:opacity-90 transition text-sm">
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--admin-accent)] text-black font-semibold rounded-lg hover:opacity-90 transition text-sm">
                     New Campaign
                   </Link>
                 )}
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] overflow-hidden">
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Campaign</th>
-                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Template</th>
-                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Recipients</th>
-                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Date</th>
-                      <th className="px-5 py-3" />
+                    <tr className="bg-[var(--admin-table-header-bg)] border-b border-[var(--admin-border)]">
+                      <th className="text-left px-5 py-3 text-xs font-medium text-[var(--admin-text)] uppercase tracking-wide">Campaign</th>
+                      <th className="text-left px-5 py-3 text-xs font-medium text-[var(--admin-text)] uppercase tracking-wide">Recipients</th>
+                      <th className="text-left px-5 py-3 text-xs font-medium text-[var(--admin-text)] uppercase tracking-wide">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredCampaigns.map((c) => (
-                      <tr key={c.id} className="hover:bg-gray-50 transition">
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-sm text-[color:var(--color-dark)] truncate max-w-[200px]">{c.name}</p>
-                          {c.subject && <p className="text-xs text-[color:var(--color-medium)] truncate max-w-[200px] mt-0.5">{c.subject}</p>}
+                  <tbody className="divide-y divide-[var(--admin-border)]">
+                    {filteredCampaigns.map((c) => {
+                      const publishedLine =
+                        c.status === "sent" && c.sent_at
+                          ? `Published ${new Date(c.sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                          : "Not published yet";
+                      return (
+                      <tr
+                        key={c.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedCampaignId(c.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedCampaignId(c.id);
+                          }
+                        }}
+                        className={`cursor-pointer transition ${
+                          selectedCampaignId === c.id
+                            ? "bg-[var(--admin-accent)]/10"
+                            : "hover:bg-[var(--admin-table-row-hover)]"
+                        }`}
+                      >
+                        <td className="px-5 py-4 align-middle">
+                          <p className="font-semibold text-sm text-[var(--admin-text)] truncate max-w-md">{c.name}</p>
+                          <p className="text-xs text-[var(--admin-text-muted)] mt-1">{publishedLine}</p>
                         </td>
-                        <td className="px-5 py-4 hidden md:table-cell">
-                          {c.template_name
-                            ? <span className="text-xs font-medium text-[color:var(--color-riviera-blue)] bg-blue-50 px-2 py-0.5 rounded-full">{c.template_name}</span>
-                            : <span className="text-xs text-gray-400 italic">No template</span>}
+                        <td className="px-5 py-4 align-middle">
+                          <RecipientsBadge type={c.recipients_type} />
                         </td>
-                        <td className="px-5 py-4 hidden sm:table-cell"><RecipientsBadge type={c.recipients_type} /></td>
-                        <td className="px-5 py-4"><StatusBadge status={c.status} /></td>
-                        <td className="px-5 py-4 hidden lg:table-cell text-xs text-gray-400">
-                          {c.status === "sent" && c.sent_at
-                            ? new Date(c.sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                            : `Updated ${new Date(c.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link href={`/admin/newsletter/campaigns/new?id=${c.id}`}
-                              className="px-3 py-1.5 text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg transition">
-                              {c.status === "sent" ? "View" : "Edit"}
-                            </Link>
-                            <button onClick={() => duplicateCampaign(c)} disabled={duplicatingId === c.id}
-                              className="px-3 py-1.5 text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg transition disabled:opacity-50">
-                              {duplicatingId === c.id ? "…" : "Duplicate"}
-                            </button>
-                            <button onClick={() => deleteCampaign(c)} disabled={deletingId === c.id}
-                              title={c.status === "sent" ? "Remove from list (does not unsend)" : "Delete draft"}
-                              className="px-3 py-1.5 text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50">
-                              {deletingId === c.id ? "…" : c.status === "sent" ? "Remove" : "Delete"}
-                            </button>
-                          </div>
+                        <td className="px-5 py-4 align-middle">
+                          <StatusBadge status={c.status} />
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
+                </div>
+              </div>
+            )}
+            </div>
+
+            <TransactionalEmailsMain
+              className="mt-0 min-w-0 xl:col-start-1 xl:row-start-2"
+              selectedId={transactionalEmailId}
+              onSelectId={setTransactionalEmailId}
+              previews={transactionalPreviews}
+            />
+            {transactionalPreviews.length > 0 && (
+              <div className="hidden w-full min-w-0 shrink-0 self-start pt-[3.25rem] xl:col-start-2 xl:row-start-2 xl:block">
+                <TransactionalEmailTypesList
+                  selectedId={transactionalEmailId}
+                  onSelect={setTransactionalEmailId}
+                  previews={transactionalPreviews}
+                />
               </div>
             )}
           </div>
@@ -416,49 +627,50 @@ function NewsletterInner() {
         {/* ── TEMPLATES TAB ── */}
         {tab === "templates" && (
           <div>
+            <h2 className="text-xl font-semibold text-white mb-4">Templates</h2>
             <div className="flex items-center gap-3 mb-5">
               <div className="relative flex-1 min-w-0 max-w-sm">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 <input type="text" placeholder="Search templates…" value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)] bg-white" />
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-[var(--admin-border)] rounded-lg bg-[var(--admin-card-bg)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]/30 focus:border-[var(--admin-accent)]" />
               </div>
             </div>
 
             {filteredTemplates.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-2xl border border-gray-200">
-                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              <div className="text-center py-20 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)]">
+                <div className="w-16 h-16 bg-[var(--admin-accent)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                 </div>
-                <p className="text-lg font-semibold text-[color:var(--color-dark)] mb-2">
+                <p className="text-lg font-semibold text-[var(--admin-text)] mb-2">
                   {templateSearch ? "No matching templates" : "No templates yet"}
                 </p>
-                <p className="text-sm text-[color:var(--color-medium)] mb-6">
+                <p className="text-sm text-[var(--admin-text-muted)] mb-6">
                   {templateSearch ? "Try a different search term." : "Create a reusable email layout to use across campaigns."}
                 </p>
                 {!templateSearch && (
                   <Link href="/admin/newsletter/template-editor"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-[color:var(--color-riviera-blue)] text-white font-semibold rounded-lg hover:opacity-90 transition text-sm">
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--admin-accent)] text-black font-semibold rounded-lg hover:opacity-90 transition text-sm">
                     Create a Template
                   </Link>
                 )}
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] overflow-hidden">
                 {filteredTemplates.map((tmpl, i) => {
                   const usedInCampaigns = campaigns.filter((c) => c.template_id === tmpl.id);
                   const isExpanded = expandedTemplateId === tmpl.id;
                   return (
-                    <div key={tmpl.id} className={i > 0 ? "border-t border-gray-100" : ""}>
+                    <div key={tmpl.id} className={i > 0 ? "border-t border-[var(--admin-border)]" : ""}>
                       {/* Main row */}
-                      <div className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition">
+                      <div className="flex items-center gap-4 px-5 py-4 hover:bg-[var(--admin-table-row-hover)] transition">
                         {/* Icon */}
-                        <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <svg className="w-4 h-4 text-[color:var(--color-riviera-blue)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <div className="w-9 h-9 bg-[var(--admin-accent)]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         </div>
                         {/* Name + meta */}
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-[color:var(--color-dark)] truncate">{tmpl.name}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">
+                          <p className="font-semibold text-sm text-[var(--admin-text)] truncate">{tmpl.name}</p>
+                          <p className="text-xs text-[var(--admin-text-muted)] mt-0.5">
                             {tmpl.blocks.length} block{tmpl.blocks.length !== 1 ? "s" : ""} · Updated {new Date(tmpl.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                           </p>
                         </div>
@@ -466,8 +678,8 @@ function NewsletterInner() {
                         <button onClick={() => setExpandedTemplateId(isExpanded ? null : tmpl.id)}
                           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex-shrink-0 ${
                             usedInCampaigns.length > 0
-                              ? "border-blue-200 text-[color:var(--color-riviera-blue)] bg-blue-50 hover:bg-blue-100"
-                              : "border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-500"
+                              ? "border-[var(--admin-accent)]/30 text-[var(--admin-accent)] bg-[var(--admin-accent)]/10 hover:bg-[var(--admin-accent)]/20"
+                              : "border-[var(--admin-border)] text-[var(--admin-text-muted)] hover:border-[var(--admin-accent)]/30 hover:text-[var(--admin-text)]"
                           }`}>
                           {usedInCampaigns.length > 0
                             ? <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>{usedInCampaigns.length} campaign{usedInCampaigns.length > 1 ? "s" : ""}</>
@@ -477,40 +689,40 @@ function NewsletterInner() {
                         {/* Actions */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <Link href={`/admin/newsletter/template-editor?id=${tmpl.id}`}
-                            className="px-3 py-1.5 text-xs font-semibold bg-blue-50 border border-blue-200 text-[color:var(--color-riviera-blue)] hover:bg-blue-100 rounded-lg transition">
+                            className="px-3 py-1.5 text-xs font-semibold bg-[var(--admin-accent)]/10 border border-[var(--admin-accent)]/30 text-[var(--admin-accent)] hover:bg-[var(--admin-accent)]/20 rounded-lg transition">
                             Edit
                           </Link>
                           <button onClick={() => duplicateTemplate(tmpl)} disabled={duplicatingId === tmpl.id}
-                            className="px-3 py-1.5 text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg transition disabled:opacity-50">
+                            className="px-3 py-1.5 text-xs font-semibold border border-[var(--admin-border)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)] rounded-lg transition disabled:opacity-50">
                             {duplicatingId === tmpl.id ? "…" : "Duplicate"}
                           </button>
                           <Link href="/admin/newsletter/campaigns/new"
-                            className="px-3 py-1.5 text-xs font-semibold bg-blue-50 border border-blue-200 text-[color:var(--color-riviera-blue)] hover:bg-blue-100 rounded-lg transition">
+                            className="px-3 py-1.5 text-xs font-semibold bg-[var(--admin-accent)]/10 border border-[var(--admin-accent)]/30 text-[var(--admin-accent)] hover:bg-[var(--admin-accent)]/20 rounded-lg transition">
                             Use
                           </Link>
                           <button onClick={() => deleteTemplate(tmpl)} disabled={deletingId === tmpl.id}
-                            className="px-3 py-1.5 text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50">
+                            className="px-3 py-1.5 text-xs font-semibold border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg transition disabled:opacity-50">
                             Delete
                           </button>
                         </div>
                       </div>
                       {/* Expandable campaign list */}
                       {isExpanded && (
-                        <div className="px-5 pb-4 bg-gray-50 border-t border-gray-100">
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-3 mb-2">Used in these campaigns</p>
+                        <div className="px-5 pb-4 bg-[var(--admin-table-header-bg)] border-t border-[var(--admin-border)]">
+                          <p className="text-xs font-semibold text-[var(--admin-text-muted)] uppercase tracking-wide pt-3 mb-2">Used in these campaigns</p>
                           {usedInCampaigns.length === 0 ? (
-                            <p className="text-sm text-gray-400 italic">No campaigns use this template yet.</p>
+                            <p className="text-sm text-[var(--admin-text-muted)] italic">No campaigns use this template yet.</p>
                           ) : (
                             <div className="space-y-1.5">
                               {usedInCampaigns.map((c) => (
                                 <Link key={c.id} href={`/admin/newsletter/campaigns/new?id=${c.id}`}
-                                  className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white border border-gray-200 hover:border-blue-200 hover:bg-blue-50 transition group">
+                                  className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--admin-card-bg)] border border-[var(--admin-border)] hover:border-[var(--admin-accent)]/30 hover:bg-[var(--admin-table-row-hover)] transition group">
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-[color:var(--color-dark)] truncate group-hover:text-[color:var(--color-riviera-blue)] transition">{c.name}</p>
-                                    {c.subject && <p className="text-xs text-gray-400 truncate">{c.subject}</p>}
+                                    <p className="text-sm font-semibold text-[var(--admin-text)] truncate group-hover:text-[var(--admin-accent)] transition">{c.name}</p>
+                                    {c.subject && <p className="text-xs text-[var(--admin-text-muted)] truncate">{c.subject}</p>}
                                   </div>
                                   <StatusBadge status={c.status} />
-                                  <svg className="w-4 h-4 text-gray-300 group-hover:text-[color:var(--color-riviera-blue)] flex-shrink-0 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                  <svg className="w-4 h-4 text-[var(--admin-text-muted)] group-hover:text-[var(--admin-accent)] flex-shrink-0 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                 </Link>
                               ))}
                             </div>
@@ -525,13 +737,20 @@ function NewsletterInner() {
           </div>
         )}
       </div>
-    </div>
+      </AdminPageLayout>
+    </>
   );
 }
 
 export default function NewsletterPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--color-riviera-blue)] border-r-transparent" /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
+        </div>
+      }
+    >
       <NewsletterInner />
     </Suspense>
   );

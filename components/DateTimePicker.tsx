@@ -58,9 +58,9 @@ export function DateTimePicker({ value, onChange, label }: DateTimePickerProps) 
           value={localDateTime}
           onChange={(e) => handleChange(e.target.value)}
           min={getMinDateTime()}
-          className="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full border-2 border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)] focus:border-[var(--admin-accent)]"
           style={{
-            colorScheme: "light",
+            colorScheme: "dark",
             fontSize: "16px",
           }}
         />
