@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DiffuseOutput, DiffuseProject } from "./client";
+import { formatUnknownError } from "@/lib/formatUnknownError";
 
 export interface Workspace {
   id: string;
@@ -103,8 +104,11 @@ async function fetchAllOutputsForProjects(
     if (error) {
       const alt = outputsTable.includes("diffuse") ? "project_outputs" : "diffuse_project_outputs";
       const r2 = await client.from(alt).select("*").in("project_id", ids).is("deleted_at", null);
-      if (r2.error) throw r2.error;
-      all.push(...(r2.data ?? []));
+      const fallbackErr = (r2 as { error?: unknown }).error;
+      if (fallbackErr) {
+        throw new Error(formatUnknownError(fallbackErr));
+      }
+      all.push(...((r2 as { data?: DiffuseOutput[] | null }).data ?? []));
     } else {
       all.push(...(data ?? []));
     }
@@ -158,6 +162,18 @@ async function fetchCoverInputsForProjects(
  * (same idea as analytics: avoid full-table scans and N+1 round trips).
  */
 export async function loadDiffuseDashboardData(
+  client: SupabaseClient,
+  diffuseUserId: string,
+): Promise<LoadDiffuseDashboardResult> {
+  try {
+    return await loadDiffuseDashboardDataInner(client, diffuseUserId);
+  } catch (e) {
+    console.error("[loadDiffuseDashboardData]", e);
+    return { ok: false, kind: "fetch", message: formatUnknownError(e) };
+  }
+}
+
+async function loadDiffuseDashboardDataInner(
   client: SupabaseClient,
   diffuseUserId: string,
 ): Promise<LoadDiffuseDashboardResult> {

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
+import { formatUnknownError } from "@/lib/formatUnknownError";
 
 interface Connection {
   id: string;
@@ -413,7 +414,7 @@ export default function DiffuseIntegrationPage() {
       console.error("Unexpected error fetching workspaces and projects:", err);
       setConfirmModalData({
         title: "Unexpected Error",
-        message: `Unexpected error: ${err instanceof Error ? err.message : String(err)}`,
+        message: `Unexpected error: ${formatUnknownError(err)}`,
         onConfirm: () => setShowConfirmModal(false),
       });
       setShowConfirmModal(true);
