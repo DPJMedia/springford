@@ -1603,8 +1603,8 @@ export default function AdsManagerPage() {
           role="status"
           aria-live="polite"
         >
-          <div className="bg-white rounded-lg shadow-lg border border-gray-300 overflow-hidden">
-            <p className="text-sm text-[color:var(--color-dark)] px-4 pt-3 pb-2">
+          <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] shadow-lg overflow-hidden">
+            <p className="text-sm text-[var(--admin-text)] px-4 pt-3 pb-2">
               {toast.message}
             </p>
             <div className="flex justify-end gap-2 px-4 pb-2">
@@ -1622,7 +1622,7 @@ export default function AdsManagerPage() {
                 <button
                   type="button"
                   onClick={dismissToast}
-                  className="text-xs font-semibold text-gray-600 hover:underline"
+                  className="text-xs font-semibold text-[var(--admin-text-muted)] hover:underline"
                 >
                   Ok
                 </button>
