@@ -220,6 +220,8 @@ export default function AdsManagerPage() {
   const [toast, setToast] = useState<{ message: string; onUndo?: () => void | Promise<void> } | null>(null);
   const [toastSecondsLeft, setToastSecondsLeft] = useState(10);
   const toastIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** After opening edit modal, skip one end_date sync so stored dates aren't overwritten. */
+  const skipEndSyncOnceRef = useRef(false);
   useEffect(() => {
     if (!toast) {
       if (toastIntervalRef.current) {
@@ -338,9 +340,14 @@ export default function AdsManagerPage() {
   }, [isSuperAdmin, ads.length]); // Re-run when ads change
 
   // Keep end date in sync from start date + campaign months (day-based schedule, no times).
+  // Skip one run after opening edit modal so we don't overwrite stored end_date before user edits.
   useEffect(() => {
     if (!showModal) return;
     if (!formData.start_date) return;
+    if (skipEndSyncOnceRef.current) {
+      skipEndSyncOnceRef.current = false;
+      return;
+    }
     const n = Math.max(1, Math.min(120, Math.floor(formData.campaignMonths) || 1));
     const nextEnd = endYmdAfterNCalendarMonths(formData.start_date, n);
     setFormData((f) => (f.end_date === nextEnd ? f : { ...f, end_date: nextEnd }));
@@ -845,11 +852,16 @@ export default function AdsManagerPage() {
 
   function handleOpenModal(ad?: Ad & { slots?: string[]; slotSettings?: Record<string, { fill_section: boolean }> }) {
     if (ad) {
+      skipEndSyncOnceRef.current = true;
       setEditingAd(ad);
       const startYmd = formatYmdET(ad.start_date);
       const endYmd = formatYmdET(ad.end_date);
       const inferredMonths = inferCustomMonthCount(startYmd, endYmd);
-      const campaignMonths = inferredMonths ?? 1;
+      const rangeFallback = Math.min(
+        120,
+        Math.max(1, monthsInScheduleRange(ad.start_date, ad.end_date))
+      );
+      const campaignMonths = inferredMonths ?? rangeFallback;
       const rawPos = (ad as Ad & { ad_label_position?: string | null }).ad_label_position;
       const adLabelPos =
         rawPos === "bottom-right" ||
@@ -883,6 +895,7 @@ export default function AdsManagerPage() {
       setSlotFillSettings(fillSettings);
       setImagePreview(ad.image_url);
     } else {
+      skipEndSyncOnceRef.current = false;
       setEditingAd(null);
       const { dateStr } = getNowInEST();
       setFormData({

@@ -75,6 +75,7 @@ function AdQuoterPageInner() {
   const [editLoadError, setEditLoadError] = useState<string | null>(null);
   const [finishSubmitting, setFinishSubmitting] = useState(false);
   const [copyProposalError, setCopyProposalError] = useState(false);
+  const [proposalCopied, setProposalCopied] = useState(false);
 
   const isEditingFromSaved = Boolean(
     editId &&
@@ -320,6 +321,7 @@ function AdQuoterPageInner() {
       advertiserName: proposalAdvertiser,
       result: quote,
     });
+    setProposalCopied(false);
     setProposalText(text);
   }
 
@@ -339,6 +341,8 @@ function AdQuoterPageInner() {
     try {
       await navigator.clipboard.writeText(proposalText);
       setCopyProposalError(false);
+      setProposalCopied(true);
+      window.setTimeout(() => setProposalCopied(false), 2500);
     } catch {
       setCopyProposalError(true);
       window.setTimeout(() => setCopyProposalError(false), 5000);
@@ -775,7 +779,7 @@ function AdQuoterPageInner() {
                       className="w-full max-w-md rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-3 py-2 text-sm text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)]"
                     />
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={generateProposal}
@@ -788,14 +792,18 @@ function AdQuoterPageInner() {
                         <button
                           type="button"
                           onClick={() => void copyProposal()}
-                          className="rounded-lg border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                          className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                            proposalCopied
+                              ? "border border-emerald-600/50 bg-emerald-950/40 text-emerald-300"
+                              : "border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                          }`}
                         >
-                          Copy
+                          {proposalCopied ? "Copied!" : "Copy to clipboard"}
                         </button>
                         <button
                           type="button"
                           onClick={downloadProposal}
-                          className="rounded-lg border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                          className="rounded-lg border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-[var(--admin-text-muted)] hover:bg-[var(--admin-table-row-hover)] hover:text-[var(--admin-text)]"
                         >
                           Download .txt
                         </button>
@@ -806,12 +814,11 @@ function AdQuoterPageInner() {
                     <p className="text-xs text-red-400">Could not copy to clipboard.</p>
                   ) : null}
                   {proposalText ? (
-                    <textarea
-                      readOnly
-                      value={proposalText}
-                      rows={18}
-                      className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-3 py-2 text-xs font-mono text-[var(--admin-text)]"
-                    />
+                    <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-4 py-3 shadow-inner">
+                      <pre className="m-0 max-h-[28rem] overflow-y-auto whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-[var(--admin-text)] [font-variant-ligatures:normal]">
+                        {proposalText}
+                      </pre>
+                    </div>
                   ) : (
                     <p className="text-xs text-[var(--admin-text-muted)]">
                       Generate a plain-text proposal you can paste into email or a contract draft.

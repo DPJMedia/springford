@@ -59,12 +59,12 @@ export default function ArticlesManagementPage() {
 
   useEffect(() => {
     setIsAdmin(true);
-    fetchArticles();
+    void fetchArticles({ silent: false });
     fetchEditorsPicks();
 
     // Set up auto-refresh every 30 seconds to check for scheduled articles
     const refreshInterval = setInterval(() => {
-      fetchArticles();
+      void fetchArticles({ silent: true });
     }, 30000); // 30 seconds
     
     // Update current time every second for real-time status updates
@@ -93,8 +93,11 @@ export default function ArticlesManagementPage() {
     }
   }
 
-  async function fetchArticles() {
-    setLoading(true);
+  async function fetchArticles(options?: { silent?: boolean }) {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      setLoading(true);
+    }
 
     // First, auto-publish any scheduled articles whose time has arrived
     try {
@@ -117,7 +120,9 @@ export default function ArticlesManagementPage() {
     } else {
       setArticles(data || []);
     }
-    setLoading(false);
+    if (!silent) {
+      setLoading(false);
+    }
   }
 
   // Tab counts: derived from full list so "All" = published + scheduled + draft (what the page shows)
@@ -594,8 +599,7 @@ export default function ArticlesManagementPage() {
                           scheduledFor={article.scheduled_for || ""} 
                           status={article.status}
                           onPublishTime={() => {
-                            // Refresh articles when publish time arrives
-                            setTimeout(() => fetchArticles(), 2000); // Wait 2 seconds then refresh
+                            setTimeout(() => void fetchArticles({ silent: true }), 2000);
                           }}
                         />
                       </div>
