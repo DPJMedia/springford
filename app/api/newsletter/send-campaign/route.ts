@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server';
 import { buildEmailHtml } from '@/lib/newsletter/buildEmailHtml';
 import type { NewsletterBlock, ArticleLayout } from '@/lib/newsletter/buildEmailHtml';
 import { enrichArticleBlocksWithAdvertisementFlags } from '@/lib/newsletter/enrichArticleBlocksForEmail';
+import {
+  SENDGRID_NEWSLETTER_GLOBAL_CATEGORY,
+  sendGridCategoryForCampaign,
+} from '@/lib/newsletter/sendGridCampaign';
 
 const SENDGRID_API_URL = 'https://api.sendgrid.com/v3/mail/send';
 const SITE_URL = 'https://www.springford.press';
@@ -130,15 +134,18 @@ export async function POST(request: Request) {
     // Send via SendGrid — one personalization per recipient so each gets a separate message
     // and cannot see other recipients (a single `to: [ ...many ]` exposes everyone in the headers).
     // Up to 1000 personalizations per API request per SendGrid limits.
+    const categoryTag = sendGridCategoryForCampaign(campaignId);
     const BATCH_SIZE = 1000;
     for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
       const batch = recipients.slice(i, i + BATCH_SIZE);
       const body = {
         personalizations: batch.map((r) => ({
           to: [{ email: r.email, ...(r.name ? { name: r.name } : {}) }],
+          custom_args: { campaign_id: campaignId },
         })),
         from: { email: fromEmail, name: fromName },
         subject,
+        categories: [SENDGRID_NEWSLETTER_GLOBAL_CATEGORY, categoryTag],
         content: [
           { type: 'text/plain', value: plainText || subject },
           { type: 'text/html', value: html },

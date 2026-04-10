@@ -120,6 +120,24 @@ export default function AnalyticsPage() {
   // Location metrics
   const [topCities, setTopCities] = useState<any[]>([]);
   const [topStates, setTopStates] = useState<any[]>([]);
+
+  /** SendGrid newsletter aggregates (aligned with sidebar time range). */
+  const [newsletterSendgrid, setNewsletterSendgrid] = useState<{
+    totals: {
+      delivered: number;
+      unique_opens: number;
+      unique_clicks: number;
+      bounces: number;
+      blocks: number;
+      bounce_drops: number;
+      spam_reports: number;
+      unsubscribes: number;
+    } | null;
+    sendGridError: string | null;
+    statsInfo: string | null;
+    campaignsInRange: number;
+    note: string | null;
+  } | null>(null);
   
   // Chart data (chartSeriesRaw from API; pageViewsOverTime derived for Chart.js)
   const [chartSeriesRaw, setChartSeriesRaw] = useState<
@@ -288,6 +306,39 @@ export default function AnalyticsPage() {
       const series = Array.isArray(chart) ? chart : [];
       setChartSeriesRaw(series);
       setServerChartGranularity(d.chartGranularity === "hour" ? "hour" : "day");
+
+      try {
+        const ns = await fetch(
+          `/api/admin/newsletter/sendgrid-summary?timeRange=${encodeURIComponent(timeRange)}`,
+          { credentials: "include" },
+        );
+        if (ns.ok) {
+          const j = await ns.json();
+          const t = j.totals;
+          setNewsletterSendgrid({
+            totals: t && typeof t === "object"
+              ? {
+                  delivered: Number(t.delivered) || 0,
+                  unique_opens: Number(t.unique_opens) || 0,
+                  unique_clicks: Number(t.unique_clicks) || 0,
+                  bounces: Number(t.bounces) || 0,
+                  blocks: Number(t.blocks) || 0,
+                  bounce_drops: Number(t.bounce_drops) || 0,
+                  spam_reports: Number(t.spam_reports) || 0,
+                  unsubscribes: Number(t.unsubscribes) || 0,
+                }
+              : null,
+            sendGridError: typeof j.sendGridError === "string" ? j.sendGridError : null,
+            statsInfo: typeof j.statsInfo === "string" ? j.statsInfo : null,
+            campaignsInRange: typeof j.campaignsInRange === "number" ? j.campaignsInRange : 0,
+            note: typeof j.note === "string" ? j.note : null,
+          });
+        } else {
+          setNewsletterSendgrid(null);
+        }
+      } catch {
+        setNewsletterSendgrid(null);
+      }
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
@@ -542,6 +593,84 @@ export default function AnalyticsPage() {
               </div>
             </div>
           </div>
+      </div>
+
+      {/* === NEWSLETTER (SENDGRID) === */}
+      <div className="mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 className="text-xl font-semibold text-white min-w-0">Newsletter email (SendGrid)</h2>
+          <Link
+            href="/admin/newsletter"
+            className="text-sm font-semibold text-[var(--admin-accent)] hover:underline shrink-0"
+          >
+            Open Newsletter admin
+          </Link>
+        </div>
+        {newsletterSendgrid?.statsInfo ? (
+          <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-4 py-3 text-sm text-[var(--admin-text)] mb-4">
+            {newsletterSendgrid.statsInfo}
+          </div>
+        ) : null}
+        {newsletterSendgrid?.sendGridError ? (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 mb-4">
+            {newsletterSendgrid.sendGridError}
+          </div>
+        ) : null}
+        {newsletterSendgrid?.totals ? (
+          <>
+            <p className="text-sm text-[var(--admin-text-muted)] mb-3">
+              Sent campaigns in this period:{" "}
+              <span className="font-semibold text-[var(--admin-text)]">
+                {newsletterSendgrid.campaignsInRange}
+              </span>
+              . Metrics are summed from SendGrid category stats per campaign.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
+              <CompactStatCard
+                label="Delivered (sum)"
+                value={newsletterSendgrid.totals.delivered.toLocaleString()}
+                tooltip="Total delivered events across newsletter campaigns sent in this period (SendGrid)."
+              />
+              <CompactStatCard
+                label="Unique opens (sum)"
+                value={newsletterSendgrid.totals.unique_opens.toLocaleString()}
+                tooltip="Sum of per-campaign unique opens; the same person may be counted on multiple campaigns."
+              />
+              <CompactStatCard
+                label="Unique clicks (sum)"
+                value={newsletterSendgrid.totals.unique_clicks.toLocaleString()}
+                tooltip="Sum of per-campaign unique clicks."
+              />
+              <CompactStatCard
+                label="Bounces (sum)"
+                value={newsletterSendgrid.totals.bounces.toLocaleString()}
+                tooltip="Hard bounces reported by SendGrid for these campaigns."
+              />
+              <CompactStatCard
+                label="Blocks / drops (sum)"
+                value={(newsletterSendgrid.totals.blocks + newsletterSendgrid.totals.bounce_drops).toLocaleString()}
+                tooltip="Blocked or dropped delivery attempts (SendGrid definitions)."
+              />
+              <CompactStatCard
+                label="Spam reports (sum)"
+                value={newsletterSendgrid.totals.spam_reports.toLocaleString()}
+                tooltip="Recipients who marked the message as spam (SendGrid)."
+              />
+              <CompactStatCard
+                label="Unsubscribes (sum)"
+                value={newsletterSendgrid.totals.unsubscribes.toLocaleString()}
+                tooltip="Unsubscribe events attributed to these sends (includes one-click list unsub where applicable)."
+              />
+            </div>
+            {newsletterSendgrid.note ? (
+              <p className="text-xs text-[var(--admin-text-muted)] max-w-3xl">{newsletterSendgrid.note}</p>
+            ) : null}
+          </>
+        ) : !newsletterSendgrid?.sendGridError ? (
+          <p className="text-sm text-[var(--admin-text-muted)]">
+            No SendGrid newsletter totals for this period (no sent campaigns in range, or metrics not available yet).
+          </p>
+        ) : null}
       </div>
 
       {/* === AD PERFORMANCE === */}

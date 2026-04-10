@@ -1,37 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
+import { QuoteSavedToast } from "@/components/ad-quoter/QuoteSavedToast";
 import { NumericTextInput } from "@/components/ad-quoter/NumericTextInput";
-import { PackageBuilderSection } from "@/components/ad-quoter/PackageBuilderSection";
-import { SavedQuoteDocumentModal } from "@/components/ad-quoter/SavedQuoteDocumentModal";
+import { Tooltip } from "@/components/Tooltip";
 import {
-  formatCampaignRange,
-  formatSavedQuoteUpdatedAt,
-} from "@/lib/advertising/formatQuoteDates";
-import {
-  BASELINE_MONTHLY_SITE_VIEWS,
-  RATES_USD,
-  REFERENCE_DEAL_PRESET,
-  type PackageInput,
-  type QuoteResult,
-  baselineEquivalentUsd,
-  computeQuote,
-  emptyPackage,
-  packageFromJson,
-  sanitizePackage,
-  suggestPackageForTotalBudget,
-  viewershipMultiplier,
-} from "@/lib/advertising/quoteModel";
+  AD_PACKAGES,
+  type AdPackageId,
+  type AddOnQuantities,
+  ADD_ON_MAX_QUANTITY,
+  ADD_ON_PRICES_USD,
+  PACKAGE_QUOTER_BASELINE_MONTHLY_VIEWS,
+  buildProposalSummaryText,
+  clampAddOns,
+  computePackageQuoter,
+  defaultAddOns,
+  packageQuoterFromJson,
+  type PackageQuoterPersistedV2,
+  type PackageQuoterResult,
+} from "@/lib/advertising/packageQuoterModel";
+import { getAdSlotTableLabel } from "@/lib/advertising/adSlots";
 import type { SavedAdQuote } from "@/lib/types/database";
 
-type Tab = "package" | "budget" | "saved";
-
-/** Supabase PostgrestError is not always `instanceof Error` — surface .message / .details / .hint */
 function supabaseErrorMessage(err: unknown): string {
   if (err == null) return "Unknown error";
   if (typeof err === "object") {
@@ -51,21 +46,21 @@ function supabaseErrorMessage(err: unknown): string {
   return String(err);
 }
 
-export default function AdQuoterPage() {
+function AdQuoterPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
-  const [monthlyViews, setMonthlyViews] = useState<number>(BASELINE_MONTHLY_SITE_VIEWS);
-  const [viewMix, setViewMix] = useState({ homepageViews: 0, articleViews: 0 });
+  const [packageId, setPackageId] = useState<AdPackageId>("article-premier");
+  const [addOns, setAddOns] = useState<AddOnQuantities>(() => defaultAddOns());
+  const [campaignMonths, setCampaignMonths] = useState<1 | 2 | 3>(1);
+  const [monthlyViews, setMonthlyViews] = useState<number | null>(null);
+  const [trafficIndexActive, setTrafficIndexActive] = useState(false);
   const [viewsLoading, setViewsLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("package");
-  const [showFormula, setShowFormula] = useState(false);
 
-  const [pkg, setPkg] = useState<PackageInput>(() => emptyPackage(3));
-
-  const [budgetUsd, setBudgetUsd] = useState(5000);
-  const [budgetDurationMonths, setBudgetDurationMonths] = useState(2);
-  const [budgetPlanOpen, setBudgetPlanOpen] = useState(false);
+  const [proposalAdvertiser, setProposalAdvertiser] = useState("");
+  const [proposalText, setProposalText] = useState<string | null>(null);
 
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
@@ -74,34 +69,30 @@ export default function AdQuoterPage() {
   const [saveEnd, setSaveEnd] = useState("");
   const [saveSubmitting, setSaveSubmitting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  /** When set, the form was loaded from this row — Save updates instead of insert */
   const [loadedQuote, setLoadedQuote] = useState<SavedAdQuote | null>(null);
+  const [quoteSavedOpen, setQuoteSavedOpen] = useState(false);
+  const [editHydrating, setEditHydrating] = useState(false);
+  const [editLoadError, setEditLoadError] = useState<string | null>(null);
+  const [finishSubmitting, setFinishSubmitting] = useState(false);
+  const [copyProposalError, setCopyProposalError] = useState(false);
 
-  const [savedQuotes, setSavedQuotes] = useState<SavedAdQuote[]>([]);
-  const [savedLoading, setSavedLoading] = useState(false);
-
-  /** Click row to view document layout */
-  const [documentQuote, setDocumentQuote] = useState<SavedAdQuote | null>(null);
-
-  /** Edit metadata only (name, client, dates, saved total) */
-  const [editQuoteModal, setEditQuoteModal] = useState<SavedAdQuote | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editClient, setEditClient] = useState("");
-  const [editStart, setEditStart] = useState("");
-  const [editEnd, setEditEnd] = useState("");
-  const [editTotalUsd, setEditTotalUsd] = useState(0);
-  const [editSubmitting, setEditSubmitting] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-
-  const quote: QuoteResult = useMemo(
-    () =>
-      computeQuote(
-        pkg,
-        monthlyViews,
-        viewMix.homepageViews + viewMix.articleViews > 0 ? viewMix : undefined,
-      ),
-    [pkg, monthlyViews, viewMix],
+  const isEditingFromSaved = Boolean(
+    editId &&
+      loadedQuote?.id &&
+      editId.toLowerCase() === loadedQuote.id.toLowerCase(),
   );
+
+  const quote: PackageQuoterResult = useMemo(() => {
+    const q = computePackageQuoter(
+      packageId,
+      addOns,
+      campaignMonths,
+      monthlyViews,
+      trafficIndexActive,
+    );
+    if (!q) throw new Error("Invalid package selection");
+    return q;
+  }, [packageId, addOns, campaignMonths, monthlyViews, trafficIndexActive]);
 
   const loadViews = useCallback(async () => {
     setViewsLoading(true);
@@ -109,30 +100,20 @@ export default function AdQuoterPage() {
       const start = new Date();
       start.setDate(start.getDate() - 30);
       const iso = start.toISOString();
-      const [totalRes, homeRes, artRes] = await Promise.all([
-        supabase.from("page_views").select("*", { count: "exact", head: true }).gte("viewed_at", iso),
-        supabase
-          .from("page_views")
-          .select("*", { count: "exact", head: true })
-          .gte("viewed_at", iso)
-          .eq("view_type", "homepage"),
-        supabase
-          .from("page_views")
-          .select("*", { count: "exact", head: true })
-          .gte("viewed_at", iso)
-          .eq("view_type", "article"),
-      ]);
-      if (!totalRes.error && totalRes.count != null && totalRes.count > 0) {
-        setMonthlyViews(totalRes.count);
+      const { count, error } = await supabase
+        .from("page_views")
+        .select("*", { count: "exact", head: true })
+        .gte("viewed_at", iso);
+      if (!error && count != null && count > 0) {
+        setMonthlyViews(count);
+        setTrafficIndexActive(true);
       } else {
-        setMonthlyViews(BASELINE_MONTHLY_SITE_VIEWS);
+        setMonthlyViews(null);
+        setTrafficIndexActive(false);
       }
-      const h = !homeRes.error && homeRes.count != null ? homeRes.count : 0;
-      const a = !artRes.error && artRes.count != null ? artRes.count : 0;
-      setViewMix({ homepageViews: h, articleViews: a });
     } catch {
-      setMonthlyViews(BASELINE_MONTHLY_SITE_VIEWS);
-      setViewMix({ homepageViews: 0, articleViews: 0 });
+      setMonthlyViews(null);
+      setTrafficIndexActive(false);
     } finally {
       setViewsLoading(false);
     }
@@ -157,56 +138,81 @@ export default function AdQuoterPage() {
         return;
       }
       setLoading(false);
-      void loadViews();
     })();
-  }, [router, supabase, loadViews]);
-
-  function updatePkg<K extends keyof PackageInput>(key: K, value: PackageInput[K]) {
-    setPkg((p) => ({ ...p, [key]: value }));
-  }
+  }, [router, supabase]);
 
   useEffect(() => {
-    setPkg((p) => sanitizePackage(p));
-  }, [pkg.durationMonths]);
-
-  function applyBudgetSuggestion() {
-    const mix =
-      viewMix.homepageViews + viewMix.articleViews > 0 ? viewMix : undefined;
-    const suggested = suggestPackageForTotalBudget(
-      budgetUsd,
-      budgetDurationMonths,
-      monthlyViews,
-      mix,
-    );
-    setPkg(suggested);
-    setBudgetPlanOpen(true);
-  }
-
-  const loadSavedQuotes = useCallback(async () => {
-    setSavedLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("saved_ad_quotes")
-        .select("*")
-        .order("updated_at", { ascending: false });
-      if (!error && data) setSavedQuotes(data as SavedAdQuote[]);
-      else setSavedQuotes([]);
-    } catch {
-      setSavedQuotes([]);
-    } finally {
-      setSavedLoading(false);
-    }
-  }, [supabase]);
+    if (loading) return;
+    if (editId) return;
+    void loadViews();
+  }, [loading, editId, loadViews]);
 
   useEffect(() => {
-    if (tab === "saved") void loadSavedQuotes();
-  }, [tab, loadSavedQuotes]);
+    if (loading) return;
+    if (!editId) return;
+
+    let cancelled = false;
+    (async () => {
+      setEditHydrating(true);
+      setEditLoadError(null);
+      const { data, error } = await supabase.from("saved_ad_quotes").select("*").eq("id", editId).single();
+      if (cancelled) return;
+      if (error || !data) {
+        setEditLoadError(supabaseErrorMessage(error ?? new Error("Quote not found.")));
+        setEditHydrating(false);
+        return;
+      }
+      const row = data as SavedAdQuote;
+      const v2 = packageQuoterFromJson(row.package_data);
+      if (v2) {
+        setPackageId(v2.packageId);
+        setAddOns(clampAddOns(v2.addOns));
+        setCampaignMonths(v2.campaignMonths);
+      }
+      setProposalAdvertiser(row.client_name?.trim() ?? "");
+      const mv = row.monthly_views_snapshot;
+      if (mv != null && mv > 0) {
+        setMonthlyViews(mv);
+        setTrafficIndexActive(true);
+      } else {
+        setMonthlyViews(null);
+        setTrafficIndexActive(false);
+      }
+      setLoadedQuote(row);
+      setSaveName(row.name);
+      setSaveClient(row.client_name ?? "");
+      setSaveStart(row.start_date ?? "");
+      setSaveEnd(row.end_date ?? "");
+      setProposalText(null);
+      setEditHydrating(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, editId, supabase]);
+
+  function updateAddOn<K extends keyof AddOnQuantities>(key: K, value: AddOnQuantities[K]) {
+    setAddOns((prev) => clampAddOns({ ...prev, [key]: value }));
+  }
+
+  function resetQuote() {
+    router.replace("/admin/ad-quoter");
+    setLoadedQuote(null);
+    setPackageId("article-premier");
+    setAddOns(defaultAddOns());
+    setCampaignMonths(1);
+    setProposalText(null);
+    setSaveName("");
+    setSaveClient("");
+    setSaveStart("");
+    setSaveEnd("");
+  }
 
   function openSaveModal() {
     setSaveError(null);
     if (loadedQuote) {
       setSaveName(loadedQuote.name);
-      setSaveClient(loadedQuote.client_name);
+      setSaveClient(proposalAdvertiser.trim() || loadedQuote.client_name || "");
       setSaveStart(loadedQuote.start_date ?? "");
       setSaveEnd(loadedQuote.end_date ?? "");
     } else {
@@ -218,43 +224,44 @@ export default function AdQuoterPage() {
     setSaveModalOpen(true);
   }
 
-  async function submitSaveQuote() {
+  async function persistQuote(): Promise<{ ok: true } | { ok: false; error: string }> {
     const name = saveName.trim();
     if (!name) {
-      setSaveError("Please enter a name for this quote.");
-      return;
+      return { ok: false, error: "Please enter a name for this quote." };
     }
-    setSaveSubmitting(true);
-    setSaveError(null);
+    // Advertiser on the main form (proposal section); save modal also edits client — prefer live proposal field.
+    const clientNamePersisted = proposalAdvertiser.trim() || saveClient.trim();
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
-        setSaveError("Not signed in.");
-        return;
+        return { ok: false, error: "Not signed in." };
       }
-      const packageData = JSON.parse(
-        JSON.stringify(sanitizePackage(pkg)),
-      ) as Record<string, unknown>;
-
+      const packageData: PackageQuoterPersistedV2 = {
+        quoterVersion: 2,
+        packageId,
+        campaignMonths,
+        addOns: clampAddOns(addOns),
+      };
       const payload = {
         name,
-        client_name: saveClient.trim(),
+        client_name: clientNamePersisted,
         start_date: saveStart.trim() || null,
         end_date: saveEnd.trim() || null,
-        package_data: packageData,
-        total_usd: quote.totalUsd,
+        package_data: packageData as unknown as Record<string, unknown>,
+        total_usd: quote.campaignTotalUsd,
         monthly_views_snapshot: monthlyViews,
-        homepage_views_snapshot: viewMix.homepageViews,
-        article_views_snapshot: viewMix.articleViews,
+        homepage_views_snapshot: 0,
+        article_views_snapshot: 0,
         manual_total_override: false,
       };
-      if (loadedQuote?.id) {
+      const existingRowId = loadedQuote?.id ?? (editId || null);
+      if (existingRowId) {
         const { data, error } = await supabase
           .from("saved_ad_quotes")
           .update(payload)
-          .eq("id", loadedQuote.id)
+          .eq("id", existingRowId)
           .select()
           .single();
         if (error) throw error;
@@ -268,118 +275,77 @@ export default function AdQuoterPage() {
         if (error) throw error;
         if (data) setLoadedQuote(data as SavedAdQuote);
       }
-      setSaveModalOpen(false);
-      void loadSavedQuotes();
+      return { ok: true };
     } catch (e: unknown) {
-      setSaveError(supabaseErrorMessage(e));
-    } finally {
-      setSaveSubmitting(false);
+      return { ok: false, error: supabaseErrorMessage(e) };
     }
   }
 
-  function loadSavedQuote(row: SavedAdQuote) {
-    setLoadedQuote(row);
-    setPkg(packageFromJson(row.package_data));
-    setSaveName(row.name);
-    setSaveClient(row.client_name);
-    setSaveStart(row.start_date ?? "");
-    setSaveEnd(row.end_date ?? "");
-    setTab("package");
-  }
-
-  function openEditQuoteModal(row: SavedAdQuote) {
-    setEditError(null);
-    setEditQuoteModal(row);
-    setEditName(row.name);
-    setEditClient(row.client_name);
-    setEditStart(row.start_date ?? "");
-    setEditEnd(row.end_date ?? "");
-    setEditTotalUsd(row.total_usd ?? 0);
-  }
-
-  async function submitEditQuote() {
-    if (!editQuoteModal) return;
-    const name = editName.trim();
-    if (!name) {
-      setEditError("Please enter a name.");
+  async function submitSaveQuote() {
+    setSaveSubmitting(true);
+    setSaveError(null);
+    const result = await persistQuote();
+    setSaveSubmitting(false);
+    if (!result.ok) {
+      setSaveError(result.error);
       return;
     }
-    setEditSubmitting(true);
-    setEditError(null);
-    try {
-      const pkg = packageFromJson(editQuoteModal.package_data);
-      const views = editQuoteModal.monthly_views_snapshot ?? BASELINE_MONTHLY_SITE_VIEWS;
-      const h = editQuoteModal.homepage_views_snapshot ?? 0;
-      const a = editQuoteModal.article_views_snapshot ?? 0;
-      const mix = h + a > 0 ? { homepageViews: h, articleViews: a } : undefined;
-      const expected = computeQuote(pkg, views, mix);
-      const manual_total_override = Math.abs(editTotalUsd - expected.totalUsd) > 2;
-
-      const { data, error } = await supabase
-        .from("saved_ad_quotes")
-        .update({
-          name,
-          client_name: editClient.trim(),
-          start_date: editStart.trim() || null,
-          end_date: editEnd.trim() || null,
-          total_usd: editTotalUsd,
-          manual_total_override,
-        })
-        .eq("id", editQuoteModal.id)
-        .select()
-        .single();
-      if (error) throw error;
-      const updated = data as SavedAdQuote;
-      setEditQuoteModal(null);
-      void loadSavedQuotes();
-      if (documentQuote?.id === updated.id) setDocumentQuote(updated);
-      if (loadedQuote?.id === updated.id) {
-        setLoadedQuote(updated);
-        setSaveName(updated.name);
-        setSaveClient(updated.client_name);
-        setSaveStart(updated.start_date ?? "");
-        setSaveEnd(updated.end_date ?? "");
-      }
-    } catch (e: unknown) {
-      setEditError(supabaseErrorMessage(e));
-    } finally {
-      setEditSubmitting(false);
-    }
+    setSaveModalOpen(false);
+    setQuoteSavedOpen(true);
   }
 
-  async function performDeleteSavedQuote(row: SavedAdQuote) {
-    try {
-      const { error } = await supabase.from("saved_ad_quotes").delete().eq("id", row.id);
-      if (error) throw error;
-      if (loadedQuote?.id === row.id) startNewQuote();
-      setDocumentQuote((q) => (q?.id === row.id ? null : q));
-      void loadSavedQuotes();
-    } catch (e: unknown) {
-      window.alert(supabaseErrorMessage(e));
-    }
-  }
-
-  function handleDeleteSavedQuote(row: SavedAdQuote) {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(`Delete "${row.name}"? This cannot be undone.`)
-    ) {
+  async function handleFinishEdit() {
+    setFinishSubmitting(true);
+    setSaveError(null);
+    const result = await persistQuote();
+    setFinishSubmitting(false);
+    if (!result.ok) {
+      setSaveError(result.error);
+      openSaveModal();
       return;
     }
-    void performDeleteSavedQuote(row);
+    setQuoteSavedOpen(true);
+    // Let toast state commit before clearing ?edit= (avoids losing confirmation on some navigations).
+    queueMicrotask(() => {
+      router.replace("/admin/ad-quoter");
+    });
   }
 
-  function startNewQuote() {
-    setLoadedQuote(null);
-    setPkg(emptyPackage(3));
-    setSaveName("");
-    setSaveClient("");
-    setSaveStart("");
-    setSaveEnd("");
-    setTab("package");
+  function handleCancelEdit() {
+    router.push("/admin/ad-quoter/saved");
   }
 
-  if (loading) {
+  function generateProposal() {
+    const text = buildProposalSummaryText({
+      advertiserName: proposalAdvertiser,
+      result: quote,
+    });
+    setProposalText(text);
+  }
+
+  function downloadProposal() {
+    if (!proposalText) return;
+    const blob = new Blob([proposalText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `springford-press-proposal-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function copyProposal() {
+    if (!proposalText) return;
+    try {
+      await navigator.clipboard.writeText(proposalText);
+      setCopyProposalError(false);
+    } catch {
+      setCopyProposalError(true);
+      window.setTimeout(() => setCopyProposalError(false), 5000);
+    }
+  }
+
+  if (loading || (Boolean(editId) && editHydrating)) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
@@ -387,601 +353,570 @@ export default function AdQuoterPage() {
     );
   }
 
-  const mult = viewershipMultiplier(monthlyViews);
-  const referenceMix =
-    viewMix.homepageViews + viewMix.articleViews > 0 ? viewMix : undefined;
-  const referenceAtCurrent = computeQuote(REFERENCE_DEAL_PRESET, monthlyViews, referenceMix);
-  const budgetDelta = quote.totalUsd - budgetUsd;
+  if (editId && editLoadError) {
+    return (
+      <>
+        <AdminPageHeader title="Ad Quoter" description="Could not load the saved quote." reserveActionsPanelSpace={false} />
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {editLoadError}
+        </div>
+        <p className="mt-4 text-sm text-[var(--admin-text-muted)]">
+          <button
+            type="button"
+            onClick={() => router.replace("/admin/ad-quoter/saved")}
+            className="font-semibold text-[var(--admin-accent)] underline hover:no-underline"
+          >
+            Back to saved quotes
+          </button>
+        </p>
+      </>
+    );
+  }
 
-  const actionsPanel = (
+  const livePanel = (
+    <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-4 sm:p-5">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
+        Live quote
+      </h2>
+      <div className="mt-3 space-y-3 text-sm text-[var(--admin-text)]">
+        <div>
+          <p className="font-semibold text-base">{quote.pkg.name}</p>
+          <ul className="mt-1.5 list-inside list-disc space-y-0.5 text-[var(--admin-text-muted)]">
+            {quote.pkg.slotIds.map((id) => (
+              <li key={id} className="text-xs">
+                {getAdSlotTableLabel(id)}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="text-xs text-[var(--admin-text-muted)]">
+          Placements use site inventory labels (tiers match ad manager).
+        </p>
+        <div className="border-t border-[var(--admin-border)] pt-3 space-y-2">
+          <div className="flex justify-between gap-2">
+            <span>Published package rate</span>
+            <span className="tabular-nums font-medium">${quote.basePackagePriceUsd.toLocaleString()}/mo</span>
+          </div>
+          {quote.trafficIndexActive ? (
+            <div className="flex justify-between gap-2">
+              <span>Traffic-adjusted package</span>
+              <span
+                className={`tabular-nums font-medium ${
+                  quote.indexedPackagePriceUsd > quote.basePackagePriceUsd
+                    ? "text-[var(--admin-accent)]"
+                    : "text-[var(--admin-text)]"
+                }`}
+              >
+                ${quote.indexedPackagePriceUsd.toLocaleString()}/mo
+                {quote.indexedPackagePriceUsd === quote.basePackagePriceUsd ? (
+                  <span className="ml-1 text-[10px] font-normal text-[var(--admin-text-muted)]">(same)</span>
+                ) : null}
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--admin-text-muted)]">
+              Traffic data unavailable — published package rate is used.
+            </p>
+          )}
+        </div>
+        {quote.addOnLineItems.length > 0 ? (
+          <div className="space-y-1.5 border-t border-[var(--admin-border)] pt-3">
+            <p className="text-xs font-semibold uppercase text-[var(--admin-text-muted)]">Add-ons</p>
+            {quote.addOnLineItems.map((row) => (
+              <div key={row.id} className="flex justify-between gap-2 text-xs">
+                <span>
+                  {row.label}
+                  {row.quantity > 1 ? ` × ${row.quantity}` : ""}
+                </span>
+                <span className="tabular-nums">${row.lineTotalUsd.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {addOns.categoryExclusivity ? (
+          <p className="rounded-md bg-[var(--admin-accent)]/15 px-2 py-1.5 text-xs font-semibold text-[var(--admin-accent)]">
+            Category exclusivity included (+${ADD_ON_PRICES_USD.categoryExclusivityMonthly}/mo)
+          </p>
+        ) : null}
+        <div className="border-t border-[var(--admin-border)] pt-3 space-y-2">
+          <div className="flex justify-between gap-2 font-semibold">
+            <span>Monthly total</span>
+            <span className="tabular-nums">${quote.monthlyTotalUsd.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between gap-2 text-[var(--admin-text-muted)]">
+            <span>Campaign ({quote.campaignMonths} mo)</span>
+            <span className="tabular-nums text-[var(--admin-text)] font-semibold">
+              ${quote.campaignTotalUsd.toLocaleString()}
+            </span>
+          </div>
+        </div>
+        <div className="border-t border-[var(--admin-border)] pt-3 space-y-1 text-xs">
+          <div className="flex justify-between gap-2">
+            <span>Impressions / month (package)</span>
+            <span className="tabular-nums">{quote.impressionsPerMonth.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span>Impressions (campaign)</span>
+            <span className="tabular-nums">{quote.impressionsCampaignTotal.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between gap-2 items-center">
+            <span className="inline-flex items-center gap-1">
+              CPM (published rate card)
+              <Tooltip text="CPM (cost per mille) is the cost per 1,000 impressions on this package’s placements. This figure matches the published rate card before traffic adjustment." />
+            </span>
+            <span className="tabular-nums">${quote.baseCpmUsd.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between gap-2 items-center">
+            <span className="inline-flex items-center gap-1">
+              CPM (traffic-adjusted)
+              <Tooltip text="CPM recalculated from the traffic-adjusted package price divided by monthly impressions × 1,000. It moves with site traffic; add-on spend is not included in CPM." />
+            </span>
+            <span className="tabular-nums font-medium">${quote.indexedCpmUsd.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const iconRefresh = (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+      />
+    </svg>
+  );
+  const iconSave = (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l3 3m0 0l3-3m-3 3V4"
+      />
+    </svg>
+  );
+  const iconPlus = (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  );
+  const iconList = (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+  const iconCheck = (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+    </svg>
+  );
+  const iconCancel = (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+
+  const actionsPanel = isEditingFromSaved ? (
     <AdminActionsPanel
       sections={[
         {
-          title: "Traffic (30d)",
-          customContent: (
-            <div className="space-y-1">
-              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)]">
-                {viewsLoading ? "…" : monthlyViews.toLocaleString()}
-              </div>
-              <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
-                Page views · index ×{mult.toFixed(2)}
-              </div>
-              {!viewsLoading && viewMix.homepageViews + viewMix.articleViews > 0 && (
-                <div className="text-xs text-[var(--admin-text-muted)] pt-2 border-t border-[var(--admin-border)] mt-2">
-                  Homepage {viewMix.homepageViews.toLocaleString()} · Article{" "}
-                  {viewMix.articleViews.toLocaleString()}
-                </div>
-              )}
-            </div>
-          ),
+          title: "",
+          items: [
+            {
+              label: finishSubmitting ? "Saving…" : "Finish",
+              icon: iconCheck,
+              onClick: () => {
+                if (!finishSubmitting) void handleFinishEdit();
+              },
+            },
+            {
+              label: "Cancel",
+              icon: iconCancel,
+              onClick: handleCancelEdit,
+            },
+          ],
         },
-        ...(tab !== "saved" ? [{
-          title: "Live Quote",
-          customContent: (
-            <div>
-              <div className="text-2xl font-semibold text-[var(--admin-accent)] tabular-nums transition-all duration-300">
-                ${quote.totalUsd.toLocaleString()}
-              </div>
-              <div className="mt-1 text-xs text-[var(--admin-text-muted)]">
-                ×{quote.viewershipMultiplier.toFixed(3)} · ${quote.subtotalBaselineUsd.toLocaleString()} before index
-              </div>
-              {quote.viewMixNote && (
-                <p className="mt-2 rounded bg-[var(--admin-table-header-bg)] px-2 py-1.5 text-xs text-[var(--admin-text-muted)]">
-                  {quote.viewMixNote}
-                </p>
-              )}
-              <ul className="mt-3 max-h-64 space-y-1.5 overflow-y-auto text-xs border-t border-[var(--admin-border)] pt-3">
-                {quote.lineItems.map((row) => (
-                  <li key={row.id} className="flex justify-between gap-2 rounded bg-[var(--admin-table-row-hover)] px-2 py-1.5 text-[var(--admin-text)]">
-                    <span>
-                      <span className="font-semibold">{row.label}</span>
-                      <span className="block text-[var(--admin-text-muted)]">{row.detail}</span>
-                    </span>
-                    <span className="shrink-0 font-semibold tabular-nums">${row.lineSubtotalUsd.toLocaleString()}</span>
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                onClick={openSaveModal}
-                className="mt-3 w-full rounded-lg bg-[var(--admin-accent)] py-2 text-sm font-semibold text-black hover:opacity-90"
-              >
-                Save quote
-              </button>
-            </div>
-          ),
-        }] : []),
+      ]}
+    />
+  ) : (
+    <AdminActionsPanel
+      sections={[
+        {
+          title: "Traffic",
+          items: [
+            {
+              label: viewsLoading ? "Refreshing…" : "Refresh 30-day traffic",
+              icon: iconRefresh,
+              onClick: () => {
+                if (!viewsLoading) void loadViews();
+              },
+            },
+          ],
+        },
+        {
+          title: "Quote",
+          items: [
+            {
+              label: "Save quote",
+              icon: iconSave,
+              onClick: openSaveModal,
+            },
+            {
+              label: "New quote",
+              icon: iconPlus,
+              onClick: resetQuote,
+            },
+          ],
+        },
+        {
+          title: "Saved",
+          items: [
+            {
+              label: "Saved quotes",
+              icon: iconList,
+              href: "/admin/ad-quoter/saved",
+            },
+          ],
+        },
       ]}
     />
   );
 
   return (
     <>
-      <AdminPageHeader title="Ad Quoter" reserveActionsPanelSpace />
-      <AdminPageLayout actionsPanel={actionsPanel}>
-        <div className="mb-6 flex flex-wrap gap-2 rounded-lg bg-[var(--admin-table-header-bg)] p-1 border border-[var(--admin-border)]">
-          {(
-            [
-              ["package", "Build a package"],
-              ["budget", "Budget → plan"],
-              ["saved", "Saved quotes"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`flex-1 min-w-[120px] rounded-md px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
-                tab === id
-                  ? "bg-[var(--admin-accent)] text-black shadow-sm"
-                  : "text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      <AdminPageHeader
+        title="Ad Quoter"
+        description="Package-based quotes with add-ons, traffic-adjusted package pricing, and proposal export."
+        reserveActionsPanelSpace={false}
+      />
 
-        {loadedQuote && (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--admin-accent)]/30 bg-[var(--admin-accent)]/5 px-4 py-3 text-sm">
-            <p className="text-[var(--admin-text)]">
-              <span className="font-semibold">Loaded quote:</span> {loadedQuote.name}
-              {loadedQuote.client_name ? ` · ${loadedQuote.client_name}` : ""}
-            </p>
-            <button
-              type="button"
-              onClick={startNewQuote}
-              className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
-            >
-              New quote
-            </button>
-          </div>
-        )}
-
-        <div className="space-y-6">
-            {tab === "package" && (
-              <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6">
-                <h2 className="text-xl font-semibold text-white tracking-tight mb-1">
-                  Build a package
-                </h2>
-                <p className="text-sm text-[var(--admin-text-muted)] mb-6 max-w-2xl">
-                  Set campaign length, then editorial &amp; newsletter, social, and site placements.
-                  Check each desktop/mobile surface for the full campaign — ads run for every month in
-                  the window you set.
+      <AdminPageLayout>
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:gap-6">
+          <div className="min-w-0 flex-1 space-y-6">
+          {isEditingFromSaved ? (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-[var(--admin-accent)]/35 bg-[var(--admin-accent)]/10 px-4 py-3 text-sm text-[var(--admin-text)]">
+                <p className="hidden xl:block">
+                  Editing a saved quote — use <span className="font-semibold">Finish</span> in the right panel to save changes, or{" "}
+                  <span className="font-semibold">Cancel</span> to return to saved quotes without saving.
                 </p>
-                <PackageBuilderSection pkg={pkg} onChange={updatePkg} />
-              </section>
-            )}
-
-            {tab === "saved" && (
-              <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6">
-                <h2 className="text-lg font-semibold text-white mb-2">Saved quotes</h2>
-                <p className="text-sm text-[var(--admin-text-muted)] mb-4">
-                  Open a saved quote to edit the package and save again, or start from{" "}
-                  <button
-                    type="button"
-                    onClick={startNewQuote}
-                    className="font-semibold text-[var(--admin-accent)] underline"
-                  >
-                    New quote
-                  </button>
-                  .
+                <p className="xl:hidden">
+                  Editing a saved quote. Use <span className="font-semibold">Finish</span> or <span className="font-semibold">Cancel</span>{" "}
+                  below.
                 </p>
-                {savedLoading ? (
-                  <p className="text-sm text-[var(--admin-text-muted)]">Loading…</p>
-                ) : savedQuotes.length === 0 ? (
-                  <p className="text-sm text-[var(--admin-text-muted)]">
-                    No saved quotes yet. Use <strong>Save quote</strong> from the live quote panel.
-                  </p>
-                ) : (
-                  <ul className="space-y-3">
-                    {savedQuotes.map((row) => (
-                      <li key={row.id}>
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setDocumentQuote(row)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              setDocumentQuote(row);
-                            }
-                          }}
-                          className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-4 py-3 text-left outline-none transition-colors hover:border-[var(--admin-accent)]/40 hover:bg-[var(--admin-table-row-hover)] focus-visible:ring-2 focus-visible:ring-[var(--admin-accent)]"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="font-semibold text-[var(--admin-text)]">{row.name}</p>
-                            <p className="mt-1 text-xs text-[var(--admin-text-muted)] leading-relaxed">
-                              <span className="font-medium text-[var(--admin-text)]">
-                                {row.client_name?.trim() || "—"}
-                              </span>
-                              {" · "}
-                              {formatCampaignRange(row.start_date, row.end_date)}
-                              {" · "}
-                              <span className="font-semibold text-[var(--admin-text)]">
-                                ${(row.total_usd ?? 0).toLocaleString()}
-                              </span>
-                              {" · "}
-                              Saved {formatSavedQuoteUpdatedAt(row.updated_at)}
-                            </p>
-                          </div>
-                          <div
-                            className="flex shrink-0 gap-2"
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => loadSavedQuote(row)}
-                              className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-3 py-2 text-xs font-semibold text-[var(--admin-accent)] hover:bg-[var(--admin-table-row-hover)]"
-                            >
-                              Load
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openEditQuoteModal(row)}
-                              className="rounded-lg bg-[var(--admin-accent)] px-3 py-2 text-xs font-semibold text-black hover:opacity-95"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteSavedQuote(row)}
-                              className="rounded-lg border border-red-800/50 bg-red-950/30 px-3 py-2 text-xs font-semibold text-red-400 hover:bg-red-950/50"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            )}
-
-            {tab === "budget" && (
-              <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6">
-                <h2 className="text-lg font-semibold text-white mb-2">
-                  They gave you a number
-                </h2>
-                <p className="text-sm text-[var(--admin-text-muted)] mb-4">
-                  Enter their budget and campaign length. We&apos;ll fill a package that uses most of
-                  that budget (after the traffic multiplier), then show the breakdown below—without
-                  leaving this tab.
-                </p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Total budget (USD)">
-                    <NumericTextInput
-                      value={budgetUsd}
-                      onCommit={setBudgetUsd}
-                      min={0}
-                      max={999_999_999}
-                      emptyFallback={0}
-                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold text-lg"
-                    />
-                  </Field>
-                  <Field label="Campaign length (months)">
-                    <NumericTextInput
-                      value={budgetDurationMonths}
-                      onCommit={setBudgetDurationMonths}
-                      min={1}
-                      max={24}
-                      emptyFallback={1}
-                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
-                    />
-                  </Field>
-                </div>
-                <div className="mt-4 rounded-lg bg-[var(--admin-table-header-bg)] p-4 text-sm">
-                  <p>
-                    <span className="font-semibold text-[var(--admin-text)]">
-                      “Baseline” dollars (before traffic):
-                    </span>{" "}
-                    <strong className="text-[var(--admin-accent)]">
-                      ${baselineEquivalentUsd(budgetUsd, monthlyViews).toLocaleString()}
-                    </strong>
-                  </p>
-                  <p className="mt-2 text-xs text-[var(--admin-text-muted)]">
-                    We divide by ×{mult.toFixed(2)} so the final total can land near ${budgetUsd.toLocaleString()}.
-                  </p>
-                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 xl:hidden">
                 <button
                   type="button"
-                  onClick={applyBudgetSuggestion}
-                  className="mt-4 w-full rounded-lg bg-[var(--admin-accent)] py-3 text-sm font-semibold text-black hover:opacity-95 transition-opacity"
+                  disabled={finishSubmitting}
+                  onClick={() => void handleFinishEdit()}
+                  className="min-h-[44px] flex-1 rounded-lg bg-[var(--admin-accent)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[var(--admin-accent-hover)] disabled:opacity-50"
                 >
-                  Suggest package
+                  {finishSubmitting ? "Saving…" : "Finish"}
                 </button>
-
-                {budgetPlanOpen && (
-                  <details
-                    open
-                    className="mt-6 rounded-lg border border-dashed border-[var(--admin-accent)]/40 bg-[var(--admin-table-header-bg)] p-4 transition-all"
-                  >
-                    <summary className="cursor-pointer text-sm font-semibold text-[var(--admin-text)]">
-                      Suggested mix (edit in &quot;Build a package&quot; anytime)
-                    </summary>
-                    <dl className="mt-3 grid gap-2 text-sm text-[var(--admin-text)]">
-                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
-                        <dt>Campaign months</dt>
-                        <dd className="font-semibold">{pkg.durationMonths}</dd>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
-                        <dt>Sponsored articles</dt>
-                        <dd className="font-semibold">{pkg.sponsoredArticleCount}</dd>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
-                        <dt>Newsletter sends / mo</dt>
-                        <dd className="font-semibold">{pkg.newsletterSendsPerMonth}</dd>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
-                        <dt>Newsletter spotlights</dt>
-                        <dd className="font-semibold">{pkg.newsletterSpotlightCount}</dd>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
-                        <dt>Desktop main page</dt>
-                        <dd className="font-semibold">{pkg.includeDesktopMainSite ? "Yes" : "No"}</dd>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
-                        <dt>Mobile main page</dt>
-                        <dd className="font-semibold">{pkg.includeMobileMainSite ? "Yes" : "No"}</dd>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
-                        <dt>Desktop articles</dt>
-                        <dd className="font-semibold">{pkg.includeDesktopArticle ? "Yes" : "No"}</dd>
-                      </div>
-                      <div className="flex justify-between border-b border-[var(--admin-border)] py-1">
-                        <dt>Mobile articles</dt>
-                        <dd className="font-semibold">{pkg.includeMobileArticle ? "Yes" : "No"}</dd>
-                      </div>
-                      <div className="flex justify-between py-1">
-                        <dt>Facebook boosts</dt>
-                        <dd className="font-semibold">{pkg.facebookBoostCount}</dd>
-                      </div>
-                    </dl>
-                    <p className="mt-4 rounded-lg bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] px-3 py-2 text-sm text-[var(--admin-text-muted)]">
-                      <strong>Target budget:</strong> ${budgetUsd.toLocaleString()} ·{" "}
-                      <strong>Quoted total:</strong> ${quote.totalUsd.toLocaleString()}
-                      {Math.abs(budgetDelta) <= 2 ? (
-                        <span className="text-green-400"> — on target</span>
-                      ) : (
-                        <span className="text-amber-400">
-                          {" "}
-                          (off by ${Math.abs(budgetDelta).toLocaleString()}
-                          {budgetDelta > 0 ? ", over" : ", under"} — small leftovers happen when
-                          nothing cheaper fits)
-                        </span>
-                      )}
-                    </p>
-                  </details>
-                )}
-              </section>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="min-h-[44px] flex-1 rounded-lg border border-[var(--admin-border)] px-4 py-2.5 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-4 py-3 text-sm text-[var(--admin-text-muted)]">
+            {viewsLoading ? (
+              <span>Loading traffic…</span>
+            ) : trafficIndexActive && monthlyViews != null ? (
+              <span>
+                Trailing 30-day traffic:{" "}
+                <strong className="text-[var(--admin-text)]">{monthlyViews.toLocaleString()}</strong> page views.
+                Published package rates apply when traffic is at or below{" "}
+                {PACKAGE_QUOTER_BASELINE_MONTHLY_VIEWS.toLocaleString()}/mo; above that, only the{" "}
+                <strong className="text-[var(--admin-text)]">package</strong> price increases (add-ons stay flat).
+              </span>
+            ) : (
+              <span>
+                Traffic data unavailable — published package rates apply (no traffic-based change).
+              </span>
             )}
+          </div>
 
-            {tab !== "saved" && (
-              <>
-            <button
-              type="button"
-              onClick={() => setShowFormula((s) => !s)}
-              className="w-full rounded-lg border border-dashed border-[var(--admin-accent)]/40 bg-[var(--admin-table-header-bg)] px-4 py-3 text-left text-sm font-semibold text-[var(--admin-accent)] hover:bg-[var(--admin-table-row-hover)] transition-colors"
-            >
-              {showFormula ? "▼" : "▶"} Simple explanation: how we get the number
-            </button>
-            {showFormula && (
-              <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6 text-sm text-[var(--admin-text-muted)] leading-relaxed space-y-3">
-                <p>
-                  <strong className="text-[var(--admin-text)]">Do rates change every day?</strong>{" "}
-                  The <strong>rate card</strong> (each line item&apos;s base dollars) is{" "}
-                  <strong>stable</strong> until you change it in code. What moves with traffic is{" "}
-                  <strong>one overall multiplier</strong> (the traffic index) applied to the{" "}
-                  <em>whole</em> subtotal after line items are summed—so you&apos;re not recalculating
-                  dozens of different rates from scratch each month.
-                </p>
-                <p>
-                  <strong className="text-[var(--admin-text)]">Step 1 — Line items.</strong> Each
-                  thing you add (article, newsletter send, site placements for the campaign, etc.) has a{" "}
-                  <em>base</em> dollar amount in the rate card below. Article placements are priced
-                  higher than main-page; mobile article higher than desktop article.
-                </p>
-                <p>
-                  <strong className="text-[var(--admin-text)]">Step 2 — Traffic index.</strong> We
-                  look at total <strong>page views</strong> (last 30 days). Versus baseline (
-                  {BASELINE_MONTHLY_SITE_VIEWS.toLocaleString()}), we apply one multiplier to the
-                  subtotal.
-                </p>
-                <p>
-                  <strong className="text-[var(--admin-text)]">Step 3 — Optional mix nudge.</strong>{" "}
-                  If we have homepage vs article view counts, <strong>article placement</strong> line
-                  rates can get a <strong>small</strong> extra bump when article traffic dominates—on
-                  top of the main index, not instead of it.
-                </p>
-                <p>
-                  <strong className="text-[var(--admin-text)]">Step 4 — Total.</strong> Baseline
-                  subtotal × traffic index → rounded total.
-                </p>
-                <div className="rounded-lg bg-[var(--admin-table-header-bg)] p-3 text-xs overflow-x-auto space-y-1 text-[var(--admin-text-muted)]">
-                  {Object.entries(RATES_USD).map(([k, v]) => (
-                    <div key={k}>
-                      {k}: ${v}
-                    </div>
+          <div className="space-y-4 xl:hidden">{livePanel}</div>
+
+          <div className="space-y-6">
+              <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-4 sm:p-5">
+                <h2 className="text-lg font-semibold text-[var(--admin-text)] mb-4">1. Package</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {AD_PACKAGES.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setPackageId(p.id)}
+                      className={`text-left rounded-lg border p-3 transition ${
+                        packageId === p.id
+                          ? "border-[var(--admin-accent)] bg-[var(--admin-accent)]/10 ring-1 ring-[var(--admin-accent)]"
+                          : "border-[var(--admin-border)] hover:bg-[var(--admin-table-row-hover)]"
+                      }`}
+                    >
+                      <p className="font-semibold text-[var(--admin-text)]">{p.name}</p>
+                      <p className="text-xs text-[var(--admin-text-muted)] mt-1">
+                        ${p.basePriceUsd.toLocaleString()}/mo · {p.impressionsPerMonth.toLocaleString()} imp/mo · CPM ${p.baseCpmUsd.toFixed(2)}
+                      </p>
+                    </button>
                   ))}
                 </div>
-              </div>
-            )}
-              </>
-            )}
-          </div>
+              </section>
 
-        {saveModalOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="save-quote-title"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setSaveModalOpen(false);
-            }}
-          >
-            <div className="w-full max-w-md rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6 shadow-2xl">
-              <h2 id="save-quote-title" className="text-lg font-semibold text-white">
-                {loadedQuote ? "Update saved quote" : "Save quote"}
-              </h2>
-              <p className="mt-1 text-sm text-[var(--admin-text-muted)]">
-                Name this quote and add client / campaign dates. You can open it later from{" "}
-                <strong className="text-[var(--admin-text)]">Saved quotes</strong>.
-              </p>
-              <div className="mt-4 space-y-3">
-                <Field label="Quote name *">
-                  <input
-                    type="text"
-                    value={saveName}
-                    onChange={(e) => setSaveName(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
-                    placeholder="e.g. Acme — Spring drive"
-                  />
-                </Field>
-                <Field label="Client">
-                  <input
-                    type="text"
-                    value={saveClient}
-                    onChange={(e) => setSaveClient(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
-                    placeholder="Company or contact"
-                  />
-                </Field>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Start date">
-                    <input
-                      type="date"
-                      value={saveStart}
-                      onChange={(e) => setSaveStart(e.target.value)}
-                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
+              <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-4 sm:p-5">
+                <h2 className="text-lg font-semibold text-[var(--admin-text)] mb-1">2. Add-ons</h2>
+                <p className="text-xs text-[var(--admin-text-muted)] mb-4">
+                  Add-on pricing is flat (not traffic-indexed). Quantity per line: 0–{ADD_ON_MAX_QUANTITY}.
+                </p>
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <label className="text-sm text-[var(--admin-text)]">Sponsored article ($150 ea)</label>
+                    <NumericTextInput
+                      value={addOns.sponsoredArticles}
+                      onCommit={(n) => updateAddOn("sponsoredArticles", n)}
+                      min={0}
+                      max={ADD_ON_MAX_QUANTITY}
+                      emptyFallback={0}
+                      liveUpdate
+                      className="w-20 rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-2 py-1.5 text-sm text-[var(--admin-text)]"
                     />
-                  </Field>
-                  <Field label="End date">
-                    <input
-                      type="date"
-                      value={saveEnd}
-                      onChange={(e) => setSaveEnd(e.target.value)}
-                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <label className="text-sm text-[var(--admin-text)]">Newsletter mention ($40/send)</label>
+                    <NumericTextInput
+                      value={addOns.newsletterMentions}
+                      onCommit={(n) => updateAddOn("newsletterMentions", n)}
+                      min={0}
+                      max={ADD_ON_MAX_QUANTITY}
+                      emptyFallback={0}
+                      liveUpdate
+                      className="w-20 rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-2 py-1.5 text-sm text-[var(--admin-text)]"
                     />
-                  </Field>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <label className="text-sm text-[var(--admin-text)]">Newsletter spotlight ($95/send)</label>
+                    <NumericTextInput
+                      value={addOns.newsletterSpotlights}
+                      onCommit={(n) => updateAddOn("newsletterSpotlights", n)}
+                      min={0}
+                      max={ADD_ON_MAX_QUANTITY}
+                      emptyFallback={0}
+                      liveUpdate
+                      className="w-20 rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-2 py-1.5 text-sm text-[var(--admin-text)]"
+                    />
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <label className="text-sm text-[var(--admin-text)]">Facebook sponsored post ($75 ea)</label>
+                    <NumericTextInput
+                      value={addOns.facebookPosts}
+                      onCommit={(n) => updateAddOn("facebookPosts", n)}
+                      min={0}
+                      max={ADD_ON_MAX_QUANTITY}
+                      emptyFallback={0}
+                      liveUpdate
+                      className="w-20 rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-2 py-1.5 text-sm text-[var(--admin-text)]"
+                    />
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-content-bg)]">
+                    <input
+                      type="checkbox"
+                      id="cat-excl"
+                      checked={addOns.categoryExclusivity}
+                      onChange={(e) => updateAddOn("categoryExclusivity", e.target.checked)}
+                      className="mt-0.5 w-5 h-5 accent-[var(--admin-accent)] border-[var(--admin-border)] rounded cursor-pointer"
+                    />
+                    <label htmlFor="cat-excl" className="text-sm text-[var(--admin-text)] cursor-pointer">
+                      Category exclusivity (+$175/mo)
+                    </label>
+                  </div>
                 </div>
-              </div>
-              {saveError && (
-                <div className="mt-3 space-y-2">
-                  <p className="text-sm font-semibold text-red-700 whitespace-pre-wrap">{saveError}</p>
-                  {/does not exist|schema cache|Could not find/i.test(saveError) && (
-                    <p className="text-xs text-[var(--admin-text-muted)] leading-relaxed">
-                      The <code className="rounded bg-[var(--admin-table-header-bg)] px-1">saved_ad_quotes</code> table may
-                      not be applied yet. Run{" "}
-                      <code className="rounded bg-[var(--admin-table-header-bg)] px-1">supabase db push</code> or execute{" "}
-                      <code className="rounded bg-[var(--admin-table-header-bg)] px-1">
-                        supabase/migrations/20260325000000_saved_ad_quotes.sql
-                      </code>{" "}
-                      in the SQL editor.
-                    </p>
-                  )}
-                  {/row-level security|RLS|policy/i.test(saveError) && (
+              </section>
+
+              <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-4 sm:p-5">
+                <h2 className="text-lg font-semibold text-[var(--admin-text)] mb-3">3. Campaign length</h2>
+                <div className="flex flex-wrap gap-2">
+                  {([1, 2, 3] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setCampaignMonths(m)}
+                      className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                        campaignMonths === m
+                          ? "bg-[var(--admin-accent)] text-white"
+                          : "border border-[var(--admin-border)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                      }`}
+                    >
+                      {m} month{m === 1 ? "" : "s"}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-4 sm:p-5">
+                <h2 className="text-lg font-semibold text-[var(--admin-text)] mb-3">4. Proposal summary</h2>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--admin-text-muted)] mb-1">
+                      Advertiser name
+                    </label>
+                    <input
+                      type="text"
+                      value={proposalAdvertiser}
+                      onChange={(e) => setProposalAdvertiser(e.target.value)}
+                      placeholder="e.g. Main Street Bakery"
+                      className="w-full max-w-md rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-3 py-2 text-sm text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)]"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={generateProposal}
+                      className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--admin-accent-hover)] transition"
+                    >
+                      Generate proposal text
+                    </button>
+                    {proposalText ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void copyProposal()}
+                          className="rounded-lg border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                        >
+                          Copy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={downloadProposal}
+                          className="rounded-lg border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                        >
+                          Download .txt
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                  {copyProposalError ? (
+                    <p className="text-xs text-red-400">Could not copy to clipboard.</p>
+                  ) : null}
+                  {proposalText ? (
+                    <textarea
+                      readOnly
+                      value={proposalText}
+                      rows={18}
+                      className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-3 py-2 text-xs font-mono text-[var(--admin-text)]"
+                    />
+                  ) : (
                     <p className="text-xs text-[var(--admin-text-muted)]">
-                      Check that your account has <strong>is_admin</strong> or{" "}
-                      <strong>is_super_admin</strong> in <code className="rounded bg-[var(--admin-table-header-bg)] px-1">user_profiles</code>.
+                      Generate a plain-text proposal you can paste into email or a contract draft.
                     </p>
                   )}
                 </div>
-              )}
-              <div className="mt-6 flex flex-wrap gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setSaveModalOpen(false)}
-                  className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-4 py-2 text-sm font-semibold hover:bg-[var(--admin-table-row-hover)]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={saveSubmitting}
-                  onClick={() => void submitSaveQuote()}
-                  className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-black hover:opacity-95 disabled:opacity-50"
-                >
-                  {saveSubmitting ? "Saving…" : loadedQuote ? "Update" : "Save"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+              </section>
 
-        {editQuoteModal && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="edit-quote-title"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setEditQuoteModal(null);
-            }}
-          >
-            <div className="w-full max-w-md rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6 shadow-2xl">
-              <h2 id="edit-quote-title" className="text-lg font-semibold text-white">
-                Edit quote details
-              </h2>
-              <p className="mt-1 text-sm text-[var(--admin-text-muted)]">
-                Update the name, client, campaign dates, or saved total. To change the package
-                contents, use <strong className="text-[var(--admin-text)]">Load</strong> and edit in Build a package.
-              </p>
-              <div className="mt-4 space-y-3">
-                <Field label="Quote name *">
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
-                  />
-                </Field>
-                <Field label="Client">
-                  <input
-                    type="text"
-                    value={editClient}
-                    onChange={(e) => setEditClient(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
-                  />
-                </Field>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Start date">
-                    <input
-                      type="date"
-                      value={editStart}
-                      onChange={(e) => setEditStart(e.target.value)}
-                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
-                    />
-                  </Field>
-                  <Field label="End date">
-                    <input
-                      type="date"
-                      value={editEnd}
-                      onChange={(e) => setEditEnd(e.target.value)}
-                      className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
-                    />
-                  </Field>
-                </div>
-                <Field label="Quoted total (USD)">
-                  <NumericTextInput
-                    value={editTotalUsd}
-                    onCommit={setEditTotalUsd}
-                    min={0}
-                    max={999_999_999}
-                    emptyFallback={0}
-                    className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-3 py-2 font-semibold"
-                  />
-                  <p className="mt-1 text-xs text-[var(--admin-text-muted)]">
-                    If this differs from the calculator by more than $2, the quote is marked as a
-                    custom total (document view hides package math).
-                  </p>
-                </Field>
-              </div>
-              {editError && (
-                <p className="mt-3 text-sm font-semibold text-red-700">{editError}</p>
-              )}
-              <div className="mt-6 flex flex-wrap gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setEditQuoteModal(null)}
-                  className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] px-4 py-2 text-sm font-semibold hover:bg-[var(--admin-table-row-hover)]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={editSubmitting}
-                  onClick={() => void submitEditQuote()}
-                  className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-black hover:opacity-95 disabled:opacity-50"
-                >
-                  {editSubmitting ? "Saving…" : "Save changes"}
-                </button>
-              </div>
-            </div>
           </div>
-        )}
+          </div>
 
-        {documentQuote && (
-          <SavedQuoteDocumentModal
-            row={documentQuote}
-            onClose={() => setDocumentQuote(null)}
-            onDelete={performDeleteSavedQuote}
-          />
-        )}
+          {/* Desktop: live quote (middle) + actions (right), one sticky unit */}
+          <aside className="hidden shrink-0 xl:flex xl:flex-row xl:items-start xl:gap-4 xl:sticky xl:top-6 xl:z-[5]">
+            <div className="w-[20rem] shrink-0">{livePanel}</div>
+            <div className="w-64 shrink-0">{actionsPanel}</div>
+          </aside>
+        </div>
       </AdminPageLayout>
+
+      {saveModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSaveModalOpen(false);
+          }}
+        >
+          <div className="w-full max-w-md rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--admin-text)]">Save quote</h3>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs text-[var(--admin-text-muted)]">Name</label>
+                <input
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-3 py-2 text-sm text-[var(--admin-text)]"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--admin-text-muted)]">Client</label>
+                <input
+                  value={saveClient}
+                  onChange={(e) => setSaveClient(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-3 py-2 text-sm text-[var(--admin-text)]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-[var(--admin-text-muted)]">Start</label>
+                  <input
+                    type="date"
+                    value={saveStart}
+                    onChange={(e) => setSaveStart(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-2 py-2 text-sm text-[var(--admin-text)]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-[var(--admin-text-muted)]">End</label>
+                  <input
+                    type="date"
+                    value={saveEnd}
+                    onChange={(e) => setSaveEnd(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-2 py-2 text-sm text-[var(--admin-text)]"
+                  />
+                </div>
+              </div>
+              {saveError ? <p className="text-sm text-red-400">{saveError}</p> : null}
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSaveModalOpen(false)}
+                className="rounded-lg border border-[var(--admin-border)] px-4 py-2 text-sm text-[var(--admin-text)]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saveSubmitting}
+                onClick={() => void submitSaveQuote()}
+                className="rounded-lg bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {saveSubmitting ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <QuoteSavedToast open={quoteSavedOpen} onClose={() => setQuoteSavedOpen(false)} />
     </>
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+export default function AdQuoterPage() {
   return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
-        {label}
-      </span>
-      {children}
-    </label>
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
+        </div>
+      }
+    >
+      <AdQuoterPageInner />
+    </Suspense>
   );
 }

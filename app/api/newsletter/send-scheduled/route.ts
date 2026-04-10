@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { buildEmailHtml } from "@/lib/newsletter/buildEmailHtml";
 import type { NewsletterBlock, ArticleLayout } from "@/lib/newsletter/buildEmailHtml";
 import { enrichArticleBlocksWithAdvertisementFlags } from "@/lib/newsletter/enrichArticleBlocksForEmail";
+import {
+  SENDGRID_NEWSLETTER_GLOBAL_CATEGORY,
+  sendGridCategoryForCampaign,
+} from "@/lib/newsletter/sendGridCampaign";
 
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 const SITE_URL = "https://www.springford.press";
@@ -115,6 +119,7 @@ export async function GET(request: Request) {
         continue;
       }
 
+      const categoryTag = sendGridCategoryForCampaign(campaign.id);
       // Send in batches of 1000 (SendGrid limit per request)
       const BATCH_SIZE = 1000;
       let sendError: string | null = null;
@@ -123,9 +128,11 @@ export async function GET(request: Request) {
         const body = {
           personalizations: batch.map((r) => ({
             to: [{ email: r.email, ...(r.name ? { name: r.name } : {}) }],
+            custom_args: { campaign_id: campaign.id },
           })),
           from: { email: fromEmail, name: fromName },
           subject,
+          categories: [SENDGRID_NEWSLETTER_GLOBAL_CATEGORY, categoryTag],
           content: [
             { type: "text/plain", value: plainText || subject },
             { type: "text/html", value: html },

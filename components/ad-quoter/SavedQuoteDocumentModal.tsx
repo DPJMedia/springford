@@ -1,10 +1,12 @@
 "use client";
 
+import { BASELINE_MONTHLY_SITE_VIEWS, computeQuote, packageFromJson } from "@/lib/advertising/quoteModel";
 import {
-  BASELINE_MONTHLY_SITE_VIEWS,
-  computeQuote,
-  packageFromJson,
-} from "@/lib/advertising/quoteModel";
+  computePackageQuoter,
+  packageQuoterFromJson,
+} from "@/lib/advertising/packageQuoterModel";
+import { getAdSlotTableLabel } from "@/lib/advertising/adSlots";
+import Link from "next/link";
 import { formatCampaignRange, formatSavedQuoteUpdatedAt } from "@/lib/advertising/formatQuoteDates";
 import type { SavedAdQuote } from "@/lib/types/database";
 
@@ -12,43 +14,45 @@ type Props = {
   row: SavedAdQuote;
   onClose: () => void;
   onDelete: (row: SavedAdQuote) => void | Promise<void>;
+  onViewProposalText?: (row: SavedAdQuote) => void;
 };
 
-function quoteForSavedRow(row: SavedAdQuote) {
-  const pkg = packageFromJson(row.package_data);
-  const views = row.monthly_views_snapshot ?? BASELINE_MONTHLY_SITE_VIEWS;
-  const h = row.homepage_views_snapshot ?? 0;
-  const a = row.article_views_snapshot ?? 0;
-  const viewMix = h + a > 0 ? { homepageViews: h, articleViews: a } : undefined;
-  return computeQuote(pkg, views, viewMix);
-}
-
-export function SavedQuoteDocumentModal({ row, onClose, onDelete }: Props) {
-  const computed = quoteForSavedRow(row);
-  const manual = row.manual_total_override === true;
-  const hasViewMixSnapshot = (row.homepage_views_snapshot ?? 0) + (row.article_views_snapshot ?? 0) > 0;
-  const views = row.monthly_views_snapshot ?? BASELINE_MONTHLY_SITE_VIEWS;
-
-  const savedDiffers =
-    !manual &&
-    row.total_usd != null &&
-    hasViewMixSnapshot &&
-    Math.abs(row.total_usd - computed.totalUsd) > 2;
+export function SavedQuoteDocumentModal({ row, onClose, onDelete, onViewProposalText }: Props) {
+  const v2 = packageQuoterFromJson(row.package_data);
+  const monthlyViews = row.monthly_views_snapshot ?? null;
+  const trafficIndexActive = monthlyViews != null && monthlyViews > 0;
 
   async function confirmDelete() {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(`Delete "${row.name}"? This cannot be undone.`)
-    ) {
+    if (typeof window !== "undefined" && !window.confirm(`Delete "${row.name}"? This cannot be undone.`)) {
       return;
     }
     await onDelete(row);
     onClose();
   }
 
+  const legacyPkg = !v2 ? packageFromJson(row.package_data) : null;
+  const legacyComputed =
+    legacyPkg != null
+      ? computeQuote(
+          legacyPkg,
+          row.monthly_views_snapshot ?? BASELINE_MONTHLY_SITE_VIEWS,
+          (row.homepage_views_snapshot ?? 0) + (row.article_views_snapshot ?? 0) > 0
+            ? {
+                homepageViews: row.homepage_views_snapshot ?? 0,
+                articleViews: row.article_views_snapshot ?? 0,
+              }
+            : undefined,
+        )
+      : null;
+
+  const v2Result =
+    v2 != null
+      ? computePackageQuoter(v2.packageId, v2.addOns, v2.campaignMonths, monthlyViews, trafficIndexActive)
+      : null;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="quote-doc-title"
@@ -56,137 +60,170 @@ export function SavedQuoteDocumentModal({ row, onClose, onDelete }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl">
-        <div className="border-b border-gray-100 bg-gradient-to-br from-slate-50 to-white px-8 py-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-[color:var(--color-medium)]">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-card-bg)] shadow-2xl">
+        <div className="border-b border-[var(--admin-border)] px-6 py-6">
+          <p className="text-xs font-bold uppercase tracking-widest text-[var(--admin-text-muted)]">
             Advertisement quote
           </p>
-          <h2
-            id="quote-doc-title"
-            className="mt-2 text-2xl font-black tracking-tight text-[color:var(--color-dark)]"
-          >
+          <h2 id="quote-doc-title" className="mt-2 text-2xl font-semibold tracking-tight text-[var(--admin-text)]">
             {row.name}
           </h2>
-          <p className="mt-3 text-lg text-[color:var(--color-dark)]">
-            <span className="font-semibold text-[color:var(--color-medium)]">Client: </span>
+          <p className="mt-3 text-sm text-[var(--admin-text)]">
+            <span className="font-semibold text-[var(--admin-text-muted)]">Client: </span>
             {row.client_name?.trim() || "—"}
           </p>
         </div>
 
-        <div className="space-y-8 px-8 py-8 text-[color:var(--color-dark)]">
+        <div className="space-y-6 px-6 py-6 text-[var(--admin-text)]">
           <section>
-            <h3 className="text-xs font-black uppercase tracking-wide text-[color:var(--color-medium)]">
-              Campaign
-            </h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">Campaign</h3>
             <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between gap-4 border-b border-gray-50 pb-2">
-                <dt className="text-[color:var(--color-medium)]">Campaign period</dt>
-                <dd className="max-w-[70%] text-right font-semibold leading-snug">
+              <div className="flex justify-between gap-4 border-b border-[var(--admin-border)] pb-2">
+                <dt className="text-[var(--admin-text-muted)]">Campaign period</dt>
+                <dd className="max-w-[70%] text-right font-medium leading-snug">
                   {formatCampaignRange(row.start_date, row.end_date)}
                 </dd>
               </div>
-              <div className="flex justify-between gap-4 pb-1">
-                <dt className="text-[color:var(--color-medium)]">Last saved</dt>
+              <div className="flex justify-between gap-4">
+                <dt className="text-[var(--admin-text-muted)]">Last saved</dt>
                 <dd className="text-right text-sm">{formatSavedQuoteUpdatedAt(row.updated_at)}</dd>
               </div>
             </dl>
           </section>
 
           <section>
-            <h3 className="text-xs font-black uppercase tracking-wide text-[color:var(--color-medium)]">
-              Investment
-            </h3>
-            <p className="mt-3 text-4xl font-black tabular-nums text-[color:var(--color-riviera-blue)]">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">Investment</h3>
+            <p className="mt-3 text-4xl font-bold tabular-nums text-[var(--admin-accent)]">
               ${(row.total_usd ?? 0).toLocaleString()}
             </p>
-            {!manual && (
-              <p className="mt-1 text-xs text-[color:var(--color-medium)]">
-                Total quoted (as saved). Package math used traffic index ×
-                {computed.viewershipMultiplier.toFixed(3)}, {views.toLocaleString()} views/mo
-                {hasViewMixSnapshot && (
-                  <>
-                    {" "}
-                    (homepage {row.homepage_views_snapshot?.toLocaleString()} · article{" "}
-                    {row.article_views_snapshot?.toLocaleString()} in 30d mix)
-                  </>
-                )}
-                .
-              </p>
-            )}
-            {manual && (
-              <p className="mt-1 text-xs text-[color:var(--color-medium)]">
-                Custom total — not tied to the line-item calculator below. Components are listed for
-                reference only.
-              </p>
-            )}
-            {savedDiffers && (
-              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                Recalculating this package with today&apos;s code gives{" "}
-                <strong>${computed.totalUsd.toLocaleString()}</strong> — rates or logic may have
-                changed since save.
-              </p>
-            )}
+            <p className="mt-1 text-xs text-[var(--admin-text-muted)]">Total campaign (as saved)</p>
           </section>
 
-          <section>
-            <h3 className="text-xs font-black uppercase tracking-wide text-[color:var(--color-medium)]">
-              Package includes
-            </h3>
-            <ul className="mt-4 space-y-3">
-              {computed.lineItems.length === 0 ? (
-                <li className="text-sm text-[color:var(--color-medium)]">No line items</li>
-              ) : manual ? (
-                computed.lineItems.map((line) => (
-                  <li key={line.id} className="border-b border-gray-100 pb-3 last:border-0">
-                    <p className="font-semibold">{line.label}</p>
-                    <p className="text-xs text-[color:var(--color-medium)]">{line.detail}</p>
-                  </li>
-                ))
-              ) : (
-                computed.lineItems.map((line) => (
-                  <li
-                    key={line.id}
-                    className="flex justify-between gap-4 border-b border-gray-100 pb-3 last:border-0"
-                  >
-                    <div>
-                      <p className="font-semibold">{line.label}</p>
-                      <p className="text-xs text-[color:var(--color-medium)]">{line.detail}</p>
-                    </div>
-                    <p className="shrink-0 text-sm font-bold tabular-nums">
-                      ${line.lineSubtotalUsd.toLocaleString()}
-                    </p>
-                  </li>
-                ))
-              )}
-            </ul>
-            {!manual && (
-              <div className="mt-4 flex justify-between border-t-2 border-gray-200 pt-4 text-sm">
-                <span className="font-bold uppercase tracking-wide text-[color:var(--color-medium)]">
+          {v2 && v2Result ? (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
+                Package (v2 calculator)
+              </h3>
+              <p className="mt-2 font-semibold">{v2Result.pkg.name}</p>
+              <ul className="mt-2 list-inside list-disc text-sm text-[var(--admin-text-muted)]">
+                {v2Result.pkg.slotIds.map((id) => (
+                  <li key={id}>{getAdSlotTableLabel(id)}</li>
+                ))}
+              </ul>
+              <dl className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt>List package / mo</dt>
+                  <dd className="tabular-nums">${v2Result.basePackagePriceUsd.toLocaleString()}</dd>
+                </div>
+                {v2Result.trafficIndexActive ? (
+                  <div className="flex justify-between gap-4">
+                    <dt>Indexed package / mo</dt>
+                    <dd className="tabular-nums text-[var(--admin-accent)]">
+                      ${v2Result.indexedPackagePriceUsd.toLocaleString()}
+                    </dd>
+                  </div>
+                ) : null}
+                <div className="flex justify-between gap-4">
+                  <dt>Campaign length</dt>
+                  <dd>
+                    {v2Result.campaignMonths} month{v2Result.campaignMonths === 1 ? "" : "s"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt>CPM (indexed)</dt>
+                  <dd className="tabular-nums">${v2Result.indexedCpmUsd.toFixed(2)}</dd>
+                </div>
+              </dl>
+              {v2Result.addOnLineItems.length > 0 ? (
+                <ul className="mt-4 space-y-2 border-t border-[var(--admin-border)] pt-4">
+                  {v2Result.addOnLineItems.map((line) => (
+                    <li key={line.id} className="flex justify-between gap-4 text-sm">
+                      <span>
+                        {line.label}
+                        {line.quantity > 1 ? ` × ${line.quantity}` : ""}
+                      </span>
+                      <span className="tabular-nums">${line.lineTotalUsd.toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ) : legacyComputed ? (
+            <section>
+              <p className="rounded-lg bg-[var(--admin-table-header-bg)] px-3 py-2 text-xs text-[var(--admin-text-muted)]">
+                This quote was saved with the <strong className="text-[var(--admin-text)]">previous</strong> line-item
+                calculator. Line items below are reconstructed from saved data.
+              </p>
+              <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
+                Package includes
+              </h3>
+              <ul className="mt-3 space-y-3">
+                {legacyComputed.lineItems.length === 0 ? (
+                  <li className="text-sm text-[var(--admin-text-muted)]">No line items</li>
+                ) : (
+                  legacyComputed.lineItems.map((line) => (
+                    <li
+                      key={line.id}
+                      className="flex justify-between gap-4 border-b border-[var(--admin-border)] pb-3 last:border-0"
+                    >
+                      <div>
+                        <p className="font-semibold">{line.label}</p>
+                        <p className="text-xs text-[var(--admin-text-muted)]">{line.detail}</p>
+                      </div>
+                      <p className="shrink-0 text-sm font-bold tabular-nums">${line.lineSubtotalUsd.toLocaleString()}</p>
+                    </li>
+                  ))
+                )}
+              </ul>
+              <div className="mt-4 flex justify-between border-t border-[var(--admin-border)] pt-4 text-sm">
+                <span className="font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
                   Subtotal (baseline)
                 </span>
-                <span className="font-bold tabular-nums">
-                  ${computed.subtotalBaselineUsd.toLocaleString()}
-                </span>
+                <span className="font-bold tabular-nums">${legacyComputed.subtotalBaselineUsd.toLocaleString()}</span>
               </div>
-            )}
-          </section>
+              <p className="mt-2 text-xs text-[var(--admin-text-muted)]">
+                Traffic index ×{legacyComputed.viewershipMultiplier.toFixed(3)} ·{" "}
+                {legacyComputed.monthlySiteViewsUsed.toLocaleString()} views/mo
+              </p>
+            </section>
+          ) : (
+            <p className="text-sm text-[var(--admin-text-muted)]">Could not read saved package data.</p>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-slate-50/80 px-8 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--admin-border)] bg-[var(--admin-content-bg)] px-6 py-4">
           <button
             type="button"
             onClick={() => void confirmDelete()}
-            className="rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 hover:bg-red-50"
+            className="rounded-lg border border-red-500/40 bg-[var(--admin-card-bg)] px-4 py-2.5 text-sm font-semibold text-red-400 hover:bg-red-500/10"
           >
             Delete quote
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg bg-[color:var(--color-riviera-blue)] px-6 py-2.5 text-sm font-bold text-white hover:opacity-95"
-          >
-            Close
-          </button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {onViewProposalText ? (
+              <button
+                type="button"
+                onClick={() => onViewProposalText(row)}
+                className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+              >
+                View proposal text
+              </button>
+            ) : null}
+            <Link
+              href={`/admin/ad-quoter?edit=${row.id}`}
+              onClick={onClose}
+              className="inline-flex items-center justify-center rounded-lg border border-[var(--admin-accent)] bg-[var(--admin-accent)]/10 px-4 py-2.5 text-sm font-semibold text-[var(--admin-accent)] hover:bg-[var(--admin-accent)]/20"
+            >
+              Edit quote
+            </Link>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg bg-[var(--admin-accent)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[var(--admin-accent-hover)]"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

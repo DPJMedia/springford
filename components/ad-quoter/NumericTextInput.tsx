@@ -10,6 +10,11 @@ type Props = {
   max?: number;
   /** When the field is left empty on blur. */
   emptyFallback: number;
+  /**
+   * When true, each valid keystroke updates the parent immediately (live quote).
+   * Empty field while typing does not commit until blur.
+   */
+  liveUpdate?: boolean;
   className?: string;
   id?: string;
 };
@@ -25,6 +30,7 @@ export function NumericTextInput({
   min,
   max,
   emptyFallback,
+  liveUpdate = false,
   className = "",
   id,
 }: Props) {
@@ -40,7 +46,7 @@ export function NumericTextInput({
 
   const display = draft !== null ? draft : String(value);
 
-  function commit(raw: string) {
+  function clampAndParse(raw: string): number {
     let n: number;
     if (raw === "") {
       n = emptyFallback;
@@ -50,6 +56,11 @@ export function NumericTextInput({
     }
     if (max !== undefined) n = Math.min(max, Math.max(min, n));
     else n = Math.max(min, n);
+    return n;
+  }
+
+  function commit(raw: string) {
+    const n = clampAndParse(raw);
     setDraft(null);
     onCommit(n);
   }
@@ -68,18 +79,26 @@ export function NumericTextInput({
       }}
       onChange={(e) => {
         const v = e.target.value.replace(/\D/g, "");
+        if (liveUpdate && v !== "") {
+          const n = clampAndParse(v);
+          onCommit(n);
+          setDraft(String(n) !== v ? String(n) : v);
+          return;
+        }
         setDraft(v);
       }}
       onBlur={(e) => {
         focusedRef.current = false;
         const raw = e.target.value.replace(/\D/g, "");
-        // User edited (including clear-to-empty) if draft was ever set this focus session
-        if (draft !== null) {
+        if (draft !== null || liveUpdate) {
           commit(raw);
         }
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        if (e.key === "Enter") {
+          e.preventDefault();
+          (e.target as HTMLInputElement).blur();
+        }
       }}
       className={className}
     />

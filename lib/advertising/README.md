@@ -1,13 +1,13 @@
 # Advertisement quoter
 
-- **Model:** `quoteModel.ts` — line-item baseline dollars × **one** traffic index (from last-30-day **total** site page views).
-- **Rate card:** `RATES_USD` is **stable** until you change it; it does not auto-scale line-by-line every day. Homepage/main placements &lt; article placements; desktop article &lt; mobile article (mobile article = premium tier).
-- **Traffic index:** `viewershipMultiplier(monthlySiteViews)` applies to the **whole** subtotal (not per line item).
-- **View mix (optional):** When `homepageViews` + `articleViews` from analytics are passed in, `computeEffectiveRates` may apply a **small** extra bump to **desktop + mobile article** row rates only (homepage rows stay fixed for calibration). Shown as `viewMixNote` on the quote.
-- **Site placements:** **Yes/no per surface** for the **full campaign** (`durationMonths`). When enabled, billing is **per month × campaign length** at the monthly rate (same total as “N months” before, without asking for N separately). Surfaces: desktop main, mobile main, desktop article, mobile article.
-- **Baseline traffic:** `BASELINE_MONTHLY_SITE_VIEWS` (12,000) ≈ index **1.0**.
-- **Policy caps:** Newsletter sends **max 8/mo**; newsletter spotlight sections **max 2/mo** (campaign cap = 2 × months); sponsored articles **max 1/mo per advertiser** (cap = campaign months). Enforced in `sanitizePackage` / `fillPackageToBaselineBudget`.
-- **Calibration:** Reference 3-month bundle ≈ **$1,100** at index 1.0 (`REFERENCE_DEAL_PRESET`).
-- **Saved quotes:** Table `saved_ad_quotes` (see migrations) stores `package_data` JSON, client, dates, snapshot totals — admin-only RLS.
+## Package quoter (v2) — current
 
-Adjust `RATES_USD` when real pricing changes.
+- **Model:** `packageQuoterModel.ts` — six fixed packages (slots + list price + impressions), optional add-ons, campaign length 1–3 months.
+- **Traffic index:** Same `viewershipMultiplier` as `quoteModel.ts` (trailing 30-day **total** `page_views`). At or below **25,000** views/mo, package price equals the published list (no discount). Above baseline, package price = list × `multiplier(views)/multiplier(25k)`. **Add-ons are never indexed.**
+- **CPM (live):** Indexed package price ÷ package impression count × 1,000.
+- **UI:** `app/admin/ad-quoter/page.tsx`.
+- **Saved quotes:** `saved_ad_quotes.package_data` with `quoterVersion: 2` and `{ packageId, campaignMonths, addOns }`.
+
+## Legacy line-item model (still in `quoteModel.ts`)
+
+Older saved quotes use `packageFromJson` / `computeQuote` (line items × one traffic index, optional homepage/article mix nudge). Not used for new quotes.

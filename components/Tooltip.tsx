@@ -31,13 +31,14 @@ export function Tooltip({ text }: TooltipProps) {
     <div className="relative inline-block ml-1" ref={tooltipRef}>
       <button
         type="button"
+        aria-label="More info"
         onMouseEnter={() => setShow(true)}
         onMouseLeave={() => setShow(false)}
         onClick={(e) => {
           e.preventDefault();
           setShow(!show);
         }}
-        className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--admin-accent)] text-[10px] font-bold text-black transition hover:opacity-90"
+        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[10px] font-semibold text-[var(--admin-text-muted)] transition hover:border-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
       >
         i
       </button>
