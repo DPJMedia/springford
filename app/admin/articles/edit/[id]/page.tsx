@@ -14,6 +14,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { DateTimePicker } from "@/components/DateTimePicker";
 import { AuthorSelector } from "@/components/AuthorSelector";
 import { TagSelector } from "@/components/TagSelector";
+import { ArticlePreviewModal } from "@/components/admin/ArticlePreviewModal";
 
 export default function EditArticlePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -47,6 +48,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authorName, setAuthorName] = useState("");
@@ -366,6 +368,16 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
       <AdminPageHeader
         title="Edit Article"
         description={`Last updated: ${new Date(article.updated_at).toLocaleString()}`}
+        actions={
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-[var(--admin-accent)] bg-[var(--admin-card-bg)] text-[var(--admin-accent)] text-sm font-semibold hover:bg-[var(--admin-accent)]/10 transition"
+            title="See how this article will look to readers before publishing"
+          >
+            Preview article
+          </button>
+        }
       />
       <AdminPageLayout>
 
@@ -767,21 +779,30 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                     />
                   </div>
 
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex flex-wrap gap-3 pt-4">
                     <button
                       type="button"
                       onClick={() => handleUpdate("publish")}
                       disabled={saving}
-                      className="flex-1 px-6 py-3 bg-[var(--admin-accent)] text-black rounded-lg hover:opacity-90 disabled:opacity-50 font-semibold"
+                      className="min-w-0 flex-1 px-6 py-3 bg-[var(--admin-accent)] text-black rounded-lg hover:opacity-90 disabled:opacity-50 font-semibold"
                     >
                       {saving ? "Updating..." : "Update Article Now"}
                     </button>
 
                     <button
                       type="button"
+                      onClick={() => setPreviewOpen(true)}
+                      className="px-6 py-3 rounded-lg font-semibold border-2 border-[var(--admin-accent)] bg-[var(--admin-card-bg)] text-[var(--admin-accent)] hover:bg-[var(--admin-accent)]/10"
+                      title="See how this article will look to readers before publishing"
+                    >
+                      Preview article
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => handleUpdate("schedule")}
                       disabled={saving || !scheduledFor}
-                      className="flex-1 px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 font-semibold"
+                      className="min-w-0 flex-1 px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 font-semibold"
                     >
                       Schedule Update
                     </button>
@@ -808,7 +829,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                     />
                   </div>
 
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex flex-wrap gap-3 pt-4">
                     <button
                       type="button"
                       onClick={() => handleUpdate("draft")}
@@ -825,6 +846,15 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 font-semibold"
                     >
                       Schedule
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPreviewOpen(true)}
+                      className="px-6 py-3 rounded-lg font-semibold border-2 border-[var(--admin-accent)] bg-[var(--admin-card-bg)] text-[var(--admin-accent)] hover:bg-[var(--admin-accent)]/10"
+                      title="See how this article will look to readers before publishing"
+                    >
+                      Preview article
                     </button>
 
                     <button
@@ -848,6 +878,20 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           </div>
         </form>
       </AdminPageLayout>
+
+      <ArticlePreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title={title}
+        subtitle={subtitle}
+        excerpt={excerpt}
+        contentBlocks={contentBlocks}
+        legacyContent=""
+        imageUrl={useFeaturedImage ? imagePreview || currentImageUrl : null}
+        imageCaption={imageCaption}
+        imageCredit={imageCredit}
+        authorName={authorName}
+      />
     </>
   );
 }

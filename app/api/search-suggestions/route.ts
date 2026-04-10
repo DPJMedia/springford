@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { allowRateLimit, getClientIp } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
+
+const SUGGESTIONS_PER_MIN = 120;
 
 const SECTIONS = [
   { label: "Spring City", query: "Spring City", slug: "spring-city" },
@@ -22,6 +25,14 @@ export type SuggestionItem = {
 };
 
 export async function GET(request: NextRequest) {
+  const ip = getClientIp(request);
+  if (!allowRateLimit(`suggestions:${ip}`, SUGGESTIONS_PER_MIN, 60_000)) {
+    return NextResponse.json(
+      { suggestions: [], error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": "60" } }
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const q = searchParams.get("q")?.trim().toLowerCase();
 

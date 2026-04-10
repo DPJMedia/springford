@@ -15,6 +15,7 @@ import { AuthorSelector } from "@/components/AuthorSelector";
 import { TagSelector } from "@/components/TagSelector";
 import type { ArticleVisibility } from "@/lib/types/database";
 import { ArticleVisibilitySelector } from "@/components/ArticleVisibilitySelector";
+import { ArticlePreviewModal } from "@/components/admin/ArticlePreviewModal";
 
 export default function NewArticlePage() {
   const [title, setTitle] = useState("");
@@ -46,6 +47,7 @@ export default function NewArticlePage() {
   const [scheduledFor, setScheduledFor] = useState("");
   
   const [loading, setLoading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authorName, setAuthorName] = useState("");
@@ -244,14 +246,24 @@ export default function NewArticlePage() {
       <AdminPageHeader
         title="Create New Article"
         actions={
-          <Link
-            href="/admin/diffuse"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black text-white text-sm font-semibold hover:opacity-90 transition shadow-sm"
-            style={{ fontFamily: 'var(--font-space-grotesk)' }}
-          >
-            <span><span className="text-white">diffuse</span><span className="text-[#ff9628]">.ai</span></span>
-            <span className="text-white">integration</span>
-          </Link>
+          <>
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-[var(--admin-accent)] bg-[var(--admin-card-bg)] text-[var(--admin-accent)] text-sm font-semibold hover:bg-[var(--admin-accent)]/10 transition"
+              title="See how this article will look to readers before publishing"
+            >
+              Preview article
+            </button>
+            <Link
+              href="/admin/diffuse"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black text-white text-sm font-semibold hover:opacity-90 transition shadow-sm"
+              style={{ fontFamily: 'var(--font-space-grotesk)' }}
+            >
+              <span><span className="text-white">diffuse</span><span className="text-[#ff9628]">.ai</span></span>
+              <span className="text-white">integration</span>
+            </Link>
+          </>
         }
       />
       <AdminPageLayout>
@@ -654,7 +666,7 @@ export default function NewArticlePage() {
                 />
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-wrap gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => handleSubmit("draft")}
@@ -677,6 +689,15 @@ export default function NewArticlePage() {
 
                 <button
                   type="button"
+                  onClick={() => setPreviewOpen(true)}
+                  className="px-6 py-3 rounded-lg font-semibold flex items-center gap-2 border-2 border-[var(--admin-accent)] bg-[var(--admin-card-bg)] text-[var(--admin-accent)] hover:bg-[var(--admin-accent)]/10"
+                  title="See how this article will look to readers before publishing"
+                >
+                  Preview article
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleSubmit("publish")}
                   disabled={loading}
                   className="px-6 py-3 bg-[var(--admin-accent)] text-black rounded-lg hover:opacity-90 disabled:opacity-50 font-semibold flex items-center gap-2"
@@ -695,6 +716,20 @@ export default function NewArticlePage() {
           </div>
         </form>
       </AdminPageLayout>
+
+      <ArticlePreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title={title}
+        subtitle={subtitle}
+        excerpt={excerpt}
+        contentBlocks={contentBlocks}
+        legacyContent=""
+        imageUrl={useFeaturedImage ? imagePreview : null}
+        imageCaption={imageCaption}
+        imageCredit={imageCredit}
+        authorName={authorName}
+      />
     </>
   );
 }

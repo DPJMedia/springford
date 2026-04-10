@@ -1,7 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
+import { allowRateLimit, getClientIp } from "@/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
+const SEARCH_PER_MIN = 120;
+
 export async function GET(request: NextRequest) {
+  const ip = getClientIp(request);
+  if (!allowRateLimit(`search:${ip}`, SEARCH_PER_MIN, 60_000)) {
+    return NextResponse.json(
+      { articles: [], total: 0, error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": "60" } }
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const q = searchParams.get("q")?.trim();
 

@@ -13,10 +13,24 @@ const SITE_URL = "https://www.springford.press";
 
 export const runtime = "edge";
 
+const isProduction =
+  process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+
 export async function GET(request: Request) {
-  // Verify Vercel cron secret (if set in env — required in production)
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
+
+  if (isProduction) {
+    if (!cronSecret) {
+      console.error("[send-scheduled] CRON_SECRET is required in production");
+      return NextResponse.json(
+        { error: "Server misconfigured" },
+        { status: 503 }
+      );
+    }
+    if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  } else if (cronSecret) {
     const auth = request.headers.get("authorization");
     if (auth !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -10,7 +10,9 @@ export function ScheduledPublisher() {
   useEffect(() => {
     const publishScheduled = async () => {
       try {
-        const response = await fetch("/api/publish-scheduled");
+        const response = await fetch("/api/publish-scheduled", {
+          credentials: "same-origin",
+        });
         const data = await response.json();
         
         if (data.published_count > 0) {

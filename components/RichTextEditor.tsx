@@ -84,6 +84,11 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     return dispPos - subtract;
   };
 
+  /** Toolbar clicks must not take focus from the textarea (preserves selection). Also restore page scroll after focus. */
+  const toolbarMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+  };
+
   // Handle @ symbol, Escape, and bullet list Enter / Shift+Enter
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "@") {
@@ -170,8 +175,12 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
+    // Textarea shows toDisplay(value); indices are display-space. value is markdown.
+    const displayValue = toDisplay(value);
+    const startDisp = textarea.selectionStart;
+    const endDisp = textarea.selectionEnd;
+    const start = displayToMarkdownPosition(displayValue, Math.min(startDisp, endDisp));
+    const end = displayToMarkdownPosition(displayValue, Math.max(startDisp, endDisp));
     const selectedText = value.substring(start, end);
 
     if (!selectedText) {
@@ -187,21 +196,39 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     }
 
     const newValue = value.substring(0, start) + formattedText + value.substring(end);
+    const scrollTop = textarea.scrollTop;
+    const pageScrollY = window.scrollY;
     onChange(newValue);
 
-    // Restore focus and selection
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + formattedText.length, start + formattedText.length);
-    }, 0);
+    const caretMd = start + formattedText.length;
+    queueMicrotask(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const ta = textareaRef.current;
+          if (!ta) return;
+          const caretDisp = markdownToDisplayPosition(newValue, caretMd);
+          ta.focus({ preventScroll: true });
+          ta.setSelectionRange(caretDisp, caretDisp);
+          ta.scrollTop = scrollTop;
+          window.scrollTo(0, pageScrollY);
+          requestAnimationFrame(() => {
+            window.scrollTo(0, pageScrollY);
+            ta.scrollTop = scrollTop;
+          });
+        });
+      });
+    });
   };
 
   const insertLink = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
+    const displayValue = toDisplay(value);
+    const startDisp = textarea.selectionStart;
+    const endDisp = textarea.selectionEnd;
+    const start = displayToMarkdownPosition(displayValue, Math.min(startDisp, endDisp));
+    const end = displayToMarkdownPosition(displayValue, Math.max(startDisp, endDisp));
     const selectedText = value.substring(start, end);
 
     if (!selectedText) {
@@ -220,19 +247,43 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       return;
     }
 
+    const textarea = textareaRef.current;
+    const scrollTop = textarea?.scrollTop ?? 0;
+    const pageScrollY = window.scrollY;
+
     const selectedText = value.substring(selectionStart, selectionEnd);
     const linkText = `[${selectedText}](${linkUrl})`;
     const newValue = value.substring(0, selectionStart) + linkText + value.substring(selectionEnd);
     onChange(newValue);
 
+    const caretMd = selectionStart + linkText.length;
     setShowLinkModal(false);
     setLinkUrl("");
-    textareaRef.current?.focus();
+
+    queueMicrotask(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const ta = textareaRef.current;
+          if (!ta) return;
+          const caretDisp = markdownToDisplayPosition(newValue, caretMd);
+          ta.focus({ preventScroll: true });
+          ta.setSelectionRange(caretDisp, caretDisp);
+          ta.scrollTop = scrollTop;
+          window.scrollTo(0, pageScrollY);
+          requestAnimationFrame(() => {
+            window.scrollTo(0, pageScrollY);
+            ta.scrollTop = scrollTop;
+          });
+        });
+      });
+    });
   };
 
   const insertBulletList = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
+
+    const pageScrollY = window.scrollY;
 
     const displayValue = toDisplay(value);
     const startDisp = textarea.selectionStart;
@@ -257,12 +308,19 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       });
       const newSelection = bulletLines.join("\n");
       const newValue = text.substring(0, start) + newSelection + text.substring(end);
+      const taScroll = textarea.scrollTop;
       onChange(newValue);
       const newEndMd = start + newSelection.length;
       const newEndDisp = markdownToDisplayPosition(newValue, newEndMd);
       setTimeout(() => {
-        textarea.focus();
+        textarea.focus({ preventScroll: true });
         textarea.setSelectionRange(newEndDisp, newEndDisp);
+        textarea.scrollTop = taScroll;
+        window.scrollTo(0, pageScrollY);
+        requestAnimationFrame(() => {
+          window.scrollTo(0, pageScrollY);
+          textarea.scrollTop = taScroll;
+        });
       }, 0);
     } else {
       // No selection: add/remove bullet at start of current line
@@ -280,11 +338,18 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         newValue = text.substring(0, lineStart) + bulletLine + text.substring(lineEnd);
         newCursorMd = lineStart + 2; // cursor after "- " (ready to type)
       }
+      const taScroll = textarea.scrollTop;
       onChange(newValue);
       const newCursorDisp = markdownToDisplayPosition(newValue, newCursorMd);
       setTimeout(() => {
-        textarea.focus();
+        textarea.focus({ preventScroll: true });
         textarea.setSelectionRange(newCursorDisp, newCursorDisp);
+        textarea.scrollTop = taScroll;
+        window.scrollTo(0, pageScrollY);
+        requestAnimationFrame(() => {
+          window.scrollTo(0, pageScrollY);
+          textarea.scrollTop = taScroll;
+        });
       }, 0);
     }
   };
@@ -293,25 +358,42 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    const cursorPosition = textarea.selectionStart;
-    const textBeforeCursor = value.substring(0, cursorPosition);
+    const displayValue = toDisplay(value);
+    const cursorDisp = textarea.selectionStart;
+    const cursorMd = displayToMarkdownPosition(displayValue, cursorDisp);
+    const textBeforeCursor = value.substring(0, cursorMd);
     const lastAtSymbol = textBeforeCursor.lastIndexOf("@");
-    
+
     const beforeAt = value.substring(0, lastAtSymbol);
-    const afterCursor = value.substring(cursorPosition);
-    
+    const afterCursor = value.substring(cursorMd);
+
     const articleLink = `[${article.title}](/article/${article.slug})`;
     const newValue = beforeAt + articleLink + afterCursor;
-    
+    const scrollTop = textarea.scrollTop;
+    const pageScrollY = window.scrollY;
+
     onChange(newValue);
     setShowArticleSearch(false);
     setArticleSearchQuery("");
-    
-    setTimeout(() => {
-      textarea.focus();
-      const newPosition = lastAtSymbol + articleLink.length;
-      textarea.setSelectionRange(newPosition, newPosition);
-    }, 0);
+
+    const caretMd = lastAtSymbol + articleLink.length;
+    queueMicrotask(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const ta = textareaRef.current;
+          if (!ta) return;
+          const caretDisp = markdownToDisplayPosition(newValue, caretMd);
+          ta.focus({ preventScroll: true });
+          ta.setSelectionRange(caretDisp, caretDisp);
+          ta.scrollTop = scrollTop;
+          window.scrollTo(0, pageScrollY);
+          requestAnimationFrame(() => {
+            window.scrollTo(0, pageScrollY);
+            ta.scrollTop = scrollTop;
+          });
+        });
+      });
+    });
   };
 
   return (
@@ -320,6 +402,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       <div className="flex items-center gap-2 mb-2 p-2 bg-[var(--admin-table-header-bg)] rounded-t-md border border-[var(--admin-border)] border-b-0">
         <button
           type="button"
+          onMouseDown={toolbarMouseDown}
           onClick={() => applyFormatting("bold")}
           className="px-3 py-1 bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded hover:bg-[var(--admin-table-row-hover)] text-[var(--admin-text)] font-bold"
           title="Bold (Ctrl+B)"
@@ -328,6 +411,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         </button>
         <button
           type="button"
+          onMouseDown={toolbarMouseDown}
           onClick={() => applyFormatting("italic")}
           className="px-3 py-1 bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded hover:bg-[var(--admin-table-row-hover)] text-[var(--admin-text)] italic"
           title="Italic (Ctrl+I)"
@@ -336,6 +420,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         </button>
         <button
           type="button"
+          onMouseDown={toolbarMouseDown}
           onClick={insertLink}
           className="px-3 py-1 bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded hover:bg-[var(--admin-table-row-hover)] text-[var(--admin-text)]"
           title="Insert Link"
@@ -344,6 +429,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         </button>
         <button
           type="button"
+          onMouseDown={toolbarMouseDown}
           onClick={insertBulletList}
           className="px-3 py-1 bg-[var(--admin-card-bg)] border border-[var(--admin-border)] rounded hover:bg-[var(--admin-table-row-hover)] text-[var(--admin-text)] flex items-center gap-1"
           title="Bullet list (prefix line or selection with -)"
@@ -389,6 +475,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
             />
             <div className="flex gap-2 justify-end">
               <button
+                type="button"
                 onClick={() => {
                   setShowLinkModal(false);
                   setLinkUrl("");
@@ -398,6 +485,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={applyLink}
                 className="px-4 py-2 bg-[var(--admin-accent)] text-black rounded hover:opacity-90 font-semibold"
               >
@@ -416,6 +504,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
           ) : (
             filteredArticles.map((article) => (
               <button
+                type="button"
                 key={article.id}
                 onClick={() => insertArticleReference(article)}
                 className="w-full text-left px-3 py-2 hover:bg-[var(--admin-table-header-bg)] border-b border-[var(--admin-border)] last:border-0"
