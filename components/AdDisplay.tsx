@@ -9,6 +9,7 @@ import {
   calculateViewportPosition,
   calculateScrollDepth,
 } from "@/lib/analytics/tracker";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 type AdDisplayProps = {
   adSlot: string;
@@ -19,6 +20,7 @@ type AdDisplayProps = {
 type AdWithFillSetting = Ad & { fill_section_for_slot?: boolean };
 
 export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDisplayProps) {
+  const { id: tenantId } = useTenant();
   const [ad, setAd] = useState<AdWithFillSetting | null>(null);
   const [adSetting, setAdSetting] = useState<AdSetting | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,21 +57,23 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
   useEffect(() => {
     async function fetchAds() {
       try {
-        // Fetch ad setting first
+        // Fetch ad setting for this tenant + slot (avoid cross-tenant fallback settings)
         const { data: setting } = await supabase
           .from("ad_settings")
           .select("*")
           .eq("ad_slot", adSlot)
-          .single();
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
 
-        setAdSetting(setting);
+        setAdSetting(setting ?? null);
 
-        // Fetch all active ads for this slot using junction table
+        // Fetch all active ads for this slot using junction table (tenant-scoped)
         const now = new Date().toISOString();
         const { data: assignments } = await supabase
           .from("ad_slot_assignments")
           .select("ad_id, fill_section, ads!inner(*)")
-          .eq("ad_slot", adSlot);
+          .eq("ad_slot", adSlot)
+          .eq("tenant_id", tenantId);
 
         if (assignments && assignments.length > 0) {
           // Filter active ads and attach per-slot fill setting
@@ -102,11 +106,12 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
             setAd(null);
           }
         } else {
-          // Fallback to legacy ad_slot column
+          // Fallback to legacy ad_slot column (tenant-scoped)
           const { data: activeAd } = await supabase
             .from("ads")
             .select("*")
             .eq("ad_slot", adSlot)
+            .eq("tenant_id", tenantId)
             .eq("is_active", true)
             .lte("start_date", now)
             .gte("end_date", now)
@@ -130,7 +135,7 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
     }
 
     fetchAds();
-  }, [adSlot, supabase]);
+  }, [adSlot, supabase, tenantId]);
 
   // Ad visibility tracking effect
   useEffect(() => {
