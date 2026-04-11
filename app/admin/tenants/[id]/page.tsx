@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
@@ -13,6 +13,55 @@ import {
 } from "@/components/admin/TenantDeleteSection";
 import { TenantMembersSection } from "@/components/admin/TenantMembersSection";
 import type { TenantRow } from "@/lib/types/database";
+
+function TenantCreatedNotice({
+  domain,
+  fromEmail,
+}: {
+  domain: string;
+  fromEmail: string;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  if (searchParams.get("created") !== "1") return null;
+
+  return (
+    <div className="rounded-lg border border-[var(--admin-accent)]/40 bg-[var(--admin-accent)]/10 p-4 text-sm text-[var(--admin-text)] leading-relaxed">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="m-0 font-semibold text-[var(--admin-accent)]">Tenant created</p>
+        <button
+          type="button"
+          onClick={() => router.replace(pathname)}
+          className="shrink-0 text-sm font-semibold text-[var(--admin-accent)] hover:underline"
+        >
+          Dismiss
+        </button>
+      </div>
+      <p className="mt-2 mb-0">To make this site live, complete these steps:</p>
+      <ol className="mt-2 list-decimal pl-5 space-y-2">
+        <li>
+          Add <strong className="font-medium text-white">{domain}</strong> as a custom domain in the Vercel dashboard
+          under this project&apos;s settings.
+        </li>
+        <li>
+          In the <strong className="font-medium text-white">Supabase</strong> dashboard, open{" "}
+          <strong className="font-medium text-white">Authentication</strong> →{" "}
+          <strong className="font-medium text-white">URL Configuration</strong> and register this tenant&apos;s URLs:
+          set <strong className="font-medium text-white">Site URL</strong> to your canonical site address (for example{" "}
+          <code className="rounded bg-black/30 px-1 py-0.5 text-xs">https://www.{domain}</code>
+          ), and add the same origin plus <code className="rounded bg-black/30 px-1 py-0.5 text-xs">/auth/callback</code>{" "}
+          to <strong className="font-medium text-white">Redirect URLs</strong> so sign-in and OAuth return to this
+          domain.
+        </li>
+        <li>
+          Add a SendGrid sender identity for <strong className="font-medium text-white">{fromEmail}</strong> and verify
+          DKIM/SPF DNS records for its domain.
+        </li>
+      </ol>
+    </div>
+  );
+}
 
 export default function TenantDetailAdminPage() {
   const router = useRouter();
@@ -127,6 +176,9 @@ export default function TenantDetailAdminPage() {
       />
       <AdminPageLayout>
         <div className="space-y-8">
+          <Suspense fallback={null}>
+            <TenantCreatedNotice domain={tenant.domain} fromEmail={tenant.from_email} />
+          </Suspense>
           <TenantForm
             mode="edit"
             initial={tenant}

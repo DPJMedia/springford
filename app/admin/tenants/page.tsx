@@ -77,7 +77,6 @@ export default function TenantsAdminPage() {
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [createdNotice, setCreatedNotice] = useState<{ domain: string; fromEmail: string } | null>(null);
 
   const [allMembers, setAllMembers] = useState<AllMembersRow[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -181,7 +180,6 @@ export default function TenantsAdminPage() {
             <button
               type="button"
               onClick={() => {
-                setCreatedNotice(null);
                 setShowCreate(true);
               }}
               className="rounded-md bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
@@ -199,40 +197,6 @@ export default function TenantsAdminPage() {
             </div>
           )}
 
-          {createdNotice && (
-            <div className="mt-6 rounded-lg border border-[var(--admin-accent)]/40 bg-[var(--admin-accent)]/10 p-4 text-sm text-[var(--admin-text)] leading-relaxed">
-              <p className="m-0 font-semibold text-[var(--admin-accent)]">Tenant created.</p>
-              <p className="mt-2 mb-0">To make this site live, complete these steps:</p>
-              <ol className="mt-2 list-decimal pl-5 space-y-2">
-                <li>
-                  Add <strong className="font-medium text-white">{createdNotice.domain}</strong> as a custom domain in
-                  the Vercel dashboard under this project&apos;s settings.
-                </li>
-                <li>
-                  In the <strong className="font-medium text-white">Supabase</strong> dashboard, open{" "}
-                  <strong className="font-medium text-white">Authentication</strong> →{" "}
-                  <strong className="font-medium text-white">URL Configuration</strong> and register this tenant&apos;s
-                  URLs: set <strong className="font-medium text-white">Site URL</strong> to your canonical site address
-                  (for example{" "}
-                  <code className="rounded bg-black/30 px-1 py-0.5 text-xs">
-                    https://www.{createdNotice.domain}
-                  </code>
-                  ), and add the same origin plus{" "}
-                  <code className="rounded bg-black/30 px-1 py-0.5 text-xs">
-                    /auth/callback
-                  </code>{" "}
-                  to <strong className="font-medium text-white">Redirect URLs</strong> so sign-in and OAuth return to
-                  this domain.
-                </li>
-                <li>
-                  Add a SendGrid sender identity for{" "}
-                  <strong className="font-medium text-white">{createdNotice.fromEmail}</strong> and verify DKIM/SPF DNS
-                  records for its domain.
-                </li>
-              </ol>
-            </div>
-          )}
-
           {showCreate && (
             <div className="mt-6 mb-8">
               <TenantForm
@@ -241,9 +205,9 @@ export default function TenantsAdminPage() {
                 onCancel={() => setShowCreate(false)}
                 onCreated={(t) => {
                   setShowCreate(false);
-                  setCreatedNotice({ domain: t.domain, fromEmail: t.from_email });
                   void loadTenants();
                   void loadAllMembers();
+                  router.push(`/admin/tenants/${t.id}?created=1`);
                 }}
                 onUpdated={() => {}}
               />
@@ -296,7 +260,11 @@ export default function TenantsAdminPage() {
         </section>
 
         <section className="mt-12">
-          <h2 className="m-0 text-2xl font-semibold text-[var(--admin-text)]">Members</h2>
+          <h2 className="m-0 text-2xl font-semibold text-[var(--admin-text)]">Super admins</h2>
+          <p className="mt-2 mb-0 max-w-3xl text-sm text-[var(--admin-text-muted)]">
+            Platform super admins only. To add or edit editors and tenant admins for a specific site, open that tenant
+            and use <strong className="text-[var(--admin-text)]">Members</strong> there.
+          </p>
           {membersError && (
             <div className="mt-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
               {membersError}
@@ -372,7 +340,7 @@ export default function TenantsAdminPage() {
               </table>
               {sortedMembers.length === 0 && !membersError && (
                 <p className="p-6 text-center text-sm text-[var(--admin-text-muted)] m-0">
-                  No admin or editor memberships yet.
+                  No platform super admins found.
                 </p>
               )}
             </div>

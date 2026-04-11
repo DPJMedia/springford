@@ -4,7 +4,10 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-/** Super admins search staff (admin or super admin on profile) to add to a tenant; excludes existing members. */
+/**
+ * Search users who are already **platform** admins (`is_admin` or `is_super_admin` on `user_profiles`)
+ * so they can be given a tenant role. Excludes existing members. Newsletter-only accounts never appear.
+ */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
