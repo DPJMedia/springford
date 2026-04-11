@@ -7,6 +7,7 @@ import {
 } from './tracker';
 
 interface UsePageTrackingOptions {
+  tenantId: string;
   viewType: 'article' | 'homepage' | 'section' | 'author' | 'tag' | 'other';
   articleId?: string;
   userId?: string;
@@ -22,6 +23,7 @@ export function usePageTracking(options: UsePageTrackingOptions) {
     // Track page view on mount
     if (!hasTrackedView.current) {
       trackPageView({
+        tenantId: options.tenantId,
         viewType: options.viewType,
         articleId: options.articleId,
         userId: options.userId,
@@ -58,6 +60,7 @@ export function usePageTracking(options: UsePageTrackingOptions) {
 
       // Update the page view record with time and scroll data
       updatePageView({
+        tenantId: options.tenantId,
         sessionId: getSessionId(),
         articleId: options.articleId,
         timeSpentSeconds: timeSpent,
@@ -66,7 +69,7 @@ export function usePageTracking(options: UsePageTrackingOptions) {
         completedArticle: scrollDepth >= 90,
       });
     };
-  }, [options.viewType, options.articleId, options.userId, options.trackScroll]);
+  }, [options.tenantId, options.viewType, options.articleId, options.userId, options.trackScroll]);
 
   return {
     sessionId: getSessionId(),

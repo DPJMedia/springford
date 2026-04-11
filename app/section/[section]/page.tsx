@@ -47,6 +47,7 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
 
   // Track section page view
   usePageTracking({
+    tenantId,
     viewType: 'section',
     trackScroll: true,
   });

@@ -473,6 +473,10 @@ export default function AnalyticsPage() {
         actionsPanel={actionsPanel}
       >
 
+      <p className="text-xs text-[var(--admin-text-muted)] mb-6 max-w-3xl leading-relaxed">
+        Stats are for <strong className="text-[var(--admin-text)] font-medium">this site only</strong> (same metrics as every tenant). Numbers refresh when you load this page or change the time range — they are not a live real-time feed. Use &ldquo;Refresh Data&rdquo; in the sidebar to reload.
+      </p>
+
       {/* === CONTENT PERFORMANCE === */}
       <div className="mb-8">
           <h2 className="text-xl font-semibold text-white mb-4">Content Performance</h2>

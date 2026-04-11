@@ -272,6 +272,7 @@ function NewsSection({
 }
 
 export default function Home() {
+  const { id: tenantId } = useTenant();
   const [heroArticle, setHeroArticle] = useState<Article | null>(null);
   const [featuredArticles, setFeaturedArticles] = useState<Article[]>([]);
   const [editorsPicks, setEditorsPicks] = useState<Article[]>([]);
@@ -283,8 +284,9 @@ export default function Home() {
   const [schoolDistrictArticles, setSchoolDistrictArticles] = useState<Article[]>([]);
   const [politicsArticles, setPoliticsArticles] = useState<Article[]>([]);
 
-  // Track homepage view
+  // Track homepage view (tenant_id stored for admin analytics per site)
   usePageTracking({
+    tenantId,
     viewType: 'homepage',
     trackScroll: true,
   });
@@ -296,7 +298,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
-  const { id: tenantId } = useTenant();
 
   // After articles load, scroll to the hash section if one is in the URL
   useEffect(() => {

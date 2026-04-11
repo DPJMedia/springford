@@ -165,6 +165,7 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
                   const viewportPosition = calculateViewportPosition(adElement);
 
                   trackAdImpression({
+                    tenantId,
                     adId: ad.id,
                     adSlot: adSlot,
                     wasViewed: true,
@@ -206,6 +207,7 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
   const handleAdClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (ad) {
       trackAdClick({
+        tenantId,
         adId: ad.id,
         adSlot: adSlot,
         destinationUrl: ad.link_url,

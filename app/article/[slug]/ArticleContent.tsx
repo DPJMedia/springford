@@ -57,6 +57,7 @@ export function ArticleContent({
 
   // Analytics tracking
   const { sessionId, getCurrentScrollDepth, getTimeSpent } = usePageTracking({
+    tenantId,
     viewType: 'article',
     articleId: article.id,
     trackScroll: true,
@@ -98,6 +99,7 @@ export function ArticleContent({
       const timeSpent = getTimeSpent();
 
       trackArticleScrollData({
+        tenantId,
         articleId: article.id,
         sessionId: sessionId,
         scrollCheckpoints: scrollCheckpointsRef.current,
@@ -107,7 +109,7 @@ export function ArticleContent({
         abandonedAtPercent: maxScroll,
       });
     };
-  }, [article.id, sessionId, getCurrentScrollDepth, getTimeSpent]);
+  }, [tenantId, article.id, sessionId, getCurrentScrollDepth, getTimeSpent]);
 
   useEffect(() => {
     async function checkAdminStatus() {
@@ -405,6 +407,7 @@ export function ArticleContent({
                           href={`/author/${authorUsername}`} 
                           className="flex items-center gap-2 hover:opacity-80 transition"
                           onClick={() => trackAuthorClick({
+                            tenantId,
                             authorName: authorName || article.author_name || 'Unknown',
                             clickedFromPage: 'article',
                             articleId: article.id,
@@ -429,6 +432,7 @@ export function ArticleContent({
                               href={`/author/${coAuthorUsername}`} 
                               className="flex items-center gap-2 hover:opacity-80 transition"
                               onClick={() => trackAuthorClick({
+                                tenantId,
                                 authorName: coAuthorName || 'Unknown',
                                 clickedFromPage: 'article',
                                 articleId: article.id,

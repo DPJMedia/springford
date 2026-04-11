@@ -13,9 +13,11 @@ import {
 } from "@/lib/branding/diffuse";
 import Link from "next/link";
 import { usePageTracking } from "@/lib/analytics/usePageTracking";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 export default function AuthorPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
+  const { id: tenantId } = useTenant();
   const [author, setAuthor] = useState<UserProfile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,7 @@ export default function AuthorPage({ params }: { params: Promise<{ username: str
 
   // Track author page view
   usePageTracking({
+    tenantId,
     viewType: 'author',
     trackScroll: true,
   });

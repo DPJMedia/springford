@@ -338,7 +338,7 @@ export function Header() {
               <a
                 key={item.label}
                 href={item.href}
-                onClick={() => trackSectionClick({ sectionName: item.slug, clickedFromPage: window.location.pathname, userId: user?.id })}
+                onClick={() => trackSectionClick({ tenantId, sectionName: item.slug, clickedFromPage: window.location.pathname, userId: user?.id })}
                 className="rounded-md px-3 py-1.5 text-sm font-semibold transition hover:bg-black/10 text-[color:var(--color-dark)] whitespace-nowrap flex-shrink-0"
               >
                 {item.label}
@@ -367,7 +367,7 @@ export function Header() {
               <a
                 key={item.label}
                 href={item.href}
-                onClick={() => { setShowMobileNav(false); trackSectionClick({ sectionName: item.slug, clickedFromPage: window.location.pathname, userId: user?.id }); }}
+                onClick={() => { setShowMobileNav(false); trackSectionClick({ tenantId, sectionName: item.slug, clickedFromPage: window.location.pathname, userId: user?.id }); }}
                 className="block px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-black/10 rounded-md transition"
               >
                 {item.label}

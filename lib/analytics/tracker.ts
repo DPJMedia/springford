@@ -103,6 +103,7 @@ export function getUTMParams(): { source?: string; medium?: string; campaign?: s
 
 // Track page view
 export async function trackPageView(data: {
+  tenantId: string;
   viewType: 'article' | 'homepage' | 'section' | 'author' | 'tag' | 'other';
   articleId?: string;
   userId?: string;
@@ -116,6 +117,7 @@ export async function trackPageView(data: {
   
   try {
     await supabase.from('page_views').insert({
+      tenant_id: data.tenantId,
       article_id: data.articleId || null,
       user_id: data.userId || null,
       session_id: sessionId,
@@ -140,6 +142,7 @@ export async function trackPageView(data: {
 
 // Update page view with time spent and scroll data
 export async function updatePageView(data: {
+  tenantId: string;
   sessionId: string;
   articleId?: string;
   timeSpentSeconds: number;
@@ -155,6 +158,7 @@ export async function updatePageView(data: {
     let pageViewsQuery = supabase
       .from('page_views')
       .select('id')
+      .eq('tenant_id', data.tenantId)
       .eq('session_id', data.sessionId);
     pageViewsQuery = data.articleId
       ? pageViewsQuery.eq('article_id', data.articleId)
@@ -182,6 +186,7 @@ export async function updatePageView(data: {
 
 // Track article scroll data
 export async function trackArticleScrollData(data: {
+  tenantId: string;
   articleId: string;
   sessionId: string;
   scrollCheckpoints: Record<number, number>; // { 10: timestamp, 25: timestamp, etc. }
@@ -194,6 +199,7 @@ export async function trackArticleScrollData(data: {
   
   try {
     await supabase.from('article_scroll_data').insert({
+      tenant_id: data.tenantId,
       article_id: data.articleId,
       session_id: data.sessionId,
       scroll_checkpoints: data.scrollCheckpoints,
@@ -209,6 +215,7 @@ export async function trackArticleScrollData(data: {
 
 // Track ad impression
 export async function trackAdImpression(data: {
+  tenantId: string;
   adId: string;
   adSlot: string;
   userId?: string;
@@ -224,6 +231,7 @@ export async function trackAdImpression(data: {
   
   try {
     await supabase.from('ad_impressions').insert({
+      tenant_id: data.tenantId,
       ad_id: data.adId,
       ad_slot: data.adSlot,
       user_id: data.userId || null,
@@ -246,6 +254,7 @@ export async function trackAdImpression(data: {
 
 // Track ad click
 export async function trackAdClick(data: {
+  tenantId: string;
   adId: string;
   adSlot: string;
   userId?: string;
@@ -257,6 +266,7 @@ export async function trackAdClick(data: {
   
   try {
     await supabase.from('ad_clicks').insert({
+      tenant_id: data.tenantId,
       ad_id: data.adId,
       ad_slot: data.adSlot,
       user_id: data.userId || null,
@@ -272,6 +282,7 @@ export async function trackAdClick(data: {
 
 // Track author click
 export async function trackAuthorClick(data: {
+  tenantId: string;
   authorName: string;
   clickedFromPage: string;
   articleId?: string;
@@ -282,6 +293,7 @@ export async function trackAuthorClick(data: {
   
   try {
     await supabase.from('author_clicks').insert({
+      tenant_id: data.tenantId,
       author_name: data.authorName,
       clicked_from_page: data.clickedFromPage,
       article_id: data.articleId || null,
@@ -295,6 +307,7 @@ export async function trackAuthorClick(data: {
 
 // Track section click
 export async function trackSectionClick(data: {
+  tenantId: string;
   sectionName: string;
   clickedFromPage: string;
   userId?: string;
@@ -304,6 +317,7 @@ export async function trackSectionClick(data: {
   
   try {
     await supabase.from('section_clicks').insert({
+      tenant_id: data.tenantId,
       section_name: data.sectionName,
       clicked_from_page: data.clickedFromPage,
       user_id: data.userId || null,
