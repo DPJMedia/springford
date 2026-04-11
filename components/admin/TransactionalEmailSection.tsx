@@ -53,10 +53,13 @@ export function TransactionalEmailTypesList({
   selectedId,
   onSelect,
   previews,
+  /** No outer card — for embedding in AdminActionsPanel (sidebar). */
+  embedded = false,
 }: {
   selectedId: string;
   onSelect: (id: string) => void;
   previews: TransactionalEmailPreview[];
+  embedded?: boolean;
 }) {
   const { newsletter, support } = useMemo(() => {
     const newsletter = previews.filter((p) => p.id.startsWith("newsletter-"));
@@ -66,8 +69,8 @@ export function TransactionalEmailTypesList({
 
   if (previews.length === 0) return null;
 
-  return (
-    <div className="w-full min-w-0 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-3">
+  const inner = (
+    <>
       <div className="space-y-4">
         {newsletter.length > 0 && (
           <div>
@@ -100,9 +103,23 @@ export function TransactionalEmailTypesList({
         )}
       </div>
 
-      <p className="mt-4 border-t border-[var(--admin-border)] pt-3 text-xs text-[var(--admin-text-muted)]">
+      <p
+        className={`text-xs text-[var(--admin-text-muted)] ${
+          embedded ? "mt-3 border-t border-[var(--admin-border)] pt-3" : "mt-4 border-t border-[var(--admin-border)] pt-3"
+        }`}
+      >
         Auth emails (sign-up, password reset) are configured in the Supabase Dashboard → Authentication → Email templates.
       </p>
+    </>
+  );
+
+  if (embedded) {
+    return <div className="w-full min-w-0">{inner}</div>;
+  }
+
+  return (
+    <div className="w-full min-w-0 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-3">
+      {inner}
     </div>
   );
 }

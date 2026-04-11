@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type TenantMemberRow = {
   user_id: string;
@@ -11,11 +11,17 @@ export type TenantMemberRow = {
   created_at: string;
 };
 
+type StaffPick = { id: string; full_name: string | null; email: string };
+
 export function TenantMembersSection({ tenantId }: { tenantId: string }) {
   const [members, setMembers] = useState<TenantMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
+  const [nameQuery, setNameQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<StaffPick[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [picked, setPicked] = useState<StaffPick | null>(null);
+  const [listOpen, setListOpen] = useState(false);
   const [role, setRole] = useState<"admin" | "editor">("editor");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -25,6 +31,7 @@ export function TenantMembersSection({ tenantId }: { tenantId: string }) {
   const [roleFeedback, setRoleFeedback] = useState<{ userId: string; kind: "ok" | "err"; message: string } | null>(
     null,
   );
+  const searchWrapRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -52,23 +59,78 @@ export function TenantMembersSection({ tenantId }: { tenantId: string }) {
     };
   }, [load]);
 
+  useEffect(() => {
+    function handlePointerDown(e: PointerEvent) {
+      const el = searchWrapRef.current;
+      if (el && !el.contains(e.target as Node)) setListOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
+  }, []);
+
+  useEffect(() => {
+    if (picked) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    const q = nameQuery.trim();
+    if (q.length < 1) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const res = await fetch(
+          `/api/admin/tenants/${tenantId}/staff-search?q=${encodeURIComponent(q)}`,
+          { credentials: "include" },
+        );
+        const j = (await res.json()) as { users?: StaffPick[] };
+        setSearchResults(Array.isArray(j.users) ? j.users : []);
+        setSearchLoading(false);
+        setListOpen(true);
+      })();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [nameQuery, tenantId, picked]);
+
+  function onNameChange(v: string) {
+    setNameQuery(v);
+    setPicked(null);
+    setFormError(null);
+  }
+
+  function selectStaff(u: StaffPick) {
+    setPicked(u);
+    setNameQuery(u.full_name?.trim() || u.email);
+    setListOpen(false);
+    setSearchResults([]);
+  }
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+    if (!picked) {
+      setFormError("Select a user from the list.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`/api/admin/tenants/${tenantId}/members`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), role }),
+        body: JSON.stringify({ email: picked.email.trim(), role }),
       });
       const j = await res.json();
       if (!res.ok) {
         setFormError(typeof j.error === "string" ? j.error : "Could not add member.");
         return;
       }
-      setEmail("");
+      setNameQuery("");
+      setPicked(null);
       setRole("editor");
       await load();
     } finally {
@@ -127,7 +189,7 @@ export function TenantMembersSection({ tenantId }: { tenantId: string }) {
     <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-6 space-y-6">
       <h2 className="text-lg font-semibold text-white m-0">Members</h2>
       <p className="text-sm text-[var(--admin-text-muted)] m-0">
-        Admins and editors for this site. Open a tenant from the list to change access; newsletter-only
+        Admins and editors for this site. Search by name to add staff (admins and super admins only). Newsletter-only
         readers are not shown here.
       </p>
 
@@ -138,18 +200,52 @@ export function TenantMembersSection({ tenantId }: { tenantId: string }) {
       )}
 
       <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-3 border-b border-[var(--admin-border)] pb-6">
-        <label className="min-w-[12rem] flex-1">
+        <div ref={searchWrapRef} className="relative min-w-[12rem] flex-1">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
-            Email
+            Find user by name
           </span>
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="user@example.com"
+            type="text"
+            autoComplete="off"
+            value={nameQuery}
+            onChange={(e) => onNameChange(e.target.value)}
+            onFocus={() => {
+              if (!picked && nameQuery.trim().length > 0) setListOpen(true);
+            }}
+            placeholder="Start typing a name…"
             className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm text-[var(--admin-text)]"
           />
-        </label>
+          {searchLoading && !picked ? (
+            <span className="absolute right-3 top-9 text-[10px] text-[var(--admin-text-muted)]">Searching…</span>
+          ) : null}
+          {listOpen && !picked && searchResults.length > 0 ? (
+            <ul
+              role="listbox"
+              className="absolute left-0 right-0 z-20 mt-1 max-h-52 overflow-y-auto rounded-md border border-[var(--admin-border)] bg-[var(--admin-sidebar-bg)] py-1 shadow-lg"
+            >
+              {searchResults.map((u) => (
+                <li key={u.id} role="presentation">
+                  <button
+                    type="button"
+                    role="option"
+                    className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm transition hover:bg-[var(--admin-card-bg)]"
+                    onClick={() => selectStaff(u)}
+                  >
+                    <span className="font-medium text-[var(--admin-text)]">
+                      {u.full_name?.trim() || "—"}
+                    </span>
+                    <span className="text-xs text-[var(--admin-text-muted)]">{u.email}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {listOpen && !picked && !searchLoading && nameQuery.trim().length > 0 && searchResults.length === 0 ? (
+            <p className="absolute left-0 right-0 z-20 mt-1 rounded-md border border-[var(--admin-border)] bg-[var(--admin-sidebar-bg)] px-3 py-2 text-sm text-[var(--admin-text-muted)] shadow-lg">
+              No matching staff users.
+            </p>
+          ) : null}
+        </div>
         <label className="w-40">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
             Role
@@ -165,7 +261,7 @@ export function TenantMembersSection({ tenantId }: { tenantId: string }) {
         </label>
         <button
           type="submit"
-          disabled={submitting || !email.trim()}
+          disabled={submitting || !picked}
           className="rounded-md bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
         >
           {submitting ? "Adding…" : "Add member"}

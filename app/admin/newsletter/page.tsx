@@ -448,6 +448,21 @@ function NewsletterInner() {
             </div>
           ),
         },
+        ...(transactionalPreviews.length > 0
+          ? [
+              {
+                title: "Newsletter",
+                customContent: (
+                  <TransactionalEmailTypesList
+                    embedded
+                    selectedId={transactionalEmailId}
+                    onSelect={setTransactionalEmailId}
+                    previews={transactionalPreviews}
+                  />
+                ),
+              },
+            ]
+          : []),
       ]}
     />
   );
@@ -552,8 +567,8 @@ function NewsletterInner() {
 
       <div>
         {tab === "campaigns" && (
-          <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_16rem] xl:gap-x-6 xl:gap-y-16 xl:items-start">
-            <div className="min-w-0 space-y-5 xl:col-span-2">
+          <div className="flex flex-col gap-12 xl:gap-16">
+            <div className="min-w-0 w-full space-y-5">
             <div className="flex flex-col sm:flex-row gap-3 mb-5 items-stretch">
               <div className="relative min-w-0 flex-1">
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -649,20 +664,11 @@ function NewsletterInner() {
             </div>
 
             <TransactionalEmailsMain
-              className="mt-0 min-w-0 xl:col-start-1 xl:row-start-2"
+              className="mt-0 w-full min-w-0"
               selectedId={transactionalEmailId}
               onSelectId={setTransactionalEmailId}
               previews={transactionalPreviews}
             />
-            {transactionalPreviews.length > 0 && (
-              <div className="hidden w-full min-w-0 shrink-0 self-start pt-[3.25rem] xl:col-start-2 xl:row-start-2 xl:block">
-                <TransactionalEmailTypesList
-                  selectedId={transactionalEmailId}
-                  onSelect={setTransactionalEmailId}
-                  previews={transactionalPreviews}
-                />
-              </div>
-            )}
           </div>
         )}
 

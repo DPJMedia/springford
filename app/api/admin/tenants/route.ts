@@ -128,5 +128,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const tenantId = data.id as string;
+  const { data: superAdmins, error: saErr } = await admin
+    .from("user_profiles")
+    .select("id")
+    .eq("is_super_admin", true);
+
+  if (saErr) {
+    return NextResponse.json(
+      { error: `Tenant created but could not load super admins for membership: ${saErr.message}` },
+      { status: 500 },
+    );
+  }
+
+  const membershipRows = (superAdmins ?? []).map((r) => ({
+    tenant_id: tenantId,
+    user_id: r.id,
+    role: "admin" as const,
+  }));
+
+  if (membershipRows.length > 0) {
+    const { error: memErr } = await admin.from("tenant_memberships").insert(membershipRows);
+    if (memErr) {
+      return NextResponse.json(
+        { error: `Tenant created but super admin memberships failed: ${memErr.message}` },
+        { status: 500 },
+      );
+    }
+  }
+
   return NextResponse.json({ tenant: data });
 }
