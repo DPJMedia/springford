@@ -260,20 +260,6 @@ export default function TenantsAdminPage() {
 
         <section className="mt-12">
           <h2 className="m-0 text-2xl font-semibold text-[var(--admin-text)]">Super admins</h2>
-          <p className="mt-2 mb-0 max-w-3xl text-sm text-[var(--admin-text-muted)]">
-            <strong className="text-[var(--admin-text)]">Read-only overview.</strong> This table only lists who is a
-            platform super admin and which sites they&apos;re on — there is no search or role editor here on purpose.
-          </p>
-          <div className="mt-4 max-w-3xl rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-4 py-3 text-sm text-[var(--admin-text)]">
-            <p className="m-0 font-semibold text-white">Add or change editors/admins for a site</p>
-            <p className="mt-2 mb-0 text-[var(--admin-text-muted)]">
-              Open <strong className="text-[var(--admin-text)]">that tenant</strong> from the table above (click a row)
-              or finish <strong className="text-[var(--admin-text)]">New tenant</strong> — you&apos;ll get the{" "}
-              <strong className="text-[var(--admin-text)]">Members</strong> section with search by name, role, and Add
-              member. That updates <code className="rounded bg-black/40 px-1 text-xs">tenant_memberships</code> for{" "}
-              <em>one</em> site at a time.
-            </p>
-          </div>
           {membersError && (
             <div className="mt-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
               {membersError}
