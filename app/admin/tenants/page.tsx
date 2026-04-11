@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { TenantForm } from "@/components/admin/TenantForm";
+import { TenantMembersSection } from "@/components/admin/TenantMembersSection";
 import type { TenantRow } from "@/lib/types/database";
 
 type MemberMembership = {
@@ -77,6 +78,8 @@ export default function TenantsAdminPage() {
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  /** After POST /api/admin/tenants succeeds, we keep you on this page and show `TenantMembersSection`. */
+  const [tenantJustCreated, setTenantJustCreated] = useState<TenantRow | null>(null);
 
   const [allMembers, setAllMembers] = useState<AllMembersRow[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -180,6 +183,7 @@ export default function TenantsAdminPage() {
             <button
               type="button"
               onClick={() => {
+                setTenantJustCreated(null);
                 setShowCreate(true);
               }}
               className="rounded-md bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
@@ -198,19 +202,54 @@ export default function TenantsAdminPage() {
           )}
 
           {showCreate && (
-            <div className="mt-6 mb-8">
-              <TenantForm
-                mode="create"
-                initial={null}
-                onCancel={() => setShowCreate(false)}
-                onCreated={(t) => {
-                  setShowCreate(false);
-                  void loadTenants();
-                  void loadAllMembers();
-                  router.push(`/admin/tenants/${t.id}?created=1`);
-                }}
-                onUpdated={() => {}}
-              />
+            <div className="mt-6 mb-8 space-y-8">
+              {!tenantJustCreated ? (
+                <TenantForm
+                  mode="create"
+                  initial={null}
+                  onCancel={() => {
+                    setShowCreate(false);
+                    setTenantJustCreated(null);
+                  }}
+                  onCreated={(t) => {
+                    setTenantJustCreated(t);
+                    void loadTenants();
+                    void loadAllMembers();
+                  }}
+                  onUpdated={() => {}}
+                />
+              ) : (
+                <>
+                  <div className="rounded-lg border border-[var(--admin-accent)]/40 bg-[var(--admin-accent)]/10 p-4 text-sm text-[var(--admin-text)]">
+                    <p className="m-0 font-semibold text-[var(--admin-accent)]">
+                      Tenant created: {tenantJustCreated.name}
+                    </p>
+                    <p className="mt-2 mb-0 text-[var(--admin-text-muted)]">
+                      Search by name below to add staff as editor or admin for this site. Platform super admins appear
+                      with a Super Admin badge (managed under Users).
+                    </p>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <Link
+                        href={`/admin/tenants/${tenantJustCreated.id}?created=1`}
+                        className="text-sm font-semibold text-[var(--admin-accent)] hover:underline"
+                      >
+                        Open full tenant settings →
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCreate(false);
+                          setTenantJustCreated(null);
+                        }}
+                        className="rounded-md border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-header-bg)]"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                  <TenantMembersSection tenantId={tenantJustCreated.id} />
+                </>
+              )}
             </div>
           )}
 
