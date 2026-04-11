@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, type ReactElement } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useTenant } from "@/lib/tenant/TenantProvider";
 import { AdminTenantSwitcher } from "@/components/admin/AdminTenantSwitcher";
 
 interface NavItem {
@@ -27,7 +26,6 @@ function formatRoleLabel(profile: any): string {
 }
 
 export function AdminSidebar({ profile }: AdminSidebarProps) {
-  const { name: siteName } = useTenant();
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -35,11 +33,11 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
   const navItems: NavItem[] = [
     { icon: "dashboard", label: "Dashboard", href: "/admin/diffuse", highlight: true },
     { icon: "article", label: "Articles", href: "/admin/articles" },
-    { icon: "analytics", label: "Analytics", href: "/admin/analytics" },
-    { icon: "newsletter", label: "Newsletter", href: "/admin/newsletter" },
-    { icon: "dollar", label: "Ad Quoter", href: "/admin/ad-quoter" },
-    { icon: "megaphone", label: "Ad Manager", href: "/admin/ads", superAdminOnly: true },
     { icon: "users", label: "Users", href: "/admin/users", superAdminOnly: true },
+    { icon: "newsletter", label: "Newsletter", href: "/admin/newsletter" },
+    { icon: "megaphone", label: "Ad Manager", href: "/admin/ads", superAdminOnly: true },
+    { icon: "dollar", label: "Ad Quoter", href: "/admin/ad-quoter" },
+    { icon: "analytics", label: "Analytics", href: "/admin/analytics" },
     { icon: "building", label: "Tenants", href: "/admin/tenants", superAdminOnly: true },
   ];
 
@@ -123,31 +121,6 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
     return true;
   });
 
-  const backToSiteNavLink = (
-    <Link
-      key="back-to-site"
-      href="/"
-      className="flex min-h-[2.75rem] items-center gap-3 px-3 py-2 rounded-lg transition-colors text-[var(--admin-text-muted)] hover:bg-[var(--admin-card-bg)] hover:text-[var(--admin-text)]"
-    >
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden>
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
-          />
-        </svg>
-      </span>
-      <span className="text-sm font-medium uppercase tracking-wide">Back to site</span>
-    </Link>
-  );
-
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   return (
@@ -155,14 +128,9 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
       <div className="flex flex-col h-full">
         {/* Logo/Brand */}
         <div className="p-6">
-          <Link href="/" className="inline-flex flex-col gap-0.5">
-            <span className="inline-flex items-baseline gap-0">
-              <span className="text-[var(--admin-text)] font-semibold text-xl leading-none">Diffuse</span>
-              <span className="text-[var(--admin-accent)] font-semibold text-xl leading-none">.AI</span>
-            </span>
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-tight">
-              {siteName.toUpperCase()}
-            </span>
+          <Link href="/" className="inline-flex items-baseline gap-0">
+            <span className="text-[var(--admin-text)] font-semibold text-2xl leading-none">Diffuse</span>
+            <span className="text-[var(--admin-accent)] font-semibold text-2xl leading-none">.AI</span>
           </Link>
         </div>
 
@@ -171,9 +139,9 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 [scrollbar-gutter:stable]">
           <div className="space-y-1">
-            {filteredNavItems.flatMap((item, idx) => {
+            {filteredNavItems.map((item) => {
               const active = isActive(item);
-              const navLink = (
+              return (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -193,13 +161,35 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
                   </span>
                 </Link>
               );
-
-              const insertBack = idx === filteredNavItems.length - 1;
-
-              return insertBack ? [navLink, backToSiteNavLink] : [navLink];
             })}
           </div>
         </nav>
+
+        <div className="px-3 pb-3">
+          <Link
+            href="/"
+            className="flex min-h-[2.75rem] items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[var(--admin-card-bg)]"
+          >
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center text-white" aria-hidden>
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
+                />
+              </svg>
+            </span>
+            <span className="text-sm font-medium uppercase tracking-wide text-[var(--admin-text-muted)]">
+              Back to site
+            </span>
+          </Link>
+        </div>
 
         {/* User profile — menu opens upward, same width as grey card */}
         <div className="p-4">

@@ -11,13 +11,6 @@ export type TenantMemberRow = {
   created_at: string;
 };
 
-function roleLabel(m: TenantMemberRow): string {
-  if (m.is_super_admin) return "Super Admin";
-  if (m.role === "admin") return "Admin";
-  if (m.role === "editor") return "Editor";
-  return m.role;
-}
-
 export function TenantMembersSection({ tenantId }: { tenantId: string }) {
   const [members, setMembers] = useState<TenantMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +21,10 @@ export function TenantMembersSection({ tenantId }: { tenantId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
+  const [roleUpdatingUserId, setRoleUpdatingUserId] = useState<string | null>(null);
+  const [roleFeedback, setRoleFeedback] = useState<{ userId: string; kind: "ok" | "err"; message: string } | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     setError(null);
@@ -76,6 +73,34 @@ export function TenantMembersSection({ tenantId }: { tenantId: string }) {
       await load();
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function patchRole(userId: string, newRole: "admin" | "editor") {
+    const current = members.find((m) => m.user_id === userId);
+    if (!current || current.is_super_admin || current.role === newRole) return;
+    setRoleFeedback(null);
+    setRoleUpdatingUserId(userId);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenantId}/members/${userId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: newRole }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setRoleFeedback({
+          userId,
+          kind: "err",
+          message: typeof j.error === "string" ? j.error : "Could not update role.",
+        });
+        return;
+      }
+      setRoleFeedback({ userId, kind: "ok", message: "Role updated." });
+      await load();
+    } finally {
+      setRoleUpdatingUserId(null);
     }
   }
 
@@ -176,16 +201,41 @@ export function TenantMembersSection({ tenantId }: { tenantId: string }) {
                     {m.full_name || "—"}
                   </td>
                   <td className="px-3 py-2 text-[var(--admin-text-muted)]">{m.email}</td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={
-                        m.is_super_admin
-                          ? "inline-block rounded border border-violet-500/40 bg-violet-950/50 px-2 py-0.5 text-xs font-semibold text-violet-200"
-                          : "text-[var(--admin-text-muted)] capitalize"
-                      }
-                    >
-                      {roleLabel(m)}
-                    </span>
+                  <td className="px-3 py-2 align-top">
+                    <div className="flex flex-col gap-1">
+                      {m.is_super_admin ? (
+                        <span className="inline-block w-fit rounded border border-violet-500/40 bg-violet-950/50 px-2 py-0.5 text-xs font-semibold text-violet-200">
+                          Super Admin
+                        </span>
+                      ) : (
+                        <>
+                          <select
+                            value={m.role === "admin" ? "admin" : "editor"}
+                            disabled={roleUpdatingUserId === m.user_id}
+                            onChange={(e) => {
+                              const v = e.target.value === "admin" ? "admin" : "editor";
+                              void patchRole(m.user_id, v);
+                            }}
+                            className="max-w-[10rem] rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-2 py-1 text-sm capitalize text-[var(--admin-text)] disabled:opacity-50"
+                            aria-label={`Role for ${m.email}`}
+                          >
+                            <option value="editor">Editor</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          {roleFeedback?.userId === m.user_id ? (
+                            <span
+                              className={
+                                roleFeedback.kind === "ok"
+                                  ? "text-xs text-emerald-400/90"
+                                  : "text-xs text-red-400"
+                              }
+                            >
+                              {roleFeedback.message}
+                            </span>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-[var(--admin-text-muted)] tabular-nums">
                     {new Date(m.created_at).toLocaleString()}

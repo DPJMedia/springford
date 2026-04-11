@@ -4,6 +4,8 @@ import { useEffect, useState, useRef, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { UserProfile } from "@/lib/types/database";
+
+type AdminUserRow = UserProfile & { newsletter_tenant_names?: string[] };
 import { Avatar } from "@/components/Avatar";
 import { EditUserModal } from "@/components/EditUserModal";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
@@ -23,16 +25,16 @@ const SORT_OPTIONS = [
   { value: "name-desc", label: "Name (Z–A)" },
   { value: "email-asc", label: "Email (A–Z)" },
   { value: "email-desc", label: "Email (Z–A)" },
-  { value: "username-asc", label: "Username (A–Z)" },
-  { value: "username-desc", label: "Username (Z–A)" },
+  { value: "newsletters-asc", label: "Newsletters (A–Z)" },
+  { value: "newsletters-desc", label: "Newsletters (Z–A)" },
 ] as const;
 
 export default function UsersAdminPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [editingUser, setEditingUser] = useState<AdminUserRow | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<string>("joined-desc");
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
@@ -46,6 +48,12 @@ export default function UsersAdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const supabase = createClient();
 
+  function newsletterSortKey(u: AdminUserRow): string {
+    const names = u.newsletter_tenant_names ?? [];
+    if (names.length === 0) return "";
+    return names.join(", ").toLowerCase();
+  }
+
   const sortedUsers = [...users].sort((a, b) => {
     const [key, dir] = sortOption.split("-") as [string, string];
     const mul = dir === "asc" ? 1 : -1;
@@ -54,10 +62,10 @@ export default function UsersAdminPage() {
       const nb = (b.full_name || "").toLowerCase();
       return mul * na.localeCompare(nb);
     }
-    if (key === "username") {
-      const ua = (a.username || "").toLowerCase();
-      const ub = (b.username || "").toLowerCase();
-      return mul * ua.localeCompare(ub);
+    if (key === "newsletters") {
+      const na = newsletterSortKey(a);
+      const nb = newsletterSortKey(b);
+      return mul * na.localeCompare(nb);
     }
     if (key === "email") {
       const ea = (a.email || "").toLowerCase();
@@ -79,15 +87,17 @@ export default function UsersAdminPage() {
       if (roleFilter === "user" && (user.is_admin || user.is_super_admin)) return false;
     }
     if (newsletterFilter !== "all") {
-      if (newsletterFilter === "subscribed" && !user.newsletter_subscribed) return false;
-      if (newsletterFilter === "not_subscribed" && user.newsletter_subscribed) return false;
+      const hasTenantSubs = (user.newsletter_tenant_names?.length ?? 0) > 0;
+      const subscribed = hasTenantSubs || user.newsletter_subscribed;
+      if (newsletterFilter === "subscribed" && !subscribed) return false;
+      if (newsletterFilter === "not_subscribed" && subscribed) return false;
     }
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       const name = (user.full_name || "").toLowerCase();
       const email = (user.email || "").toLowerCase();
-      const username = (user.username || "").toLowerCase();
-      if (!name.includes(q) && !email.includes(q) && !username.includes(q)) return false;
+      const newsletters = (user.newsletter_tenant_names ?? []).join(" ").toLowerCase();
+      if (!name.includes(q) && !email.includes(q) && !newsletters.includes(q)) return false;
     }
     return true;
   });
@@ -139,14 +149,15 @@ export default function UsersAdminPage() {
   }
 
   async function loadUsers() {
-    const { data } = await supabase
-      .from("user_profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (data) {
-      setUsers(data);
+    const res = await fetch("/api/admin/users", { credentials: "include" });
+    const j = (await res.json()) as { users?: AdminUserRow[]; error?: string };
+    if (!res.ok) {
+      console.error(j.error ?? "Failed to load users");
+      setUsers([]);
+      setLoading(false);
+      return;
     }
+    setUsers(Array.isArray(j.users) ? j.users : []);
     setLoading(false);
   }
 
@@ -498,7 +509,9 @@ export default function UsersAdminPage() {
               <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Regular Users</div>
             </div>
             <div className="min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
-              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">{users.filter(u => u.newsletter_subscribed).length}</div>
+              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">
+                {users.filter((u) => (u.newsletter_tenant_names?.length ?? 0) > 0 || u.newsletter_subscribed).length}
+              </div>
               <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Newsletter Subscribers</div>
             </div>
           </div>
@@ -516,7 +529,7 @@ export default function UsersAdminPage() {
               <input
                 id="user-search"
                 type="search"
-                placeholder="Search name, email, username..."
+                placeholder="Search name, email, newsletters..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] py-2 pl-9 pr-3 text-sm text-[var(--admin-text)] placeholder-[var(--admin-text-muted)] focus:border-[var(--admin-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]/30"
@@ -573,7 +586,9 @@ export default function UsersAdminPage() {
               <tr>
                 <th className="pl-4 pr-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)]">User</th>
                 <th className="pl-2 pr-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)] min-w-[12rem]">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)] whitespace-nowrap">Username</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)] whitespace-nowrap min-w-[10rem]">
+                  Newsletters
+                </th>
                 <th className="px-4 py-3 text-left align-bottom">
                   <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)]">SUBSCRIBED</span>
                 </th>
@@ -631,8 +646,18 @@ export default function UsersAdminPage() {
                   <td className="pl-2 pr-4 py-4 align-middle text-sm text-[var(--admin-text)] break-words max-w-md">
                     {user.email}
                   </td>
-                  <td className="px-4 py-4 align-middle text-sm text-[var(--admin-text)] whitespace-nowrap">
-                    {user.username ? `@${user.username}` : <span className="text-[var(--admin-text-muted)]">Not set</span>}
+                  <td className="px-4 py-4 align-middle text-sm text-[var(--admin-text)] min-w-[10rem]">
+                    {(user.newsletter_tenant_names?.length ?? 0) > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {user.newsletter_tenant_names!.map((name, idx) => (
+                          <span key={`${name}-${idx}`} className="leading-snug">
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[var(--admin-text-muted)]">None</span>
+                    )}
                   </td>
                   <td className="px-4 py-4 align-middle">
                     <span

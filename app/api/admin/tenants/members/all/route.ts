@@ -41,21 +41,58 @@ export async function GET() {
   const tenantById = new Map((tenants ?? []).map((t) => [t.id, t]));
   const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
 
-  const out = rows.map((m) => {
+  type Grouped = {
+    user_id: string;
+    full_name: string | null;
+    email: string;
+    is_super_admin: boolean;
+    memberships: Array<{
+      tenant_id: string;
+      tenant_name: string;
+      tenant_slug: string;
+      role: string;
+      created_at: string;
+    }>;
+  };
+
+  const grouped = new Map<string, Grouped>();
+
+  for (const m of rows) {
     const t = tenantById.get(m.tenant_id);
     const p = profileById.get(m.user_id);
-    return {
-      user_id: m.user_id,
+    let g = grouped.get(m.user_id);
+    if (!g) {
+      g = {
+        user_id: m.user_id,
+        full_name: p?.full_name ?? null,
+        email: p?.email ?? "",
+        is_super_admin: Boolean(p?.is_super_admin),
+        memberships: [],
+      };
+      grouped.set(m.user_id, g);
+    }
+    if (p) {
+      g.full_name = p.full_name ?? null;
+      g.email = p.email ?? "";
+      g.is_super_admin = Boolean(p.is_super_admin);
+    }
+    g.memberships.push({
       tenant_id: m.tenant_id,
-      full_name: p?.full_name ?? null,
-      email: p?.email ?? "",
-      role: m.role,
-      is_super_admin: Boolean(p?.is_super_admin),
       tenant_name: t?.name ?? "",
       tenant_slug: t?.slug ?? "",
+      role: m.role,
       created_at: m.created_at,
-    };
-  });
+    });
+  }
+
+  const out = [...grouped.values()].map((u) => ({
+    ...u,
+    memberships: [...u.memberships].sort((a, b) =>
+      a.tenant_name.localeCompare(b.tenant_name, undefined, { sensitivity: "base" }),
+    ),
+  }));
+
+  out.sort((a, b) => a.email.localeCompare(b.email, undefined, { sensitivity: "base" }));
 
   return NextResponse.json({ rows: out });
 }

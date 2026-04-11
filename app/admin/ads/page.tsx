@@ -532,11 +532,31 @@ export default function AdsManagerPage() {
 
   async function handleRemoveAdFromSlot(adId: string, slotId: string) {
     try {
-      const { error } = await supabase.rpc("remove_ad_from_slot", {
-        p_ad_id: adId,
-        p_ad_slot: slotId,
-      });
-      if (error) throw error;
+      const { error: delErr } = await supabase
+        .from("ad_slot_assignments")
+        .delete()
+        .eq("ad_id", adId)
+        .eq("ad_slot", slotId)
+        .eq("tenant_id", tenantId);
+      if (delErr) throw delErr;
+
+      const { data: remaining } = await supabase
+        .from("ad_slot_assignments")
+        .select("ad_slot")
+        .eq("ad_id", adId)
+        .eq("tenant_id", tenantId)
+        .order("ad_slot", { ascending: true })
+        .limit(1);
+
+      const nextSlot = remaining?.[0]?.ad_slot ?? UNASSIGNED_AD_SLOT;
+
+      const { error: updErr } = await supabase
+        .from("ads")
+        .update({ ad_slot: nextSlot })
+        .eq("id", adId)
+        .eq("tenant_id", tenantId);
+      if (updErr) throw updErr;
+
       await loadAds();
       showToast("Ad removed from slot.");
     } catch (e: unknown) {
