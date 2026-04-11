@@ -13,6 +13,12 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
 import { formatUnknownError } from "@/lib/formatUnknownError";
+import {
+  extractDescriptionFromDiffuseOutput,
+  extractTitleFromDiffuseOutput,
+  pickTitleFromUnknown,
+} from "@/lib/diffuse/extractArticleFields";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 interface Connection {
   id: string;
@@ -27,37 +33,6 @@ interface OutputWithProject extends DiffuseOutput {
 }
 
 const ORG_ARTICLE_PREVIEW = 3;
-
-function getLatestOutputArticleTitle(output: DiffuseOutput | undefined): string | null {
-  if (!output) return null;
-  try {
-    let parsedData = output.structured_data;
-    if (typeof parsedData === "string") {
-      try {
-        parsedData = JSON.parse(parsedData);
-      } catch {
-        parsedData = null;
-      }
-    }
-    if (parsedData && typeof parsedData === "object") {
-      const o = parsedData as { title?: string; name?: string };
-      const t = o.title || o.name;
-      if (t && typeof t === "string" && t.trim()) return t.trim();
-    }
-    if (output.content && typeof output.content === "string" && output.content.trim().startsWith("{")) {
-      try {
-        const contentJson = JSON.parse(output.content) as { title?: string; name?: string };
-        const t = contentJson.title || contentJson.name;
-        if (t && typeof t === "string" && t.trim()) return t.trim();
-      } catch {
-        /* ignore */
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
 
 function sortProjectsByRecent(projects: ProjectWithWorkspace[]): ProjectWithWorkspace[] {
   return [...projects].sort(
@@ -110,7 +85,7 @@ function OrgProjectsBlock({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visible.map((project) => {
-            const outputTitle = getLatestOutputArticleTitle(project.latest_output);
+            const outputTitle = extractTitleFromDiffuseOutput(project.latest_output);
             const dateStr = new Date(project.updated_at || project.created_at).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
@@ -179,6 +154,7 @@ export default function DiffuseIntegrationPage() {
   } | null>(null);
   const router = useRouter();
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   useEffect(() => {
     checkUser();
@@ -479,11 +455,12 @@ export default function DiffuseIntegrationPage() {
         return;
       }
 
-      // Check if already imported
+      // Check if already imported for this tenant (same Diffuse output can be imported per site)
       const { data: existing } = await supabase
         .from("diffuse_imported_articles")
         .select("article_id")
         .eq("diffuse_output_id", output.id)
+        .eq("tenant_id", tenantId)
         .maybeSingle();
 
       if (existing) {
@@ -547,94 +524,95 @@ export default function DiffuseIntegrationPage() {
       }
 
       // Extract ALL fields from parsed data
-      if (parsedData && typeof parsedData === 'object') {
+      if (parsedData && typeof parsedData === "object" && !Array.isArray(parsedData)) {
+        const pd = parsedData as Record<string, unknown>;
         console.log("📋 Extracting fields from:", parsedData);
         
-        // Title
-        if (parsedData.title) {
-          title = parsedData.title;
-          console.log("✅ Found title:", title);
-        }
-        
         // Subtitle
-        if (parsedData.subtitle) {
-          subtitle = parsedData.subtitle;
+        if (pd.subtitle && typeof pd.subtitle === "string") {
+          subtitle = pd.subtitle;
           console.log("✅ Found subtitle:", subtitle);
         }
         
         // Author (should always be Diffuse.AI for DiffuseAI imports)
-        if (parsedData.author) {
-          author = parsedData.author;
+        if (pd.author && typeof pd.author === "string") {
+          author = pd.author;
           console.log("✅ Found author:", author);
         }
         
         // Excerpt
-        if (parsedData.excerpt) {
-          excerpt = parsedData.excerpt;
+        if (pd.excerpt && typeof pd.excerpt === "string") {
+          excerpt = pd.excerpt;
           console.log("✅ Found excerpt:", excerpt.substring(0, 50) + "...");
         }
         
-        // Article Content (use parsedData.content if available and content is still empty)
-        if (parsedData.content && !content) {
-          content = parsedData.content;
+        // Article Content (use parsed content if available and content is still empty)
+        if (pd.content && typeof pd.content === "string" && !content) {
+          content = pd.content;
           console.log("✅ Found content:", content.substring(0, 100) + "...");
         }
         
         // Category (convert to lowercase slug format)
-        if (parsedData.category) {
-          // Convert "Sports" → "sports", "Community Events" → "community-events"
-          category = parsedData.category.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-          console.log("✅ Found category:", parsedData.category, "→ converted to slug:", category);
+        if (pd.category && typeof pd.category === "string") {
+          category = pd.category.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+          console.log("✅ Found category:", pd.category, "→ converted to slug:", category);
         }
         
         // Tags (split by comma if string, or use array directly)
-        if (parsedData.tags) {
-          if (typeof parsedData.tags === 'string') {
-            tags = parsedData.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
-          } else if (Array.isArray(parsedData.tags)) {
-            tags = parsedData.tags;
+        if (pd.tags) {
+          if (typeof pd.tags === "string") {
+            tags = pd.tags.split(",").map((t: string) => t.trim()).filter(Boolean);
+          } else if (Array.isArray(pd.tags)) {
+            tags = pd.tags.filter((t): t is string => typeof t === "string");
           }
           console.log("✅ Found tags:", tags);
         }
         
         // Sections (convert to lowercase slug format)
-        if (parsedData.suggested_sections) {
+        if (pd.suggested_sections) {
           let rawSections: string[] = [];
-          if (typeof parsedData.suggested_sections === 'string') {
-            rawSections = parsedData.suggested_sections.split(',').map((s: string) => s.trim()).filter(Boolean);
-          } else if (Array.isArray(parsedData.suggested_sections)) {
-            rawSections = parsedData.suggested_sections;
+          if (typeof pd.suggested_sections === "string") {
+            rawSections = pd.suggested_sections.split(",").map((s: string) => s.trim()).filter(Boolean);
+          } else if (Array.isArray(pd.suggested_sections)) {
+            rawSections = pd.suggested_sections.filter((s): s is string => typeof s === "string");
           }
-          // Convert "Spring City" → "spring-city", "School District" → "school-district"
-          sections = rawSections.map(s => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+          sections = rawSections.map((s) => s.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
           console.log("✅ Found sections:", rawSections, "→ converted to slugs:", sections);
         }
         
         // Meta Title
-        if (parsedData.meta_title) {
-          metaTitle = parsedData.meta_title;
+        if (pd.meta_title && typeof pd.meta_title === "string") {
+          metaTitle = pd.meta_title;
           console.log("✅ Found meta_title:", metaTitle);
         }
         
         // Meta Description
-        if (parsedData.meta_description) {
-          metaDescription = parsedData.meta_description;
+        if (pd.meta_description && typeof pd.meta_description === "string") {
+          metaDescription = pd.meta_description;
           console.log("✅ Found meta_description:", metaDescription);
         }
         
         // Photo Caption
-        if (parsedData.photo_caption) {
-          photoCaption = parsedData.photo_caption;
+        if (pd.photo_caption && typeof pd.photo_caption === "string") {
+          photoCaption = pd.photo_caption;
           console.log("✅ Found photo_caption:", photoCaption);
         }
         
         // Photo Credit
-        if (parsedData.photo_credit) {
-          photoCredit = parsedData.photo_credit;
+        if (pd.photo_credit && typeof pd.photo_credit === "string") {
+          photoCredit = pd.photo_credit;
           console.log("✅ Found photo_credit:", photoCredit);
         }
       } else {
         console.warn("⚠️ No parsed data available, using defaults");
+      }
+
+      const resolvedTitle =
+        (parsedData && typeof parsedData === "object" ? pickTitleFromUnknown(parsedData) : null) ??
+        extractTitleFromDiffuseOutput(output);
+      if (resolvedTitle) {
+        title = resolvedTitle;
+        console.log("✅ Resolved title (nested structured_data / workflow / content):", title);
       }
 
       // Generate excerpt from content if not available
@@ -872,6 +850,7 @@ export default function DiffuseIntegrationPage() {
       console.log("  - title:", title);
       
       const articleData = {
+        tenant_id: tenantId,
         title: title,
         subtitle: subtitle,
         slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now(),
@@ -932,6 +911,7 @@ export default function DiffuseIntegrationPage() {
       await supabase
         .from("diffuse_imported_articles")
         .insert({
+          tenant_id: tenantId,
           article_id: article.id,
           diffuse_output_id: output.id,
           diffuse_project_id: project.id,
@@ -1182,45 +1162,13 @@ export default function DiffuseIntegrationPage() {
               {/* Outputs List */}
               <div className="space-y-3 mb-6">
                 {outputSelectorData.outputs.map((output, index) => {
-                  // Try to get title and preview from the output
-                  let title = "";
+                  const title =
+                    extractTitleFromDiffuseOutput(output) || `Output #${index + 1}`;
                   let preview = "";
-                  
                   try {
-                    // First try: structured_data
-                    let parsedData = output.structured_data;
-                    if (typeof output.structured_data === 'string') {
-                      parsedData = JSON.parse(output.structured_data);
-                    }
-                    
-                    if (parsedData && typeof parsedData === 'object') {
-                      title = parsedData.title || parsedData.name || "";
-                      preview = parsedData.excerpt || parsedData.description || parsedData.subtitle || "";
-                    }
-                    
-                    // Second try: parse content if it's JSON
-                    if (!title && output.content && typeof output.content === 'string') {
-                      if (output.content.trim().startsWith('{')) {
-                        try {
-                          const contentJson = JSON.parse(output.content);
-                          title = contentJson.title || contentJson.name || "";
-                          preview = contentJson.excerpt || contentJson.description || contentJson.subtitle || "";
-                        } catch {
-                          // Content is not JSON, use as preview
-                          preview = output.content.substring(0, 100);
-                        }
-                      } else {
-                        // Content is plain text, use first 100 chars as preview
-                        preview = output.content.substring(0, 100);
-                      }
-                    }
-                  } catch (err) {
-                    console.warn("Could not parse output data:", err);
-                  }
-                  
-                  // Fallback to generic label if no title found
-                  if (!title) {
-                    title = `Output #${index + 1}`;
+                    preview = extractDescriptionFromDiffuseOutput(output) || "";
+                  } catch {
+                    preview = "";
                   }
 
                   return (

@@ -151,11 +151,15 @@ export async function updatePageView(data: {
   
   try {
     // Find the most recent page view for this session and article
-    const { data: pageViews } = await supabase
+    // Use .is for null article_id — .eq(..., null) becomes invalid PostgREST (article_id=eq.null)
+    let pageViewsQuery = supabase
       .from('page_views')
       .select('id')
-      .eq('session_id', data.sessionId)
-      .eq('article_id', data.articleId || null)
+      .eq('session_id', data.sessionId);
+    pageViewsQuery = data.articleId
+      ? pageViewsQuery.eq('article_id', data.articleId)
+      : pageViewsQuery.is('article_id', null);
+    const { data: pageViews } = await pageViewsQuery
       .order('viewed_at', { ascending: false })
       .limit(1);
     

@@ -17,9 +17,9 @@ export interface DiffuseOutput {
   project_id: string;
   input_id: string | null;
   content: string;
-  structured_data: any;
+  structured_data: unknown;
   workflow_status: string;
-  workflow_metadata: any;
+  workflow_metadata: unknown;
   cover_photo_path?: string | null;
   created_at: string;
   updated_at: string;
