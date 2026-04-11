@@ -3,11 +3,13 @@
 import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
 const MIN_LENGTH = 3;
 
 function SetUsernameContent() {
+  const { name: siteName } = useTenant();
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") || searchParams.get("next") || "/";
@@ -97,7 +99,7 @@ function SetUsernameContent() {
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <h1 className="masthead text-3xl font-black text-[color:var(--color-dark)]">
-            Spring-Ford Press
+            {siteName}
           </h1>
         </div>
         <div className="bg-white rounded-lg p-8 shadow-soft ring-1 ring-[color:var(--color-border)]">

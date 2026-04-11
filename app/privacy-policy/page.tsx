@@ -1,13 +1,29 @@
+import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import Link from "next/link";
+import { getSiteConfig } from "@/lib/seo/site";
+import { getTenantById } from "@/lib/tenant/getTenant";
+import { getTenantFromHeaders } from "@/lib/tenant/getTenantFromHeaders";
 
-export const metadata = {
-  title: "Privacy Policy | Spring-Ford Press",
-  description: "Privacy Policy for Spring Ford Press – DPJ Media LLC.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const h = await headers();
+  const { tenantId } = getTenantFromHeaders(h);
+  const tenant = await getTenantById(tenantId);
+  const siteName = tenant ? getSiteConfig(tenant).siteName : "Local News";
+  return {
+    title: "Privacy Policy",
+    description: `Privacy Policy for ${siteName} – DPJ Media LLC.`,
+  };
+}
 
-export default function PrivacyPolicyPage() {
+export default async function PrivacyPolicyPage() {
+  const h = await headers();
+  const { tenantId } = getTenantFromHeaders(h);
+  const tenant = await getTenantById(tenantId);
+  const siteName = tenant ? getSiteConfig(tenant).siteName : "this publication";
+
   return (
     <>
       <Header />
@@ -17,7 +33,7 @@ export default function PrivacyPolicyPage() {
             Privacy Policy
           </h1>
           <p className="mt-1 text-sm text-[color:var(--color-medium)]">
-            Spring Ford Press – DPJ Media LLC
+            {siteName} – DPJ Media LLC
           </p>
           <p className="mt-2 text-sm text-[color:var(--color-medium)]">
             <strong>Effective Date:</strong> February 14, 2026
@@ -27,7 +43,7 @@ export default function PrivacyPolicyPage() {
             <p className="text-[color:var(--color-medium)] leading-relaxed">
               This Privacy Policy explains how <strong>DPJ Media LLC</strong> (&quot;DPJ Media,&quot; &quot;we,&quot;
               &quot;us,&quot; or &quot;our&quot;) collects, uses, shares, and protects information when you visit or
-              use the Spring Ford Press Site, subscribe to newsletters, or sign up for subscriptions. It
+              use the {siteName} site, subscribe to newsletters, or sign up for subscriptions. It
               also explains your rights and choices regarding your information.
             </p>
 

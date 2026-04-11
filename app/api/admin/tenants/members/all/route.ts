@@ -31,7 +31,7 @@ export async function GET() {
 
   const [{ data: tenants, error: tErr }, { data: profiles, error: pErr }] = await Promise.all([
     admin.from("tenants").select("id, name, slug").in("id", tenantIds),
-    admin.from("user_profiles").select("id, full_name, email").in("id", userIds),
+    admin.from("user_profiles").select("id, full_name, email, is_super_admin").in("id", userIds),
   ]);
 
   if (tErr || pErr) {
@@ -50,6 +50,7 @@ export async function GET() {
       full_name: p?.full_name ?? null,
       email: p?.email ?? "",
       role: m.role,
+      is_super_admin: Boolean(p?.is_super_admin),
       tenant_name: t?.name ?? "",
       tenant_slug: t?.slug ?? "",
       created_at: m.created_at,

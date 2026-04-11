@@ -8,6 +8,7 @@ import { getAdSlotLabel } from "@/lib/advertising/adSlots";
 import type { NewsletterBlock, BlockType, Alignment, ArticleLayout } from "@/lib/newsletter/buildEmailHtml";
 import { buildEmailHtml, newsletterBrandingFromTenant } from "@/lib/newsletter/buildEmailHtml";
 import { useTenant } from "@/lib/tenant/TenantProvider";
+import { tenantPublicOrigin } from "@/lib/tenant/publicSiteUrl";
 
 // ─── Types / Helpers ──────────────────────────────────────────────────────────
 
@@ -387,6 +388,8 @@ function AdPickerModal({ onSelect, onClose }: { onSelect: (ad: AdOption) => void
 function BlockEditor({ block, onChange, onPickArticle, onPickAd }: {
   block: NewsletterBlock; onChange: (u: Partial<NewsletterBlock>) => void; onPickArticle: () => void; onPickAd: () => void;
 }) {
+  const { domain } = useTenant();
+  const siteOrigin = tenantPublicOrigin(domain);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -477,13 +480,13 @@ function BlockEditor({ block, onChange, onPickArticle, onPickAd }: {
       <div className={field}>
         <label className={lbl}>Quick presets</label>
         <div className="space-y-1.5">
-          {[{ label: "Advertise with Us", link: "https://www.springford.press/advertise", color: "#2b8aa8" },
-            { label: "Support Us", link: "https://www.springford.press/support", color: "#2b8aa8" },
-            { label: "Read Latest News", link: "https://www.springford.press", color: "#1a1a1a" }].map((preset) => (
+          {[{ label: "Advertise with Us", link: `${siteOrigin}/advertise`, color: "#2b8aa8" },
+            { label: "Support Us", link: `${siteOrigin}/support`, color: "#2b8aa8" },
+            { label: "Read Latest News", link: siteOrigin, color: "#1a1a1a" }].map((preset) => (
             <button key={preset.label} onClick={() => onChange({ buttonText: preset.label, buttonLink: preset.link, buttonColor: preset.color })}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-semibold transition ${block.buttonText === preset.label && block.buttonLink === preset.link ? "border-[var(--admin-accent)] bg-[var(--admin-accent)]/10 text-[var(--admin-accent)]" : "border-[var(--admin-border)] text-[var(--admin-text-muted)] hover:border-[var(--admin-accent)]/50 hover:bg-[var(--admin-table-row-hover)]"}`}>
               <span>{preset.label}</span>
-              <span className="text-[10px] font-normal text-[var(--admin-text-muted)] truncate max-w-[110px]">{preset.link.replace("https://www.springford.press", "") || "/"}</span>
+              <span className="text-[10px] font-normal text-[var(--admin-text-muted)] truncate max-w-[110px]">{preset.link.replace(siteOrigin, "") || "/"}</span>
             </button>
           ))}
         </div>

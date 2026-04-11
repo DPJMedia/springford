@@ -1,5 +1,8 @@
 "use client";
 
+import { tenantPublicOrigin } from "@/lib/tenant/publicSiteUrl";
+import { useTenant } from "@/lib/tenant/TenantProvider";
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
@@ -13,6 +16,8 @@ export function CancelNewsletterModal({
   onConfirm,
   cancelling = false,
 }: Props) {
+  const { name: siteName, domain } = useTenant();
+  const subscribeUrl = `${tenantPublicOrigin(domain)}/subscribe`;
   if (!isOpen) return null;
 
   return (
@@ -38,7 +43,8 @@ export function CancelNewsletterModal({
           Cancel newsletter
         </h2>
         <p className="text-sm text-[color:var(--color-medium)] mb-4">
-          Are you sure you want to unsubscribe from the Spring-Ford Press newsletter? You will receive a confirmation email and can resubscribe anytime from your profile or at springford.press/subscribe.
+          Are you sure you want to unsubscribe from the {siteName} newsletter? You will receive a confirmation email and can resubscribe anytime from your profile or at{" "}
+          <span className="break-all">{subscribeUrl}</span>.
         </p>
 
         <div className="flex gap-3">

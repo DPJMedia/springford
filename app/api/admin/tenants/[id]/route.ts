@@ -3,10 +3,12 @@ import { NextResponse } from "next/server";
 import type { TenantRow } from "@/lib/types/database";
 import { requireSuperAdminApi } from "@/lib/api/requireSuperAdmin";
 import { PROTECTED_TENANT_SLUG } from "@/lib/tenant/protectedTenant";
+import {
+  serializeSectionConfigForDb,
+  validateSectionsForApi,
+} from "@/lib/tenant/sectionConfigStorage";
 
 export const dynamic = "force-dynamic";
-
-const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function normalizeDomain(input: string): string {
   let s = input.trim().toLowerCase();
@@ -15,19 +17,6 @@ function normalizeDomain(input: string): string {
   const slash = s.indexOf("/");
   if (slash >= 0) s = s.slice(0, slash);
   return s;
-}
-
-function parseSectionConfig(raw: unknown): { slug: string; label: string }[] | null {
-  if (!Array.isArray(raw) || raw.length < 1) return null;
-  const out: { slug: string; label: string }[] = [];
-  for (const row of raw) {
-    if (!row || typeof row !== "object") return null;
-    const slug = String((row as Record<string, unknown>).slug ?? "").trim();
-    const label = String((row as Record<string, unknown>).label ?? "").trim();
-    if (!slug || !label || !SLUG_RE.test(slug)) return null;
-    out.push({ slug, label });
-  }
-  return out;
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -69,7 +58,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const from_email = String(body.from_email ?? "").trim();
   const from_name = String(body.from_name ?? "").trim();
   const is_active = typeof body.is_active === "boolean" ? body.is_active : true;
-  const section_config = parseSectionConfig(body.section_config);
+  const sections = validateSectionsForApi(body.section_config);
+  const facebookRaw = typeof body.facebook_url === "string" ? body.facebook_url.trim() : "";
+  const facebook_url = facebookRaw || null;
 
   if (!name) {
     return NextResponse.json({ error: "Site name is required." }, { status: 400 });
@@ -83,12 +74,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!from_name) {
     return NextResponse.json({ error: "From name is required." }, { status: 400 });
   }
-  if (!section_config) {
+  if (!sections) {
     return NextResponse.json(
       { error: "Add at least one section with valid slug (lowercase, hyphens) and label." },
       { status: 400 },
     );
   }
+
+  const section_config = serializeSectionConfigForDb(sections, facebook_url);
 
   const admin = createAdminClient();
   const { data, error } = await admin

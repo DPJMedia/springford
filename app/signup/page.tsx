@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 function buildCallbackUrl(params: { returnTo?: string }) {
   const search = new URLSearchParams();
@@ -92,6 +93,7 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
 const USERNAME_MIN = 3;
 
 function SignupPageContent() {
+  const { name: siteName } = useTenant();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/subscribe";
   const [email, setEmail] = useState("");
@@ -239,7 +241,7 @@ function SignupPageContent() {
         <div className="text-center mb-6">
           <Link href="/" className="inline-block">
             <h1 className="masthead text-3xl font-black text-[color:var(--color-dark)]">
-              Spring-Ford Press
+              {siteName}
             </h1>
           </Link>
           <p className="text-sm text-[color:var(--color-medium)] mt-2">

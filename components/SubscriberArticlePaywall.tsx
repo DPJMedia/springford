@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { Fragment } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import type { ContentBlock } from "@/lib/types/database";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 /** Match main article markdown so background layout ≈ the real article */
 const blurMarkdownComponents = {
@@ -123,6 +124,7 @@ function BlurredArticleBody({
  * Frosted gradient + copy on top. “Not a subscriber?” sits above the limited-time offer.
  */
 export function SubscriberArticlePaywall({ content, contentBlocks }: Props) {
+  const { name: siteName } = useTenant();
   return (
     <div className="relative my-8 min-h-[min(70vh,640px)] overflow-hidden rounded-2xl border border-slate-200/90 shadow-[0_20px_50px_-12px_rgba(15,23,42,0.18)]">
       {/* Background: full article — light blur so words still read as text */}
@@ -149,7 +151,7 @@ export function SubscriberArticlePaywall({ content, contentBlocks }: Props) {
             Limited time
           </p>
           <h3 className="text-xl font-semibold tracking-tight text-[color:var(--color-dark)] sm:text-2xl">
-            Spring-Ford Press
+            {siteName}
             <br />
             <span className="text-[color:var(--color-riviera-blue)]">Grand Opening Offer</span>
           </h3>
@@ -160,8 +162,7 @@ export function SubscriberArticlePaywall({ content, contentBlocks }: Props) {
           </div>
           <p className="mt-3 text-sm text-[color:var(--color-medium)]">No payment method required</p>
           <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-[color:var(--color-medium)]">
-            Our way of giving back to the Spring-Ford community and keeping our earliest subscribers well
-            informed.
+            Our way of giving back to the community and keeping our earliest subscribers well informed.
           </p>
 
           <Link

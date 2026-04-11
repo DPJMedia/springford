@@ -12,6 +12,7 @@ type Props = {
 export function OrganizationJsonLd({ tenant }: Props) {
   const { siteUrl, siteName: name } = getSiteConfig(tenant);
   const logoUrl = `${siteUrl}/springford-press-logo.svg`;
+  const description = `${name} — local news and community reporting.`;
 
   const org = {
     "@context": "https://schema.org",
@@ -20,8 +21,7 @@ export function OrganizationJsonLd({ tenant }: Props) {
     name,
     url: siteUrl,
     logo: logoUrl,
-    description:
-      "Local news for Spring-Ford, Limerick, Royersford, Spring City, Upper Providence, and Montgomery & Chester County, Pennsylvania.",
+    description,
     knowsAbout: SITE_KEYWORDS,
   };
 

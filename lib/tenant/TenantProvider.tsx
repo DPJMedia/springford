@@ -14,6 +14,8 @@ export type TenantContextValue = {
   from_email: string;
   from_name: string;
   section_config: Array<{ slug: string; label: string }>;
+  /** Optional Facebook page URL (stored in section_config JSON). */
+  facebook_url: string | null;
 };
 
 const TenantContext = createContext<TenantContextValue | null>(null);

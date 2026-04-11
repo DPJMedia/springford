@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 const COOKIE_DISMISSED = "newsletter_popup_dismissed";
 const COOKIE_VIEWS = "newsletter_popup_views";
@@ -33,6 +34,7 @@ function setDismissCookie() {
 }
 
 export function NewsletterPopupBanner() {
+  const { name: siteName } = useTenant();
   const searchParams = useSearchParams();
   /** Bypass dismiss cookie for QA: add ?show_newsletter_popup=1 to the URL */
   const forceShow = searchParams.get("show_newsletter_popup") === "1";
@@ -128,7 +130,7 @@ export function NewsletterPopupBanner() {
               Limited time
             </p>
             <h2 className="masthead mt-3 text-[1.65rem] font-semibold leading-tight tracking-tight text-[color:var(--color-dark)] sm:text-3xl">
-              Spring-Ford Press
+              {siteName}
               <br />
               <span className="text-[color:var(--color-riviera-blue)]">Grand Opening Offer</span>
             </h2>
@@ -149,7 +151,7 @@ export function NewsletterPopupBanner() {
             </div>
 
             <p className="mt-4 text-sm leading-relaxed text-[color:var(--color-medium)] max-w-sm mx-auto">
-              Our way of giving back to the Spring-Ford community and keeping our earliest subscribers well informed.
+              Our way of giving back to the community and keeping our earliest subscribers well informed.
             </p>
 
             <div className="mt-8 flex justify-center">

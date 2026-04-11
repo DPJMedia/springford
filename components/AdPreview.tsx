@@ -2,6 +2,7 @@
 
 import type { Article } from "@/lib/types/database";
 import { getAdSlotTableLabel } from "@/lib/advertising/adSlots";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 export type AdOccupant = { id: string; title: string };
 
@@ -228,6 +229,7 @@ function HomepagePreview({
   adsBySlot: Record<string, AdOccupant[]>;
   onRemoveAdFromSlot?: (adId: string, slotId: string) => void;
 }) {
+  const { name: siteName } = useTenant();
   const currentInSlot = (slotId: string) => adsBySlot[slotId] ?? [];
 
   const renderAdSlot = (slotId: string, recommendedSize: string, heightClass: string) => {
@@ -288,7 +290,7 @@ function HomepagePreview({
     <div className="p-6">
       {/* Header */}
       <div className="border-b border-gray-200 pb-4 mb-6">
-        <h1 className="text-2xl font-bold">Spring-Ford Press</h1>
+        <h1 className="text-2xl font-bold">{siteName}</h1>
       </div>
 
       {renderAdSlot("homepage-banner-top", "3880×360 px", "h-24")}
@@ -362,6 +364,7 @@ function HomepageMobilePreview({
   adsBySlot: Record<string, AdOccupant[]>;
   onRemoveAdFromSlot?: (adId: string, slotId: string) => void;
 }) {
+  const { name: siteName } = useTenant();
   const currentInSlot = (slotId: string) => adsBySlot[slotId] ?? [];
   const size = "1200×600 px";
 
@@ -420,7 +423,7 @@ function HomepageMobilePreview({
   return (
     <div className="p-6 max-w-md mx-auto">
       <div className="border-b border-gray-200 pb-4 mb-6">
-        <h1 className="text-2xl font-bold">Spring-Ford Press</h1>
+        <h1 className="text-2xl font-bold">{siteName}</h1>
       </div>
 
       <div className="mb-6 p-4 rounded-lg bg-white border border-gray-200">
@@ -480,6 +483,7 @@ function ArticlePreview({
   adsBySlot?: Record<string, AdOccupant[]>;
   onRemoveAdFromSlot?: (adId: string, slotId: string) => void;
 }) {
+  const { name: siteName } = useTenant();
   const currentInSlot = (slotId: string) => adsBySlot[slotId] ?? [];
 
   const renderSlotContent = (slotId: string, heightClass: string) => {
@@ -530,7 +534,7 @@ function ArticlePreview({
     <div className="p-6">
       {/* Header */}
       <div className="border-b border-gray-200 pb-4 mb-6">
-        <h1 className="text-2xl font-bold">Spring-Ford Press</h1>
+        <h1 className="text-2xl font-bold">{siteName}</h1>
       </div>
 
       {/* Article Content Grid */}

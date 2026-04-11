@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import { Newsreader, Playfair_Display, Red_Hat_Display, Space_Grotesk } from "next/font/google";
 import { headers } from "next/headers";
 import { OrganizationJsonLd } from "@/components/seo/OrganizationJsonLd";
-import { SITE_KEYWORDS } from "@/lib/seo/site";
+import { getSiteConfig, SITE_KEYWORDS } from "@/lib/seo/site";
 import { getTenantById } from "@/lib/tenant/getTenant";
 import { getTenantFromHeaders } from "@/lib/tenant/getTenantFromHeaders";
-import { parseTenantSectionConfig } from "@/lib/tenant/parseSectionConfig";
+import {
+  parseTenantFacebookUrl,
+  parseTenantSectionConfig,
+} from "@/lib/tenant/parseSectionConfig";
 import { TenantProvider } from "@/lib/tenant/TenantProvider";
 import "./globals.css";
 
@@ -38,36 +41,37 @@ const spaceGrotesk = Space_Grotesk({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Spring-Ford Press",
-  description:
-    "Spring-Ford Press – local news for Spring-Ford, Limerick, Royersford, Spring City, Upper Providence, and Montgomery & Chester County, Pennsylvania.",
-  keywords: SITE_KEYWORDS,
-  metadataBase: new URL("https://www.springford.press"),
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
+export async function generateMetadata(): Promise<Metadata> {
+  const h = await headers();
+  const { tenantId } = getTenantFromHeaders(h);
+  const tenant = await getTenantById(tenantId);
+  if (!tenant) {
+    return { title: "Local News" };
+  }
+  const { siteUrl, siteName } = getSiteConfig(tenant);
+  const desc = `${siteName} — local news and community reporting.`;
+  const base = new URL(siteUrl);
+  return {
+    title: { default: siteName, template: `%s | ${siteName}` },
+    description: desc,
+    keywords: SITE_KEYWORDS,
+    metadataBase: base,
+    robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
+    openGraph: {
+      title: siteName,
+      description: desc,
+      url: siteUrl,
+      siteName,
+      locale: "en_US",
+      type: "website",
     },
-  },
-  openGraph: {
-    title: "Spring-Ford Press",
-    description:
-      "Local news for Spring-Ford, Limerick, Royersford, Upper Providence, and Montgomery & Chester County.",
-    url: "https://www.springford.press",
-    siteName: "Spring-Ford Press",
-    locale: "en_US",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Spring-Ford Press",
-    description:
-      "Local news for Spring-Ford, Limerick, Royersford, Upper Providence, and Montgomery & Chester County.",
-  },
-};
+    twitter: {
+      card: "summary_large_image",
+      title: siteName,
+      description: desc,
+    },
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -89,6 +93,7 @@ export default async function RootLayout({
     from_email: tenantRow.from_email,
     from_name: tenantRow.from_name,
     section_config: parseTenantSectionConfig(tenantRow),
+    facebook_url: parseTenantFacebookUrl(tenantRow),
   };
 
   return (

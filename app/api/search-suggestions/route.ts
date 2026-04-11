@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { allowRateLimit, getClientIp } from "@/lib/rate-limit";
 import { getTenantForApiRoute } from "@/lib/tenant/getTenantForApiRoute";
+import { parseStoredSectionConfig } from "@/lib/tenant/sectionConfigStorage";
 import { NextRequest, NextResponse } from "next/server";
 
 const SUGGESTIONS_PER_MIN = 120;
@@ -33,17 +34,14 @@ export async function GET(request: NextRequest) {
   const suggestions: SuggestionItem[] = [];
   const seen = new Set<string>();
 
-  const rawConfig = tenant.section_config;
-  const sectionRows: { label: string; slug: string; query: string }[] = [];
-  if (Array.isArray(rawConfig)) {
-    for (const item of rawConfig) {
-      if (!item || typeof item !== "object") continue;
-      const slug = String((item as { slug?: string }).slug || "").trim();
-      const label = String((item as { label?: string }).label || slug).trim();
-      if (!slug) continue;
-      sectionRows.push({ label: label || slug, slug, query: label || slug });
-    }
-  }
+  const { sections: sectionEntries } = parseStoredSectionConfig(tenant.section_config);
+  const sectionRows: { label: string; slug: string; query: string }[] = sectionEntries
+    .filter((s) => s.slug.trim())
+    .map((s) => ({
+      label: s.label.trim() || s.slug,
+      slug: s.slug.trim(),
+      query: s.label.trim() || s.slug,
+    }));
 
   // 1. Section matches (label or slug)
   for (const s of sectionRows) {

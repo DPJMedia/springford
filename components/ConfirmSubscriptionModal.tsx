@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 type Props = {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export function ConfirmSubscriptionModal({
   confirming = false,
   title = "Confirm subscription",
 }: Props) {
+  const { name: siteName } = useTenant();
   if (!isOpen) return null;
 
   return (
@@ -42,14 +44,12 @@ export function ConfirmSubscriptionModal({
           {title}
         </h2>
         <p className="text-sm text-[color:var(--color-medium)] mb-4">
-          Are you sure you want to sign up for the Spring-Ford Press newsletter? You&apos;ll receive our welcome email and be among the first to get neighborhood news.
+          Are you sure you want to sign up for the {siteName} newsletter? You&apos;ll receive our welcome email and be among the first to get neighborhood news.
         </p>
         <p className="text-xs text-[color:var(--color-medium)] mb-4">
           By subscribing, you agree to our{" "}
           <Link
-            href="https://www.springford.press/terms-of-service"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/terms-of-service"
             className="text-[color:var(--color-riviera-blue)] underline hover:no-underline"
           >
             Terms of Service

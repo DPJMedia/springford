@@ -1,13 +1,29 @@
+import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import Link from "next/link";
+import { getSiteConfig } from "@/lib/seo/site";
+import { getTenantById } from "@/lib/tenant/getTenant";
+import { getTenantFromHeaders } from "@/lib/tenant/getTenantFromHeaders";
 
-export const metadata = {
-  title: "Terms of Service | Spring-Ford Press",
-  description: "Terms of Service for Spring Ford Press – DPJ Media LLC.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const h = await headers();
+  const { tenantId } = getTenantFromHeaders(h);
+  const tenant = await getTenantById(tenantId);
+  const siteName = tenant ? getSiteConfig(tenant).siteName : "Local News";
+  return {
+    title: "Terms of Service",
+    description: `Terms of Service for ${siteName} – DPJ Media LLC.`,
+  };
+}
 
-export default function TermsOfServicePage() {
+export default async function TermsOfServicePage() {
+  const h = await headers();
+  const { tenantId } = getTenantFromHeaders(h);
+  const tenant = await getTenantById(tenantId);
+  const siteName = tenant ? getSiteConfig(tenant).siteName : "this publication";
+
   return (
     <>
       <Header />
@@ -17,7 +33,7 @@ export default function TermsOfServicePage() {
             Terms of Service
           </h1>
           <p className="mt-1 text-sm text-[color:var(--color-medium)]">
-            Spring Ford Press – DPJ Media LLC
+            {siteName} – DPJ Media LLC
           </p>
           <p className="mt-2 text-sm text-[color:var(--color-medium)]">
             <strong>Effective Date:</strong> February 14, 2026
@@ -25,7 +41,7 @@ export default function TermsOfServicePage() {
 
           <div className="mt-8 space-y-8 text-[color:var(--color-dark)] prose prose-sm max-w-none">
             <p className="text-[color:var(--color-medium)] leading-relaxed">
-              These Terms of Service (&quot;Terms&quot;) govern your access to and use of the Spring Ford Press
+              These Terms of Service (&quot;Terms&quot;) govern your access to and use of the {siteName}
               website (the &quot;Site&quot;), newsletters, subscription services, and any other services
               operated by <strong>DPJ Media LLC</strong> (&quot;DPJ Media,&quot; &quot;we,&quot; &quot;us,&quot; or
               &quot;our&quot;). Use of the Site means you agree to these Terms. If you do not agree, do not use
@@ -37,8 +53,7 @@ export default function TermsOfServicePage() {
                 1. Who We Are
               </h2>
               <p className="mt-3 text-[color:var(--color-medium)] leading-relaxed">
-                <strong>Spring Ford Press</strong> is a local news publisher serving Spring City,
-                Royersford, Limerick, and Upper Providence, Pennsylvania.
+                <strong>{siteName}</strong> is a local news publisher focused on neighborhood and community coverage.
               </p>
               <p className="mt-2 text-[color:var(--color-medium)]">
                 <strong>Operator:</strong> DPJ Media LLC

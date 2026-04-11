@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 const PRESET_AMOUNTS = [
   { label: "$5", value: 500 },
@@ -20,6 +21,7 @@ const MAX_CUSTOM = 1000;
 type RecurringPlan = "one_time" | "monthly_ongoing" | "monthly_limited" | "annual";
 
 function SupportPageContent() {
+  const { name: siteName } = useTenant();
   const searchParams = useSearchParams();
   const success = searchParams.get("success") === "true";
   const recurringSuccess = searchParams.get("recurring") === "1";
@@ -114,10 +116,10 @@ function SupportPageContent() {
             className="masthead text-2xl font-semibold tracking-tight text-[color:var(--color-dark)] text-center sm:text-3xl"
             style={{ letterSpacing: "-0.02em" }}
           >
-            Support Spring-Ford Press
+            Support {siteName}
           </h1>
           <p className="mt-3 text-sm text-[color:var(--color-medium)] text-center">
-            Your contribution helps us keep independent, neighborhood-first reporting in the Spring-Ford area.
+            Your contribution helps us keep independent, neighborhood-first local reporting.
           </p>
 
           {success && (
@@ -154,7 +156,7 @@ function SupportPageContent() {
                 Create an account or sign in to contribute
               </p>
               <p className="text-sm text-[color:var(--color-medium)] mb-6">
-                Your thank-you email and receipt will be sent to your Spring-Ford Press account email.
+                Your thank-you email and receipt will be sent to your {siteName} account email.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link

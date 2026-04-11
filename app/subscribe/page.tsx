@@ -33,7 +33,7 @@ function SubscribePageContent() {
   const [confirming, setConfirming] = useState(false);
   const hasOpenedWelcomeModal = useRef(false);
   const supabase = createClient();
-  const { id: tenantId } = useTenant();
+  const { id: tenantId, name: siteName } = useTenant();
 
   useEffect(() => {
     checkUserStatus();
@@ -151,7 +151,7 @@ function SubscribePageContent() {
                     Limited time
                   </p>
                   <h1 className="masthead mt-3 text-3xl font-semibold leading-tight tracking-tight text-[color:var(--color-dark)] sm:text-4xl lg:text-[2.5rem]">
-                    Spring-Ford Press
+                    {siteName}
                     <br />
                     <span className="text-[color:var(--color-riviera-blue)]">Grand Opening Offer</span>
                   </h1>
@@ -172,7 +172,7 @@ function SubscribePageContent() {
                   </div>
 
                   <p className="mt-4 text-sm leading-relaxed text-[color:var(--color-medium)] max-w-xl mx-auto lg:mx-0">
-                    Our way of giving back to the Spring-Ford community and keeping our earliest subscribers well informed.
+                    Our way of giving back to the community and keeping our earliest subscribers well informed.
                   </p>
 
                   <div className="mt-8">
@@ -195,7 +195,7 @@ function SubscribePageContent() {
                       </div>
                     ) : isSubscribed ? (
                       <p className="text-[color:var(--color-medium)] font-medium">
-                        You’re subscribed. Thanks for being part of Spring-Ford Press.
+                        You’re subscribed. Thanks for being part of {siteName}.
                       </p>
                     ) : (
                       <form onSubmit={handleClaimClick}>

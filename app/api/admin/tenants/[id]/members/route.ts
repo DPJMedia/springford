@@ -40,7 +40,7 @@ export async function GET(
   const userIds = [...new Set(rows.map((r) => r.user_id))];
   const { data: profiles, error: pErr } = await admin
     .from("user_profiles")
-    .select("id, full_name, email")
+    .select("id, full_name, email, is_super_admin")
     .in("id", userIds);
 
   if (pErr) {
@@ -56,6 +56,7 @@ export async function GET(
       full_name: p?.full_name ?? null,
       email: p?.email ?? "",
       role: m.role as StaffRole,
+      is_super_admin: Boolean(p?.is_super_admin),
       created_at: m.created_at,
     };
   });

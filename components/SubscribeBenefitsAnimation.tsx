@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 const SCENES = [
   { id: "article", label: "Premium articles", duration: 4500 },
@@ -11,6 +12,7 @@ const SCENES = [
 const PHONE_OPEN_DELAY_MS = 2500;
 
 export function SubscribeBenefitsAnimation() {
+  const { name: siteName } = useTenant();
   const [scene, setScene] = useState(0);
   const [newsletterOpened, setNewsletterOpened] = useState(false);
   const [articleAlertOpened, setArticleAlertOpened] = useState(false);
@@ -97,7 +99,7 @@ export function SubscribeBenefitsAnimation() {
                   Council votes on new development
                 </h3>
                 <p className="text-[11px] text-[color:var(--color-medium)] line-clamp-2">
-                  The Spring-Ford school board approved the latest proposal…
+                  The local school board approved the latest proposal…
                 </p>
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-[color:var(--color-riviera-blue)]/10 text-[color:var(--color-riviera-blue)]">
@@ -151,7 +153,7 @@ export function SubscribeBenefitsAnimation() {
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-[10px] font-semibold text-[color:var(--color-dark)] truncate">
-                            Spring-Ford Press
+                            {siteName}
                           </p>
                           <p className="text-[9px] text-[color:var(--color-medium)]">
                             Your weekly briefing is here
@@ -169,7 +171,7 @@ export function SubscribeBenefitsAnimation() {
                   <div className="mt-2 mx-1.5 overflow-y-auto rounded-lg bg-white transition-opacity duration-300">
                     <div className="p-2 border-b border-[color:var(--color-border)]">
                       <p className="text-[9px] text-[color:var(--color-medium)] uppercase tracking-wider">
-                        From Spring-Ford Press
+                        From {siteName}
                       </p>
                       <p className="text-[10px] font-semibold text-[color:var(--color-dark)]">
                         Your weekly briefing is here
@@ -177,7 +179,7 @@ export function SubscribeBenefitsAnimation() {
                     </div>
                     <div className="p-2 space-y-1">
                       <p className="text-[9px] font-semibold text-[color:var(--color-dark)]">
-                        Welcome to the Spring-Ford Press Newsletter
+                        Welcome to the {siteName} Newsletter
                       </p>
                       <p className="text-[8px] text-[color:var(--color-medium)] leading-snug">
                         You're all set. We'll keep you updated with the latest neighborhood stories, local news, and council updates.
@@ -236,7 +238,7 @@ export function SubscribeBenefitsAnimation() {
                   <div className="mt-2 mx-1.5 overflow-y-auto rounded-lg bg-white transition-opacity duration-300">
                     <div className="p-2 border-b border-[color:var(--color-border)]">
                       <p className="text-[9px] text-[color:var(--color-medium)] uppercase tracking-wider">
-                        From Spring-Ford Press
+                        From {siteName}
                       </p>
                       <p className="text-[10px] font-semibold text-[color:var(--color-dark)]">
                         New article published
@@ -247,7 +249,7 @@ export function SubscribeBenefitsAnimation() {
                         Council votes on new development
                       </p>
                       <p className="text-[8px] text-[color:var(--color-medium)] leading-snug">
-                        A new article has been published. Tap to read the full story on Spring-Ford Press.
+                        A new article has been published. Tap to read the full story on {siteName}.
                       </p>
                       <p className="text-[8px] font-semibold text-[color:var(--color-riviera-blue)] pt-1">
                         Read article →

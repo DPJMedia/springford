@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 export default function ForgotPasswordPage() {
+  const { name: siteName } = useTenant();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -78,7 +80,7 @@ export default function ForgotPasswordPage() {
         <div className="text-center mb-6">
           <Link href="/" className="inline-block">
             <h1 className="masthead text-3xl font-black text-[color:var(--color-dark)]">
-              Spring-Ford Press
+              {siteName}
             </h1>
           </Link>
           <p className="text-sm text-[color:var(--color-medium)] mt-2">

@@ -7,8 +7,16 @@ export type TenantMemberRow = {
   full_name: string | null;
   email: string;
   role: string;
+  is_super_admin?: boolean;
   created_at: string;
 };
+
+function roleLabel(m: TenantMemberRow): string {
+  if (m.is_super_admin) return "Super Admin";
+  if (m.role === "admin") return "Admin";
+  if (m.role === "editor") return "Editor";
+  return m.role;
+}
 
 export function TenantMembersSection({ tenantId }: { tenantId: string }) {
   const [members, setMembers] = useState<TenantMemberRow[]>([]);
@@ -168,7 +176,17 @@ export function TenantMembersSection({ tenantId }: { tenantId: string }) {
                     {m.full_name || "—"}
                   </td>
                   <td className="px-3 py-2 text-[var(--admin-text-muted)]">{m.email}</td>
-                  <td className="px-3 py-2 text-[var(--admin-text-muted)] capitalize">{m.role}</td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={
+                        m.is_super_admin
+                          ? "inline-block rounded border border-violet-500/40 bg-violet-950/50 px-2 py-0.5 text-xs font-semibold text-violet-200"
+                          : "text-[var(--admin-text-muted)] capitalize"
+                      }
+                    >
+                      {roleLabel(m)}
+                    </span>
+                  </td>
                   <td className="px-3 py-2 text-[var(--admin-text-muted)] tabular-nums">
                     {new Date(m.created_at).toLocaleString()}
                   </td>

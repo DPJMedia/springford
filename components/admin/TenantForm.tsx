@@ -1,7 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { TenantRow } from "@/lib/types/database";
+import {
+  parseStoredSectionConfig,
+  parseTenantFacebookUrl,
+} from "@/lib/tenant/parseSectionConfig";
+import {
+  DEFAULT_TENANT_SECTIONS,
+  deriveDomainFromSiteName,
+  deriveSectionSlugFromLabel,
+  deriveSlugFromSiteName,
+} from "@/lib/tenant/tenantFormDerive";
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -10,6 +20,8 @@ type SectionRow = { slug: string; label: string };
 function emptySection(): SectionRow {
   return { slug: "", label: "" };
 }
+
+const DEFAULT_FROM_EMAIL = "admin@dpjmedia.com";
 
 export function TenantForm({
   mode,
@@ -25,7 +37,6 @@ export function TenantForm({
   onCancel: () => void;
   onCreated: (tenant: TenantRow) => void;
   onUpdated: (tenant: TenantRow) => void;
-  /** e.g. "Tenant configuration" on detail page */
   titleOverride?: string;
   showCancel?: boolean;
 }) {
@@ -33,40 +44,87 @@ export function TenantForm({
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [domain, setDomain] = useState(initial?.domain ?? "");
   const [fromEmail, setFromEmail] = useState(
-    initial?.from_email ?? "admin@dpjmedia.com",
+    initial?.from_email ?? DEFAULT_FROM_EMAIL,
   );
   const [fromName, setFromName] = useState(initial?.from_name ?? "");
+  const [facebookUrl, setFacebookUrl] = useState(() =>
+    initial ? parseTenantFacebookUrl(initial) ?? "" : "",
+  );
   const [isActive, setIsActive] = useState(initial?.is_active !== false);
+
+  const [userTouchedSlug, setUserTouchedSlug] = useState(false);
+  const [userTouchedDomain, setUserTouchedDomain] = useState(false);
+  const [userTouchedFromName, setUserTouchedFromName] = useState(false);
+  const [userTouchedFromEmail, setUserTouchedFromEmail] = useState(false);
+  const [userTouchedFacebook, setUserTouchedFacebook] = useState(false);
+
   const [sections, setSections] = useState<SectionRow[]>(() => {
+    if (mode === "create") {
+      return DEFAULT_TENANT_SECTIONS.map((r) => ({ ...r }));
+    }
     const sc = initial?.section_config;
-    if (Array.isArray(sc) && sc.length > 0) {
-      return sc.map((r: unknown) => {
-        const o = r as Record<string, unknown>;
-        return { slug: String(o.slug ?? ""), label: String(o.label ?? "") };
-      });
+    const parsed = parseStoredSectionConfig(sc);
+    if (parsed.sections.length > 0) {
+      return parsed.sections.map((r) => ({ slug: r.slug, label: r.label }));
     }
     return [emptySection()];
   });
+
+  const [sectionSlugManual, setSectionSlugManual] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (userTouchedSlug) return;
+    setSlug(deriveSlugFromSiteName(name));
+  }, [mode, name, userTouchedSlug]);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (userTouchedDomain) return;
+    setDomain(deriveDomainFromSiteName(name));
+  }, [mode, name, userTouchedDomain]);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (userTouchedFromName) return;
+    setFromName(name);
+  }, [mode, name, userTouchedFromName]);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSlugInput = (v: string) => {
+    setUserTouchedSlug(true);
     setSlug(v.toLowerCase().replace(/[^a-z0-9-]/g, ""));
   };
 
-  const addSection = () => setSections((s) => [...s, emptySection()]);
+  const addSection = () => {
+    setSections((s) => [...s, emptySection()]);
+  };
+
   const removeSection = (i: number) =>
     setSections((s) => (s.length <= 1 ? s : s.filter((_, j) => j !== i)));
-  const setSection = (i: number, field: keyof SectionRow, v: string) => {
+
+  const setSectionLabel = (i: number, v: string) => {
+    setSections((rows) =>
+      rows.map((row, j) => {
+        if (j !== i) return row;
+        const manual = sectionSlugManual[i] === true;
+        const nextLabel = v;
+        const nextSlug = manual ? row.slug : deriveSectionSlugFromLabel(nextLabel);
+        return { label: nextLabel, slug: nextSlug };
+      }),
+    );
+  };
+
+  const setSectionSlugInput = (i: number, v: string) => {
+    setSectionSlugManual((m) => ({ ...m, [i]: true }));
     setSections((rows) =>
       rows.map((row, j) =>
         j === i
           ? {
               ...row,
-              [field]:
-                field === "slug"
-                  ? v.toLowerCase().replace(/[^a-z0-9-]/g, "")
-                  : v,
+              slug: v.toLowerCase().replace(/[^a-z0-9-]/g, ""),
             }
           : row,
       ),
@@ -89,6 +147,7 @@ export function TenantForm({
 
     setSubmitting(true);
     try {
+      const facebookPayload = facebookUrl.trim() || null;
       if (mode === "create") {
         const res = await fetch("/api/admin/tenants", {
           method: "POST",
@@ -101,6 +160,7 @@ export function TenantForm({
             from_email: fromEmail.trim(),
             from_name: fromName.trim(),
             section_config,
+            facebook_url: facebookPayload,
             is_active: isActive,
           }),
         });
@@ -121,6 +181,7 @@ export function TenantForm({
             from_email: fromEmail.trim(),
             from_name: fromName.trim(),
             section_config,
+            facebook_url: facebookPayload,
             is_active: isActive,
           }),
         });
@@ -208,7 +269,10 @@ export function TenantForm({
           <input
             required
             value={domain}
-            onChange={(e) => setDomain(e.target.value)}
+            onChange={(e) => {
+              setUserTouchedDomain(true);
+              setDomain(e.target.value);
+            }}
             placeholder="example.com"
             className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm text-[var(--admin-text)]"
           />
@@ -222,7 +286,10 @@ export function TenantForm({
             required
             type="email"
             value={fromEmail}
-            onChange={(e) => setFromEmail(e.target.value)}
+            onChange={(e) => {
+              setUserTouchedFromEmail(true);
+              setFromEmail(e.target.value);
+            }}
             className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm text-[var(--admin-text)]"
           />
         </label>
@@ -234,9 +301,31 @@ export function TenantForm({
           <input
             required
             value={fromName}
-            onChange={(e) => setFromName(e.target.value)}
+            onChange={(e) => {
+              setUserTouchedFromName(true);
+              setFromName(e.target.value);
+            }}
             className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm text-[var(--admin-text)]"
           />
+        </label>
+
+        <label className="block sm:col-span-2">
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
+            Facebook page URL <span className="font-normal normal-case">(optional)</span>
+          </span>
+          <input
+            type="url"
+            value={facebookUrl}
+            onChange={(e) => {
+              setUserTouchedFacebook(true);
+              setFacebookUrl(e.target.value);
+            }}
+            placeholder="https://www.facebook.com/..."
+            className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm text-[var(--admin-text)]"
+          />
+          <span className="mt-1 block text-[11px] text-[var(--admin-text-muted)]">
+            Used for the &quot;Follow us on Facebook&quot; link in the site footer.
+          </span>
         </label>
 
         <div className="flex items-center gap-3 sm:col-span-2">
@@ -269,25 +358,25 @@ export function TenantForm({
         <div className="space-y-2">
           {sections.map((row, i) => (
             <div key={i} className="flex flex-wrap gap-2 sm:items-end">
-              <label className="min-w-[8rem] flex-1">
-                <span className="mb-0.5 block text-[10px] font-semibold uppercase text-[var(--admin-text-muted)]">
-                  Slug
-                </span>
-                <input
-                  value={row.slug}
-                  onChange={(e) => setSection(i, "slug", e.target.value)}
-                  placeholder="news"
-                  className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-2 py-1.5 text-sm text-[var(--admin-text)]"
-                />
-              </label>
               <label className="min-w-[10rem] flex-[2]">
                 <span className="mb-0.5 block text-[10px] font-semibold uppercase text-[var(--admin-text-muted)]">
                   Label
                 </span>
                 <input
                   value={row.label}
-                  onChange={(e) => setSection(i, "label", e.target.value)}
+                  onChange={(e) => setSectionLabel(i, e.target.value)}
                   placeholder="News"
+                  className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-2 py-1.5 text-sm text-[var(--admin-text)]"
+                />
+              </label>
+              <label className="min-w-[8rem] flex-1">
+                <span className="mb-0.5 block text-[10px] font-semibold uppercase text-[var(--admin-text-muted)]">
+                  Slug
+                </span>
+                <input
+                  value={row.slug}
+                  onChange={(e) => setSectionSlugInput(i, e.target.value)}
+                  placeholder="news"
                   className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-2 py-1.5 text-sm text-[var(--admin-text)]"
                 />
               </label>

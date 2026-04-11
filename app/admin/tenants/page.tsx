@@ -15,12 +15,12 @@ type AllMembersRow = {
   full_name: string | null;
   email: string;
   role: string;
+  is_super_admin?: boolean;
   tenant_name: string;
   tenant_slug: string;
   created_at: string;
 };
 
-type MainTab = "tenants" | "members";
 type SortKey = "tenant_name" | "role";
 
 function SortHeader({
@@ -48,6 +48,13 @@ function SortHeader({
   );
 }
 
+function memberRoleDisplay(m: AllMembersRow): string {
+  if (m.is_super_admin) return "Super Admin";
+  if (m.role === "admin") return "Admin";
+  if (m.role === "editor") return "Editor";
+  return m.role;
+}
+
 export default function TenantsAdminPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -58,7 +65,6 @@ export default function TenantsAdminPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [createdNotice, setCreatedNotice] = useState<{ domain: string; fromEmail: string } | null>(null);
 
-  const [mainTab, setMainTab] = useState<MainTab>("tenants");
   const [allMembers, setAllMembers] = useState<AllMembersRow[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [membersError, setMembersError] = useState<string | null>(null);
@@ -102,7 +108,7 @@ export default function TenantsAdminPage() {
         const c = a.tenant_name.localeCompare(b.tenant_name, undefined, { sensitivity: "base" });
         return c * mult;
       }
-      const c = a.role.localeCompare(b.role, undefined, { sensitivity: "base" });
+      const c = memberRoleDisplay(a).localeCompare(memberRoleDisplay(b), undefined, { sensitivity: "base" });
       return c * mult;
     });
     return rows;
@@ -137,14 +143,10 @@ export default function TenantsAdminPage() {
       }
       setIsSuperAdmin(true);
       await loadTenants();
+      await loadAllMembers();
       setLoading(false);
     })();
-  }, [router, supabase, loadTenants]);
-
-  useEffect(() => {
-    if (!isSuperAdmin || mainTab !== "members") return;
-    void loadAllMembers();
-  }, [isSuperAdmin, mainTab, loadAllMembers]);
+  }, [router, supabase, loadTenants, loadAllMembers]);
 
   if (loading || !isSuperAdmin) {
     return (
@@ -160,7 +162,7 @@ export default function TenantsAdminPage() {
         title="Tenants"
         description="Manage sites and staff access (super admin only)."
         actions={
-          mainTab === "tenants" && !showCreate ? (
+          !showCreate ? (
             <button
               type="button"
               onClick={() => {
@@ -175,73 +177,69 @@ export default function TenantsAdminPage() {
         }
       />
       <AdminPageLayout>
-        <div className="mb-6 flex gap-1 border-b border-[var(--admin-border)]">
-          <button
-            type="button"
-            onClick={() => setMainTab("tenants")}
-            className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
-              mainTab === "tenants"
-                ? "border-[var(--admin-accent)] text-[var(--admin-accent)]"
-                : "border-transparent text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
-            }`}
-          >
+        <section className="mb-10">
+          <h2 className="m-0 border-b border-[var(--admin-border)] pb-3 text-lg font-semibold text-[var(--admin-text)]">
             Tenants
-          </button>
-          <button
-            type="button"
-            onClick={() => setMainTab("members")}
-            className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
-              mainTab === "members"
-                ? "border-[var(--admin-accent)] text-[var(--admin-accent)]"
-                : "border-transparent text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"
-            }`}
-          >
-            Members
-          </button>
-        </div>
+          </h2>
 
-        {loadError && mainTab === "tenants" && (
-          <div className="mb-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
-            {loadError}
-          </div>
-        )}
+          {loadError && (
+            <div className="mt-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
+              {loadError}
+            </div>
+          )}
 
-        {createdNotice && mainTab === "tenants" && (
-          <div className="mb-6 rounded-lg border border-[var(--admin-accent)]/40 bg-[var(--admin-accent)]/10 p-4 text-sm text-[var(--admin-text)] leading-relaxed">
-            <p className="m-0 font-semibold text-[var(--admin-accent)]">Tenant created.</p>
-            <p className="mt-2 mb-0">To make this site live, complete these two steps:</p>
-            <ol className="mt-2 list-decimal pl-5 space-y-1">
-              <li>
-                Add <strong className="font-medium text-white">{createdNotice.domain}</strong> as a custom domain in
-                the Vercel dashboard under this project&apos;s settings.
-              </li>
-              <li>
-                Add a SendGrid sender identity for{" "}
-                <strong className="font-medium text-white">{createdNotice.fromEmail}</strong> and verify DKIM/SPF DNS
-                records for its domain.
-              </li>
-            </ol>
-          </div>
-        )}
+          {createdNotice && (
+            <div className="mt-6 rounded-lg border border-[var(--admin-accent)]/40 bg-[var(--admin-accent)]/10 p-4 text-sm text-[var(--admin-text)] leading-relaxed">
+              <p className="m-0 font-semibold text-[var(--admin-accent)]">Tenant created.</p>
+              <p className="mt-2 mb-0">To make this site live, complete these steps:</p>
+              <ol className="mt-2 list-decimal pl-5 space-y-2">
+                <li>
+                  Add <strong className="font-medium text-white">{createdNotice.domain}</strong> as a custom domain in
+                  the Vercel dashboard under this project&apos;s settings.
+                </li>
+                <li>
+                  In the <strong className="font-medium text-white">Supabase</strong> dashboard, open{" "}
+                  <strong className="font-medium text-white">Authentication</strong> →{" "}
+                  <strong className="font-medium text-white">URL Configuration</strong> and register this tenant&apos;s
+                  URLs: set <strong className="font-medium text-white">Site URL</strong> to your canonical site address
+                  (for example{" "}
+                  <code className="rounded bg-black/30 px-1 py-0.5 text-xs">
+                    https://www.{createdNotice.domain}
+                  </code>
+                  ), and add the same origin plus{" "}
+                  <code className="rounded bg-black/30 px-1 py-0.5 text-xs">
+                    /auth/callback
+                  </code>{" "}
+                  to <strong className="font-medium text-white">Redirect URLs</strong> so sign-in and OAuth return to
+                  this domain.
+                </li>
+                <li>
+                  Add a SendGrid sender identity for{" "}
+                  <strong className="font-medium text-white">{createdNotice.fromEmail}</strong> and verify DKIM/SPF DNS
+                  records for its domain.
+                </li>
+              </ol>
+            </div>
+          )}
 
-        {mainTab === "tenants" && showCreate && (
-          <div className="mb-8">
-            <TenantForm
-              mode="create"
-              initial={null}
-              onCancel={() => setShowCreate(false)}
-              onCreated={(t) => {
-                setShowCreate(false);
-                setCreatedNotice({ domain: t.domain, fromEmail: t.from_email });
-                void loadTenants();
-              }}
-              onUpdated={() => {}}
-            />
-          </div>
-        )}
+          {showCreate && (
+            <div className="mt-6 mb-8">
+              <TenantForm
+                mode="create"
+                initial={null}
+                onCancel={() => setShowCreate(false)}
+                onCreated={(t) => {
+                  setShowCreate(false);
+                  setCreatedNotice({ domain: t.domain, fromEmail: t.from_email });
+                  void loadTenants();
+                  void loadAllMembers();
+                }}
+                onUpdated={() => {}}
+              />
+            </div>
+          )}
 
-        {mainTab === "tenants" && (
-          <div className="overflow-x-auto rounded-lg border border-[var(--admin-border)]">
+          <div className="mt-6 overflow-x-auto rounded-lg border border-[var(--admin-border)]">
             <table className="w-full min-w-[680px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--admin-border)] bg-[var(--admin-table-header-bg)]">
@@ -284,78 +282,91 @@ export default function TenantsAdminPage() {
               <p className="p-6 text-center text-sm text-[var(--admin-text-muted)]">No tenants yet.</p>
             )}
           </div>
-        )}
+        </section>
 
-        {mainTab === "members" && (
-          <>
-            <p className="mb-4 text-sm text-[var(--admin-text-muted)] m-0">
-              Everyone with admin or editor access on any tenant. To add or remove someone, use the Tenants tab and
-              open the site.
-            </p>
-            {membersError && (
-              <div className="mb-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
-                {membersError}
-              </div>
-            )}
-            {membersLoading ? (
-              <div className="flex justify-center py-12">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-lg border border-[var(--admin-border)]">
-                <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--admin-border)] bg-[var(--admin-table-header-bg)]">
-                      <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Name</th>
-                      <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Email</th>
-                      <SortHeader
-                        label="Role"
-                        active={sortKey === "role"}
-                        direction={sortDir}
-                        onClick={() => toggleSort("role")}
-                      />
-                      <SortHeader
-                        label="Tenant"
-                        active={sortKey === "tenant_name"}
-                        direction={sortDir}
-                        onClick={() => toggleSort("tenant_name")}
-                      />
-                      <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Date added</th>
+        <div className="border-t border-[var(--admin-border)] pt-10" />
+
+        <section>
+          <h2 className="m-0 border-b border-[var(--admin-border)] pb-3 text-lg font-semibold text-[var(--admin-text)]">
+            Members
+          </h2>
+          <p className="mt-3 mb-4 text-sm text-[var(--admin-text-muted)] m-0">
+            Everyone with admin or editor access on any tenant. To add or remove someone, open the site from the table
+            above.
+          </p>
+          {membersError && (
+            <div className="mb-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
+              {membersError}
+            </div>
+          )}
+          {membersLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-[var(--admin-border)]">
+              <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--admin-border)] bg-[var(--admin-table-header-bg)]">
+                    <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Name</th>
+                    <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Email</th>
+                    <SortHeader
+                      label="Role"
+                      active={sortKey === "role"}
+                      direction={sortDir}
+                      onClick={() => toggleSort("role")}
+                    />
+                    <SortHeader
+                      label="Tenant"
+                      active={sortKey === "tenant_name"}
+                      direction={sortDir}
+                      onClick={() => toggleSort("tenant_name")}
+                    />
+                    <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Date added</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedMembers.map((r) => (
+                    <tr
+                      key={`${r.tenant_id}-${r.user_id}`}
+                      className="border-b border-[var(--admin-border)] hover:bg-[var(--admin-table-row-hover)]"
+                    >
+                      <td className="px-3 py-2 text-[var(--admin-text)]">{r.full_name || "—"}</td>
+                      <td className="px-3 py-2 text-[var(--admin-text-muted)]">{r.email}</td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={
+                            r.is_super_admin
+                              ? "inline-block rounded border border-violet-500/40 bg-violet-950/50 px-2 py-0.5 text-xs font-semibold text-violet-200"
+                              : "text-[var(--admin-text-muted)]"
+                          }
+                        >
+                          {memberRoleDisplay(r)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Link
+                          href={`/admin/tenants/${r.tenant_id}`}
+                          className="font-medium text-[var(--admin-accent)] hover:underline"
+                        >
+                          {r.tenant_name || r.tenant_slug}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2 text-[var(--admin-text-muted)] tabular-nums">
+                        {new Date(r.created_at).toLocaleString()}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {sortedMembers.map((r) => (
-                      <tr
-                        key={`${r.tenant_id}-${r.user_id}`}
-                        className="border-b border-[var(--admin-border)] hover:bg-[var(--admin-table-row-hover)]"
-                      >
-                        <td className="px-3 py-2 text-[var(--admin-text)]">{r.full_name || "—"}</td>
-                        <td className="px-3 py-2 text-[var(--admin-text-muted)]">{r.email}</td>
-                        <td className="px-3 py-2 text-[var(--admin-text-muted)] capitalize">{r.role}</td>
-                        <td className="px-3 py-2">
-                          <Link
-                            href={`/admin/tenants/${r.tenant_id}`}
-                            className="font-medium text-[var(--admin-accent)] hover:underline"
-                          >
-                            {r.tenant_name || r.tenant_slug}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2 text-[var(--admin-text-muted)] tabular-nums">
-                          {new Date(r.created_at).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {sortedMembers.length === 0 && !membersError && (
-                  <p className="p-6 text-center text-sm text-[var(--admin-text-muted)] m-0">
-                    No admin or editor memberships yet.
-                  </p>
-                )}
-              </div>
-            )}
-          </>
-        )}
+                  ))}
+                </tbody>
+              </table>
+              {sortedMembers.length === 0 && !membersError && (
+                <p className="p-6 text-center text-sm text-[var(--admin-text-muted)] m-0">
+                  No admin or editor memberships yet.
+                </p>
+              )}
+            </div>
+          )}
+        </section>
       </AdminPageLayout>
     </>
   );

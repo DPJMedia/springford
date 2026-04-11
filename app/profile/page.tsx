@@ -10,8 +10,10 @@ import {
   isDiffuseAIUser,
   normalizeAvatarUrl,
 } from "@/lib/user/display";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 export default function ProfilePage() {
+  const { name: siteName } = useTenant();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -639,7 +641,7 @@ export default function ProfilePage() {
               Recurring support
             </h2>
             <p className="text-sm text-[color:var(--color-medium)]">
-              Manage your recurring contribution to Spring-Ford Press. One-time donations are not listed here.
+              Manage your recurring contribution to {siteName}. One-time donations are not listed here.
             </p>
 
             {hasRecurringSupportCard ? (
@@ -762,7 +764,7 @@ export default function ProfilePage() {
                   Newsletter subscription
                 </h2>
                 <p className="text-sm text-[color:var(--color-medium)]">
-                  Get the latest neighborhood news, premium articles, and exclusive updates by subscribing to the Spring-Ford Press newsletter.
+                  Get the latest neighborhood news, premium articles, and exclusive updates by subscribing to the {siteName} newsletter.
                 </p>
                 <Link
                   href="/subscribe"
@@ -809,7 +811,7 @@ export default function ProfilePage() {
                     Cancel newsletter
                   </h3>
                   <p className="text-xs text-[color:var(--color-medium)] mb-3">
-                    Unsubscribe from the Spring-Ford Press newsletter. You will receive a confirmation email and can resubscribe anytime.
+                    Unsubscribe from the {siteName} newsletter. You will receive a confirmation email and can resubscribe anytime.
                   </p>
                   <button
                     type="button"

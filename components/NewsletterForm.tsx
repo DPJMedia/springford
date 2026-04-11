@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useTenant } from '@/lib/tenant/TenantProvider'
 
 export function NewsletterForm() {
+  const { name: siteName } = useTenant()
   const [user, setUser] = useState<any>(null)
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -87,7 +89,7 @@ export function NewsletterForm() {
         <div className="max-w-xl flex-1">
           <p className="eyebrow text-xs text-[color:var(--color-medium)]">Newsletter</p>
           <h3 className="headline mt-0.5 text-lg font-semibold text-[color:var(--color-dark)]">
-            Stay ahead with the Spring-Ford briefing
+            Stay ahead with the {siteName} briefing
           </h3>
           <p className="mt-0.5 text-xs text-[color:var(--color-medium)] leading-relaxed">
             Weekly highlights on neighborhood stories, council agendas, and upcoming

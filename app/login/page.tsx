@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 function buildCallbackUrl(returnTo?: string) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -30,6 +31,7 @@ async function signInWithGoogle(returnTo?: string) {
 }
 
 function LoginPageContent() {
+  const { name: siteName } = useTenant();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/";
   const [email, setEmail] = useState("");
@@ -65,7 +67,7 @@ function LoginPageContent() {
         <div className="text-center mb-6">
           <Link href="/" className="inline-block">
             <h1 className="masthead text-3xl font-black text-[color:var(--color-dark)]">
-              Spring-Ford Press
+              {siteName}
             </h1>
           </Link>
           <p className="text-sm text-[color:var(--color-medium)] mt-2">

@@ -4,8 +4,10 @@ import { Suspense, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import Link from "next/link";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 function AdvertisePageContent() {
+  const { name: siteName } = useTenant();
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
@@ -21,7 +23,7 @@ function AdvertisePageContent() {
                 <div>
                   <Link href="/" className="flex items-center gap-2 mb-8">
                     <span className="masthead font-semibold text-[color:var(--color-dark)] text-lg" style={{ letterSpacing: "-0.02em" }}>
-                      Spring-Ford Press
+                      {siteName}
                     </span>
                   </Link>
                   <h1 className="headline text-2xl font-bold text-[color:var(--color-dark)] leading-tight">
@@ -29,8 +31,8 @@ function AdvertisePageContent() {
                   </h1>
                   <div className="mt-4 h-1 w-16 bg-[color:var(--color-riviera-blue)] rounded" />
                   <p className="mt-6 text-sm text-[color:var(--color-medium)] leading-relaxed">
-                    Reach your local audience through Spring-Ford Press. We serve Spring City, Royersford,
-                    Limerick, Upper Providence, and the greater Spring-Ford area with trusted, neighborhood-focused journalism.
+                    Reach your local audience through {siteName}. We publish trusted, neighborhood-focused journalism
+                    for your community.
                   </p>
                   <p className="mt-4 text-sm text-[color:var(--color-medium)] leading-relaxed">
                     Whether you&apos;re a local business, community organization, or regional brand, our advertising

@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 // Password strength calculation
 function calculatePasswordStrength(password: string) {
@@ -63,6 +64,7 @@ function validatePasswordRequirements(password: string) {
 }
 
 export default function ResetPasswordPage() {
+  const { name: siteName } = useTenant();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -195,7 +197,7 @@ export default function ResetPasswordPage() {
         <div className="text-center mb-6">
           <Link href="/" className="inline-block">
             <h1 className="masthead text-3xl font-black text-[color:var(--color-dark)]">
-              Spring-Ford Press
+              {siteName}
             </h1>
           </Link>
           <p className="text-sm text-[color:var(--color-medium)] mt-2">

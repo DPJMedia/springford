@@ -1,32 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import type { ArticleVisibility } from "@/lib/types/database";
-
-const OPTIONS: {
-  value: ArticleVisibility;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: "public",
-    label: "Public",
-    description:
-      "The story is visible to everyone on the site, including visitors who are not signed in.",
-  },
-  {
-    value: "newsletter_subscribers",
-    label: "Newsletter subscribers only",
-    description:
-      "Only signed-in users who are subscribed to the Spring-Ford Press newsletter can read this article once it is published.",
-  },
-  {
-    value: "admin_only",
-    label: "Admin only",
-    description:
-      "Only users with the Admin or Super Admin role can view this article on the site. Useful for internal notes or pre-release content.",
-  },
-];
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 type Props = {
   value: ArticleVisibility;
@@ -35,6 +12,40 @@ type Props = {
 };
 
 export function ArticleVisibilitySelector({ value, onChange, disabled }: Props) {
+  const { name: siteName, domain } = useTenant();
+  const wwwHost = useMemo(
+    () => `www.${domain.replace(/^www\./i, "").trim()}`,
+    [domain],
+  );
+
+  const options = useMemo(
+    () =>
+      [
+        {
+          value: "public" as const,
+          label: "Public",
+          description:
+            "The story is visible to everyone on the site, including visitors who are not signed in.",
+        },
+        {
+          value: "newsletter_subscribers" as const,
+          label: "Newsletter subscribers only",
+          description: `Only signed-in users who are subscribed to the ${siteName} newsletter can read this article once it is published.`,
+        },
+        {
+          value: "admin_only" as const,
+          label: "Admin only",
+          description:
+            "Only users with the Admin or Super Admin role can view this article on the site. Useful for internal notes or pre-release content.",
+        },
+      ] satisfies {
+        value: ArticleVisibility;
+        label: string;
+        description: string;
+      }[],
+    [siteName],
+  );
+
   return (
     <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-5">
       <div className="mb-3 flex items-center gap-2">
@@ -42,10 +53,10 @@ export function ArticleVisibilitySelector({ value, onChange, disabled }: Props) 
         <Tooltip text="Controls who can see this article on the live site after you publish it. Drafts are always limited to staff in the dashboard." />
       </div>
       <p className="mb-4 text-xs text-[var(--admin-text-muted)]">
-        Choose who can read this story on springford.press. This does not affect the admin article list.
+        Choose who can read this story on {wwwHost}. This does not affect the admin article list.
       </p>
       <fieldset disabled={disabled} className="space-y-3">
-        {OPTIONS.map((opt) => (
+        {options.map((opt) => (
           <label
             key={opt.value}
             className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
