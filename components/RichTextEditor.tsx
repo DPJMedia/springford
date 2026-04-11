@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { normalizeArticleBodyTextForMarkdown } from "@/lib/article/normalizeArticleBodyText";
 
 interface RichTextEditorProps {
   value: string;
@@ -23,9 +24,19 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   const [articles, setArticles] = useState<Article[]>([]);
   const [filteredArticles, setFilteredArticles] = useState<Article[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
   const supabase = createClient();
+
+  // Turn escaped newlines (e.g. literal \n from JSON) into real line breaks in the editor
+  useEffect(() => {
+    const normalized = normalizeArticleBodyTextForMarkdown(value);
+    if (normalized !== value) {
+      onChangeRef.current(normalized);
+    }
+  }, [value]);
 
   // Fetch articles for @ mentions
   useEffect(() => {

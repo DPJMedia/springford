@@ -31,15 +31,17 @@ export function Header() {
 
   const allNavItems = useMemo(() => {
     if (!Array.isArray(sectionConfig)) return [];
-    return sectionConfig.map((entry) => {
-      const slug = String((entry as { slug?: string }).slug || "").trim();
-      const label = String((entry as { label?: string }).label || slug).trim();
-      return {
-        label: label || slug,
-        slug: slug.toLowerCase(),
-        href: slug ? `/#${encodeURIComponent(slug)}` : "/",
-      };
-    });
+    return sectionConfig
+      .filter((entry) => String((entry as { slug?: string }).slug || "").toLowerCase().trim() !== "hero")
+      .map((entry) => {
+        const slug = String((entry as { slug?: string }).slug || "").trim();
+        const label = String((entry as { label?: string }).label || slug).trim();
+        return {
+          label: label || slug,
+          slug: slug.toLowerCase(),
+          href: slug ? `/#${encodeURIComponent(slug)}` : "/",
+        };
+      });
   }, [sectionConfig]);
 
   const [sectionsWithContent, setSectionsWithContent] = useState<Set<string>>(new Set());

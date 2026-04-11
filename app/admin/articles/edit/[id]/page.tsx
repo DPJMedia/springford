@@ -16,6 +16,10 @@ import { AuthorSelector } from "@/components/AuthorSelector";
 import { TagSelector } from "@/components/TagSelector";
 import { ArticlePreviewModal } from "@/components/admin/ArticlePreviewModal";
 import { useTenant } from "@/lib/tenant/TenantProvider";
+import {
+  normalizeArticleBodyTextForMarkdown,
+  normalizeContentBlocksTextForEditor,
+} from "@/lib/article/normalizeArticleBodyText";
 
 export default function EditArticlePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -107,11 +111,18 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
       
       // Load content blocks (with fallback to legacy content)
       if (data.content_blocks && Array.isArray(data.content_blocks) && data.content_blocks.length > 0) {
-        setContentBlocks(data.content_blocks);
+        setContentBlocks(
+          normalizeContentBlocksTextForEditor(data.content_blocks as ContentBlock[]),
+        );
       } else if (data.content) {
         // Convert legacy content to a single text block
         setContentBlocks([
-          { id: "1", type: "text", content: data.content, order: 0 }
+          {
+            id: "1",
+            type: "text",
+            content: normalizeArticleBodyTextForMarkdown(data.content),
+            order: 0,
+          },
         ]);
       } else {
         setContentBlocks([{ id: "1", type: "text", content: "", order: 0 }]);

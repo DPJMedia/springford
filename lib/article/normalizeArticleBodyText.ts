@@ -16,3 +16,14 @@ export function normalizeArticleBodyTextForMarkdown(text: string | null | undefi
   t = t.replace(/\n{3,}/g, "\n\n");
   return t;
 }
+
+/** Normalize text in each content block (admin editor / imports). */
+export function normalizeContentBlocksTextForEditor<
+  T extends { type: string; content?: string },
+>(blocks: T[]): T[] {
+  return blocks.map((b) =>
+    b.type === "text" && typeof b.content === "string"
+      ? ({ ...b, content: normalizeArticleBodyTextForMarkdown(b.content) } as T)
+      : b
+  );
+}

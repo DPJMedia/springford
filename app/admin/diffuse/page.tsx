@@ -21,6 +21,7 @@ import {
   pickTitleFromUnknown,
 } from "@/lib/diffuse/extractArticleFields";
 import { useTenant } from "@/lib/tenant/TenantProvider";
+import { normalizeArticleBodyTextForMarkdown } from "@/lib/article/normalizeArticleBodyText";
 
 interface Connection {
   id: string;
@@ -620,6 +621,8 @@ export default function DiffuseIntegrationPage() {
         content = resolvedBody;
         console.log("✅ Resolved article body length:", content.length);
       }
+
+      content = normalizeArticleBodyTextForMarkdown(content);
 
       // Generate excerpt from content if not available
       if (!excerpt && content) {
