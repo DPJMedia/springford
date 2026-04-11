@@ -28,7 +28,7 @@ export async function GET() {
 
   const { data: subs, error: sErr } = await admin
     .from("tenant_newsletter_subscriptions")
-    .select("user_id, tenant_id")
+    .select("user_id, tenant_id, subscribed_at")
     .eq("subscribed", true)
     .in("user_id", userIds);
 
@@ -46,21 +46,35 @@ export async function GET() {
     nameByTenant = new Map((tenants ?? []).map((t) => [t.id, t.name]));
   }
 
-  const namesByUser = new Map<string, string[]>();
+  type SubRow = { tenant_name: string; subscribed_at: string | null };
+  const subsByUser = new Map<string, SubRow[]>();
   for (const s of subs ?? []) {
-    const name = nameByTenant.get(s.tenant_id);
-    if (!name) continue;
-    const arr = namesByUser.get(s.user_id) ?? [];
-    if (!arr.includes(name)) arr.push(name);
-    namesByUser.set(s.user_id, arr);
+    const tenantName = nameByTenant.get(s.tenant_id as string);
+    if (!tenantName) continue;
+    const row: SubRow = {
+      tenant_name: tenantName,
+      subscribed_at: (s.subscribed_at as string | null) ?? null,
+    };
+    const arr = subsByUser.get(s.user_id as string) ?? [];
+    arr.push(row);
+    subsByUser.set(s.user_id as string, arr);
+  }
+  for (const [uid, rows] of subsByUser) {
+    rows.sort((a, b) =>
+      a.tenant_name.localeCompare(b.tenant_name, undefined, { sensitivity: "base" }),
+    );
+    subsByUser.set(uid, rows);
   }
 
-  const users = list.map((p) => ({
-    ...p,
-    newsletter_tenant_names: (namesByUser.get(p.id) ?? []).sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" }),
-    ),
-  }));
+  const users = list.map((p) => {
+    const newsletter_subscriptions = subsByUser.get(p.id) ?? [];
+    const newsletter_tenant_names = newsletter_subscriptions.map((x) => x.tenant_name);
+    return {
+      ...p,
+      newsletter_subscriptions,
+      newsletter_tenant_names,
+    };
+  });
 
   return NextResponse.json({ users });
 }

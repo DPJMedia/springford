@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { UserProfile } from "@/lib/types/database";
 
-type AdminUserRow = UserProfile & { newsletter_tenant_names?: string[] };
+type NewsletterSubRow = { tenant_name: string; subscribed_at: string | null };
+
+type AdminUserRow = UserProfile & {
+  newsletter_tenant_names?: string[];
+  /** Per-tenant newsletter opt-ins (all sites; not scoped to current admin tenant) */
+  newsletter_subscriptions?: NewsletterSubRow[];
+};
 import { Avatar } from "@/components/Avatar";
 import { EditUserModal } from "@/components/EditUserModal";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
@@ -49,9 +55,37 @@ export default function UsersAdminPage() {
   const supabase = createClient();
 
   function newsletterSortKey(u: AdminUserRow): string {
-    const names = u.newsletter_tenant_names ?? [];
+    const names = u.newsletter_tenant_names ?? u.newsletter_subscriptions?.map((s) => s.tenant_name) ?? [];
     if (names.length === 0) return "";
     return names.join(", ").toLowerCase();
+  }
+
+  /** All newsletter lines for display (per-tenant rows + legacy profile flag if needed). */
+  function newsletterDisplayRows(u: AdminUserRow): NewsletterSubRow[] {
+    const subs = u.newsletter_subscriptions ?? [];
+    if (subs.length > 0) return subs;
+    if (u.newsletter_subscribed) {
+      return [
+        {
+          tenant_name: "Newsletter (account)",
+          subscribed_at: u.newsletter_subscribed_at ?? null,
+        },
+      ];
+    }
+    return [];
+  }
+
+  function formatSubDate(iso: string | null): string {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return "—";
+    }
   }
 
   const sortedUsers = [...users].sort((a, b) => {
@@ -87,7 +121,7 @@ export default function UsersAdminPage() {
       if (roleFilter === "user" && (user.is_admin || user.is_super_admin)) return false;
     }
     if (newsletterFilter !== "all") {
-      const hasTenantSubs = (user.newsletter_tenant_names?.length ?? 0) > 0;
+      const hasTenantSubs = (user.newsletter_subscriptions?.length ?? 0) > 0;
       const subscribed = hasTenantSubs || user.newsletter_subscribed;
       if (newsletterFilter === "subscribed" && !subscribed) return false;
       if (newsletterFilter === "not_subscribed" && subscribed) return false;
@@ -96,7 +130,9 @@ export default function UsersAdminPage() {
     if (q) {
       const name = (user.full_name || "").toLowerCase();
       const email = (user.email || "").toLowerCase();
-      const newsletters = (user.newsletter_tenant_names ?? []).join(" ").toLowerCase();
+      const newsletters = (user.newsletter_tenant_names ?? user.newsletter_subscriptions?.map((s) => s.tenant_name) ?? [])
+        .join(" ")
+        .toLowerCase();
       if (!name.includes(q) && !email.includes(q) && !newsletters.includes(q)) return false;
     }
     return true;
@@ -510,7 +546,7 @@ export default function UsersAdminPage() {
             </div>
             <div className="min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
               <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">
-                {users.filter((u) => (u.newsletter_tenant_names?.length ?? 0) > 0 || u.newsletter_subscribed).length}
+                {users.filter((u) => (u.newsletter_subscriptions?.length ?? 0) > 0 || u.newsletter_subscribed).length}
               </div>
               <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Newsletter Subscribers</div>
             </div>
@@ -589,8 +625,8 @@ export default function UsersAdminPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)] whitespace-nowrap min-w-[10rem]">
                   Newsletters
                 </th>
-                <th className="px-4 py-3 text-left align-bottom">
-                  <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)]">SUBSCRIBED</span>
+                <th className="px-4 py-3 text-left align-bottom w-24">
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)]">ACTIVE</span>
                 </th>
               </tr>
             </thead>
@@ -646,33 +682,48 @@ export default function UsersAdminPage() {
                   <td className="pl-2 pr-4 py-4 align-middle text-sm text-[var(--admin-text)] break-words max-w-md">
                     {user.email}
                   </td>
-                  <td className="px-4 py-4 align-middle text-sm text-[var(--admin-text)] min-w-[10rem]">
-                    {(user.newsletter_tenant_names?.length ?? 0) > 0 ? (
-                      <div className="flex flex-col gap-1">
-                        {user.newsletter_tenant_names!.map((name, idx) => (
-                          <span key={`${name}-${idx}`} className="leading-snug">
-                            {name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-[var(--admin-text-muted)]">None</span>
-                    )}
+                  <td className="px-4 py-4 align-middle text-sm text-[var(--admin-text)] min-w-[12rem]">
+                    {(() => {
+                      const rows = newsletterDisplayRows(user);
+                      return rows.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {rows.map((row, idx) => (
+                            <div key={`${row.tenant_name}-${idx}`} className="leading-snug border-b border-[var(--admin-border)]/60 pb-2 last:border-0 last:pb-0">
+                              <div className="font-medium text-[var(--admin-text)]">{row.tenant_name}</div>
+                              <div className="text-xs text-[var(--admin-text-muted)] mt-0.5">
+                                Subscribed {formatSubDate(row.subscribed_at)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[var(--admin-text-muted)]">None</span>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-4 align-middle">
-                    <span
-                      className="inline-flex items-center gap-2 whitespace-nowrap text-sm tabular-nums text-[var(--admin-text)]"
-                      aria-label={
-                        user.newsletter_subscribed
-                          ? `Newsletter subscribed, account joined ${new Date(user.created_at).toLocaleDateString()}`
-                          : `Not on newsletter, account joined ${new Date(user.created_at).toLocaleDateString()}`
-                      }
-                    >
-                      <span className={`font-semibold ${user.newsletter_subscribed ? "text-emerald-400" : "text-red-400/90"}`} aria-hidden>
-                        {user.newsletter_subscribed ? "✓" : "✕"}
-                      </span>
-                      <span className="text-[var(--admin-text-muted)]">{new Date(user.created_at).toLocaleDateString()}</span>
-                    </span>
+                    {(() => {
+                      const rows = newsletterDisplayRows(user);
+                      return rows.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {rows.map((row, idx) => (
+                            <div
+                              key={`sub-${row.tenant_name}-${idx}`}
+                              className="flex items-center justify-center border-b border-[var(--admin-border)]/60 pb-2 last:border-0 last:pb-0 min-h-[2.25rem]"
+                              title={`Subscribed ${formatSubDate(row.subscribed_at)}`}
+                            >
+                              <span className="font-semibold text-emerald-400 text-lg" aria-hidden>
+                                ✓
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="flex justify-center text-lg font-semibold text-red-400/90" aria-hidden>
+                          ✕
+                        </span>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))}
