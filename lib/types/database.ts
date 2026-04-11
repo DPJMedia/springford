@@ -62,7 +62,8 @@ export interface Article {
   status: ArticleStatus;
   published_at: string | null;
   scheduled_for: string | null;
-  section: ArticleSection; // Legacy (still supported)
+  /** Legacy single section; null when unset (e.g. Diffuse import before editor picks sections). */
+  section: ArticleSection | null;
   sections: string[]; // New: Multiple sections
   category: string | null;
   tags: string[] | null;

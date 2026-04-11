@@ -870,7 +870,7 @@ export default function DiffuseIntegrationPage() {
         author_name: author, // Use Diffuse.AI as author (byline)
         author_id: user?.id ?? null, // Real user who imported
         updated_by: user?.id ?? null, // Real user who imported (actor for any future notifications)
-        section: "general",
+        section: null,
         sections: sections,
         category: category,
         tags: tags.length > 0 ? tags : null,
