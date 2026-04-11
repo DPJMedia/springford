@@ -14,8 +14,10 @@ import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
 import { formatUnknownError } from "@/lib/formatUnknownError";
 import {
+  extractBodyTextFromDiffuseOutput,
   extractDescriptionFromDiffuseOutput,
   extractTitleFromDiffuseOutput,
+  pickBodyFromUnknown,
   pickTitleFromUnknown,
 } from "@/lib/diffuse/extractArticleFields";
 import { useTenant } from "@/lib/tenant/TenantProvider";
@@ -508,16 +510,20 @@ export default function DiffuseIntegrationPage() {
         }
       }
       
-      // If output.content is a string that looks like JSON, try to parse it
-      if (output.content && typeof output.content === 'string' && output.content.trim().startsWith('{')) {
+      // If output.content is JSON (object or array), parse it — Diffuse often stores the full article
+      // here while structured_data is empty. Arrays like [{ "article": { ... } }] are common.
+      const rawContent = output.content && typeof output.content === "string" ? output.content.trim() : "";
+      if (rawContent && (rawContent.startsWith("{") || rawContent.startsWith("["))) {
         try {
-          const contentJson = JSON.parse(output.content);
+          let contentJson: unknown = JSON.parse(output.content as string);
           console.log("📋 Parsed content as JSON:", contentJson);
-          // Use the parsed JSON as our data source
+          if (Array.isArray(contentJson) && contentJson.length > 0) {
+            contentJson = contentJson[0];
+          }
           parsedData = contentJson;
         } catch (e) {
           console.log("Content is not JSON, using as-is");
-          content = output.content;
+          content = output.content as string;
         }
       } else {
         content = output.content || "";
@@ -546,10 +552,13 @@ export default function DiffuseIntegrationPage() {
           console.log("✅ Found excerpt:", excerpt.substring(0, 50) + "...");
         }
         
-        // Article Content (use parsed content if available and content is still empty)
-        if (pd.content && typeof pd.content === "string" && !content) {
-          content = pd.content;
-          console.log("✅ Found content:", content.substring(0, 100) + "...");
+        // Article body: often nested as article.content (not top-level content)
+        if (!content) {
+          const nested = pickBodyFromUnknown(parsedData);
+          if (nested) {
+            content = nested;
+            console.log("✅ Found body (nested JSON):", content.substring(0, 100) + "...");
+          }
         }
         
         // Category (convert to lowercase slug format)
@@ -613,6 +622,13 @@ export default function DiffuseIntegrationPage() {
       if (resolvedTitle) {
         title = resolvedTitle;
         console.log("✅ Resolved title (nested structured_data / workflow / content):", title);
+      }
+
+      const resolvedBody =
+        pickBodyFromUnknown(parsedData) ?? extractBodyTextFromDiffuseOutput(output);
+      if (resolvedBody && resolvedBody.trim()) {
+        content = resolvedBody;
+        console.log("✅ Resolved article body length:", content.length);
       }
 
       // Generate excerpt from content if not available
