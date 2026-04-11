@@ -142,6 +142,17 @@ export default function TenantsAdminPage() {
   }
 
   useEffect(() => {
+    if (!tenantJustCreated) return;
+    const id = window.requestAnimationFrame(() => {
+      document.getElementById("tenant-members-panel")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [tenantJustCreated]);
+
+  useEffect(() => {
     (async () => {
       const {
         data: { user },
@@ -219,36 +230,33 @@ export default function TenantsAdminPage() {
                   onUpdated={() => {}}
                 />
               ) : (
-                <>
-                  <div className="rounded-lg border border-[var(--admin-accent)]/40 bg-[var(--admin-accent)]/10 p-4 text-sm text-[var(--admin-text)]">
-                    <p className="m-0 font-semibold text-[var(--admin-accent)]">
-                      Tenant created: {tenantJustCreated.name}
-                    </p>
-                    <p className="mt-2 mb-0 text-[var(--admin-text-muted)]">
-                      Search by name below to add staff as editor or admin for this site. Platform super admins appear
-                      with a Super Admin badge (managed under Users).
-                    </p>
-                    <div className="mt-4 flex flex-wrap items-center gap-3">
-                      <Link
-                        href={`/admin/tenants/${tenantJustCreated.id}?created=1`}
-                        className="text-sm font-semibold text-[var(--admin-accent)] hover:underline"
-                      >
-                        Open full tenant settings →
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowCreate(false);
-                          setTenantJustCreated(null);
-                        }}
-                        className="rounded-md border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-header-bg)]"
-                      >
-                        Done
-                      </button>
-                    </div>
+                <div className="rounded-lg border border-[var(--admin-accent)]/40 bg-[var(--admin-accent)]/10 p-4 text-sm text-[var(--admin-text)]">
+                  <p className="m-0 font-semibold text-[var(--admin-accent)]">
+                    Tenant created: {tenantJustCreated.name}
+                  </p>
+                  <p className="mt-2 mb-0 text-[var(--admin-text-muted)]">
+                    Scroll to the <strong className="text-[var(--admin-text)]">Members</strong> section below to search
+                    by name, pick a role, and add staff for this site.
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <Link
+                      href={`/admin/tenants/${tenantJustCreated.id}?created=1`}
+                      className="text-sm font-semibold text-[var(--admin-accent)] hover:underline"
+                    >
+                      Open full tenant settings →
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreate(false);
+                        setTenantJustCreated(null);
+                      }}
+                      className="rounded-md border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-header-bg)]"
+                    >
+                      Done
+                    </button>
                   </div>
-                  <TenantMembersSection tenantId={tenantJustCreated.id} />
-                </>
+                </div>
               )}
             </div>
           )}
@@ -298,91 +306,118 @@ export default function TenantsAdminPage() {
           </div>
         </section>
 
-        <section className="mt-12">
-          <h2 className="m-0 text-2xl font-semibold text-[var(--admin-text)]">Super admins</h2>
-          <p className="mt-2 mb-0 max-w-3xl text-sm text-[var(--admin-text-muted)]">
-            Platform super admins only. To add or edit editors and tenant admins for a specific site, open that tenant
-            and use <strong className="text-[var(--admin-text)]">Members</strong> there.
-          </p>
-          {membersError && (
-            <div className="mt-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
-              {membersError}
-            </div>
-          )}
-          {membersLoading ? (
-            <div className="flex justify-center py-12 mt-6">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
-            </div>
+        <section className="mt-12 scroll-mt-8" id="tenant-members-panel">
+          {tenantJustCreated ? (
+            <>
+              <h2 className="m-0 text-2xl font-semibold text-[var(--admin-text)]">Members</h2>
+              <p className="mt-2 mb-0 max-w-3xl text-sm text-[var(--admin-text-muted)]">
+                Admins and editors for <strong className="text-[var(--admin-text)]">{tenantJustCreated.name}</strong>.
+                Search by name to add staff (platform admins and super admins). Newsletter-only accounts are not listed.
+              </p>
+              <div className="mt-6">
+                <TenantMembersSection tenantId={tenantJustCreated.id} />
+              </div>
+            </>
+          ) : showCreate ? (
+            <>
+              <h2 className="m-0 text-2xl font-semibold text-[var(--admin-text)]">Members</h2>
+              <p className="mt-2 mb-0 max-w-3xl text-sm text-[var(--admin-text-muted)]">
+                After you submit <strong className="text-[var(--admin-text)]">Create tenant</strong> above, this section
+                will open the same member editor you use on an existing tenant — search, role, and add.
+              </p>
+              <div className="mt-6 rounded-lg border border-dashed border-[var(--admin-border)] bg-[var(--admin-table-header-bg)]/40 px-6 py-10 text-center text-sm text-[var(--admin-text-muted)]">
+                Create the tenant first; then you can add members here.
+              </div>
+            </>
           ) : (
-            <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--admin-border)]">
-              <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--admin-border)] bg-[var(--admin-table-header-bg)]">
-                    <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Name</th>
-                    <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Email</th>
-                    <SortHeader
-                      label="Role"
-                      active={sortKey === "role"}
-                      direction={sortDir}
-                      onClick={() => toggleSort("role")}
-                    />
-                    <SortHeader
-                      label="Tenant"
-                      active={sortKey === "tenant_name"}
-                      direction={sortDir}
-                      onClick={() => toggleSort("tenant_name")}
-                    />
-                    <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Date added</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedMembers.map((r) => (
-                    <tr
-                      key={r.user_id}
-                      className="border-b border-[var(--admin-border)] hover:bg-[var(--admin-table-row-hover)]"
-                    >
-                      <td className="px-3 py-2 text-[var(--admin-text)]">{r.full_name || "—"}</td>
-                      <td className="px-3 py-2 text-[var(--admin-text-muted)]">{r.email}</td>
-                      <td className="px-3 py-2 align-top">
-                        {r.is_super_admin ? (
-                          <span className="inline-block rounded border border-violet-500/40 bg-violet-950/50 px-2 py-0.5 text-xs font-semibold text-violet-200">
-                            Super Admin
-                          </span>
-                        ) : (
-                          <div className="flex flex-col gap-1.5 text-[var(--admin-text-muted)]">
-                            {r.memberships.map((m) => (
-                              <span key={m.tenant_id}>{membershipRoleLabel(m.role)}</span>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <div className="flex flex-col gap-1.5">
-                          {r.memberships.map((m) => (
-                            <div key={m.tenant_id} className="leading-snug">
-                              <Link
-                                href={`/admin/tenants/${m.tenant_id}`}
-                                className="font-medium text-[var(--admin-accent)] hover:underline"
-                              >
-                                {m.tenant_name || m.tenant_slug}
-                              </Link>
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-[var(--admin-text-muted)] tabular-nums align-top">
-                        {new Date(latestMembershipDate(r)).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {sortedMembers.length === 0 && !membersError && (
-                <p className="p-6 text-center text-sm text-[var(--admin-text-muted)] m-0">
-                  No platform super admins found.
-                </p>
+            <>
+              <h2 className="m-0 text-2xl font-semibold text-[var(--admin-text)]">Super admins</h2>
+              <p className="mt-2 mb-0 max-w-3xl text-sm text-[var(--admin-text-muted)]">
+                Platform super admins across all sites. To add or edit editors and tenant admins for one site, open that
+                tenant or use <strong className="text-[var(--admin-text)]">New tenant</strong> and add members in the
+                Members section after creation.
+              </p>
+              {membersError && (
+                <div className="mt-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
+                  {membersError}
+                </div>
               )}
-            </div>
+              {membersLoading ? (
+                <div className="flex justify-center py-12 mt-6">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
+                </div>
+              ) : (
+                <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--admin-border)]">
+                  <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--admin-border)] bg-[var(--admin-table-header-bg)]">
+                        <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Name</th>
+                        <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Email</th>
+                        <SortHeader
+                          label="Role"
+                          active={sortKey === "role"}
+                          direction={sortDir}
+                          onClick={() => toggleSort("role")}
+                        />
+                        <SortHeader
+                          label="Tenant"
+                          active={sortKey === "tenant_name"}
+                          direction={sortDir}
+                          onClick={() => toggleSort("tenant_name")}
+                        />
+                        <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Date added</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedMembers.map((r) => (
+                        <tr
+                          key={r.user_id}
+                          className="border-b border-[var(--admin-border)] hover:bg-[var(--admin-table-row-hover)]"
+                        >
+                          <td className="px-3 py-2 text-[var(--admin-text)]">{r.full_name || "—"}</td>
+                          <td className="px-3 py-2 text-[var(--admin-text-muted)]">{r.email}</td>
+                          <td className="px-3 py-2 align-top">
+                            {r.is_super_admin ? (
+                              <span className="inline-block rounded border border-violet-500/40 bg-violet-950/50 px-2 py-0.5 text-xs font-semibold text-violet-200">
+                                Super Admin
+                              </span>
+                            ) : (
+                              <div className="flex flex-col gap-1.5 text-[var(--admin-text-muted)]">
+                                {r.memberships.map((m) => (
+                                  <span key={m.tenant_id}>{membershipRoleLabel(m.role)}</span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            <div className="flex flex-col gap-1.5">
+                              {r.memberships.map((m) => (
+                                <div key={m.tenant_id} className="leading-snug">
+                                  <Link
+                                    href={`/admin/tenants/${m.tenant_id}`}
+                                    className="font-medium text-[var(--admin-accent)] hover:underline"
+                                  >
+                                    {m.tenant_name || m.tenant_slug}
+                                  </Link>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-[var(--admin-text-muted)] tabular-nums align-top">
+                            {new Date(latestMembershipDate(r)).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {sortedMembers.length === 0 && !membersError && (
+                    <p className="p-6 text-center text-sm text-[var(--admin-text-muted)] m-0">
+                      No platform super admins found.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </section>
       </AdminPageLayout>
