@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TenantRow } from "@/lib/types/database";
 import {
   parseStoredSectionConfig,
@@ -22,6 +22,16 @@ function emptySection(): SectionRow {
 }
 
 const DEFAULT_FROM_EMAIL = "admin@dpjmedia.com";
+
+/** Queued before tenant exists; persisted via POST .../members after tenant row is created. */
+export type DraftTenantMember = {
+  userId: string;
+  email: string;
+  full_name: string | null;
+  role: "admin" | "editor";
+};
+
+type StaffPick = { id: string; full_name: string | null; email: string };
 
 export function TenantForm({
   mode,
@@ -93,6 +103,56 @@ export function TenantForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [draftMembers, setDraftMembers] = useState<DraftTenantMember[]>([]);
+  const [nameQuery, setNameQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<StaffPick[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [picked, setPicked] = useState<StaffPick | null>(null);
+  const [listOpen, setListOpen] = useState(false);
+  const [draftRole, setDraftRole] = useState<"admin" | "editor">("editor");
+  const [draftFormError, setDraftFormError] = useState<string | null>(null);
+  const draftSearchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    function handlePointerDown(e: PointerEvent) {
+      const el = draftSearchRef.current;
+      if (el && !el.contains(e.target as Node)) setListOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (picked) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    const q = nameQuery.trim();
+    if (q.length < 1) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const res = await fetch(`/api/admin/staff-search?q=${encodeURIComponent(q)}`, {
+          credentials: "include",
+        });
+        const j = (await res.json()) as { users?: StaffPick[] };
+        const raw = Array.isArray(j.users) ? j.users : [];
+        const exclude = new Set(draftMembers.map((d) => d.userId));
+        setSearchResults(raw.filter((u) => !exclude.has(u.id)));
+        setSearchLoading(false);
+        setListOpen(true);
+      })();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [mode, nameQuery, picked, draftMembers]);
+
   const handleSlugInput = (v: string) => {
     setUserTouchedSlug(true);
     setSlug(v.toLowerCase().replace(/[^a-z0-9-]/g, ""));
@@ -130,6 +190,48 @@ export function TenantForm({
       ),
     );
   };
+
+  function onDraftNameChange(v: string) {
+    setNameQuery(v);
+    setPicked(null);
+    setDraftFormError(null);
+  }
+
+  function selectDraftStaff(u: StaffPick) {
+    setPicked(u);
+    setNameQuery(u.full_name?.trim() || u.email);
+    setListOpen(false);
+    setSearchResults([]);
+  }
+
+  function handleDraftAddClick() {
+    setDraftFormError(null);
+    if (!picked) {
+      setDraftFormError("Select a user from the list.");
+      return;
+    }
+    const emailLower = picked.email.trim().toLowerCase();
+    if (draftMembers.some((d) => d.email.toLowerCase() === emailLower)) {
+      setDraftFormError("That user is already in the list.");
+      return;
+    }
+    setDraftMembers((prev) => [
+      ...prev,
+      {
+        userId: picked.id,
+        email: picked.email.trim(),
+        full_name: picked.full_name,
+        role: draftRole,
+      },
+    ]);
+    setPicked(null);
+    setNameQuery("");
+    setDraftRole("editor");
+  }
+
+  function removeDraftMember(userId: string) {
+    setDraftMembers((prev) => prev.filter((d) => d.userId !== userId));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -169,7 +271,29 @@ export function TenantForm({
           setError(typeof j.error === "string" ? j.error : "Could not create tenant.");
           return;
         }
-        onCreated(j.tenant as TenantRow);
+        const tenant = j.tenant as TenantRow;
+        if (draftMembers.length > 0) {
+          const failures: string[] = [];
+          for (const m of draftMembers) {
+            const mr = await fetch(`/api/admin/tenants/${tenant.id}/members`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: m.email, role: m.role }),
+            });
+            if (!mr.ok) {
+              if (mr.status === 409) continue;
+              const ej = (await mr.json().catch(() => ({}))) as { error?: string };
+              failures.push(`${m.email}: ${typeof ej.error === "string" ? ej.error : mr.status}`);
+            }
+          }
+          if (failures.length > 0) {
+            window.alert(
+              `Tenant was created.\n\nSome members could not be added automatically (add them from the tenant page):\n\n${failures.join("\n")}`,
+            );
+          }
+        }
+        onCreated(tenant);
       } else if (initial) {
         const res = await fetch(`/api/admin/tenants/${initial.id}`, {
           method: "PATCH",
@@ -392,6 +516,122 @@ export function TenantForm({
           ))}
         </div>
       </div>
+
+      {mode === "create" ? (
+        <div className="border-t border-[var(--admin-border)] pt-6 space-y-4">
+          <div>
+            <h3 className="m-0 text-base font-semibold text-white">Members</h3>
+            <p className="mt-1 mb-0 text-sm text-[var(--admin-text-muted)]">
+              Add editors and admins now (saved when you create the tenant). Only accounts that already have platform
+              admin access can be found — same as on an existing tenant&apos;s Members screen.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-end gap-3 border-b border-[var(--admin-border)] pb-6">
+            <div ref={draftSearchRef} className="relative min-w-[12rem] flex-1">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
+                Find user by name
+              </span>
+              <input
+                type="text"
+                autoComplete="off"
+                value={nameQuery}
+                onChange={(e) => onDraftNameChange(e.target.value)}
+                onFocus={() => {
+                  if (!picked && nameQuery.trim().length > 0) setListOpen(true);
+                }}
+                placeholder="Start typing a name…"
+                className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm text-[var(--admin-text)]"
+              />
+              {searchLoading && !picked ? (
+                <span className="absolute right-3 top-9 text-[10px] text-[var(--admin-text-muted)]">Searching…</span>
+              ) : null}
+              {listOpen && !picked && searchResults.length > 0 ? (
+                <ul
+                  role="listbox"
+                  className="absolute left-0 right-0 z-20 mt-1 max-h-52 overflow-y-auto rounded-md border border-[var(--admin-border)] bg-[var(--admin-sidebar-bg)] py-1 shadow-lg"
+                >
+                  {searchResults.map((u) => (
+                    <li key={u.id} role="presentation">
+                      <button
+                        type="button"
+                        role="option"
+                        className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm transition hover:bg-[var(--admin-card-bg)]"
+                        onClick={() => selectDraftStaff(u)}
+                      >
+                        <span className="font-medium text-[var(--admin-text)]">
+                          {u.full_name?.trim() || "—"}
+                        </span>
+                        <span className="text-xs text-[var(--admin-text-muted)]">{u.email}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {listOpen && !picked && !searchLoading && nameQuery.trim().length > 0 && searchResults.length === 0 ? (
+                <p className="absolute left-0 right-0 z-20 mt-1 rounded-md border border-[var(--admin-border)] bg-[var(--admin-sidebar-bg)] px-3 py-2 text-sm text-[var(--admin-text-muted)] shadow-lg">
+                  No matching staff users.
+                </p>
+              ) : null}
+            </div>
+            <label className="w-40">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
+                Role
+              </span>
+              <select
+                value={draftRole}
+                onChange={(e) => setDraftRole(e.target.value as "admin" | "editor")}
+                className="w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm text-[var(--admin-text)]"
+              >
+                <option value="editor">Editor</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={handleDraftAddClick}
+              disabled={submitting || !picked}
+              className="rounded-md bg-[var(--admin-accent)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-50"
+            >
+              Add member
+            </button>
+            {draftFormError ? <p className="w-full m-0 text-sm text-red-400">{draftFormError}</p> : null}
+          </div>
+          {draftMembers.length > 0 ? (
+            <div className="overflow-x-auto rounded-md border border-[var(--admin-border)]">
+              <table className="w-full min-w-[480px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--admin-border)] bg-[var(--admin-table-header-bg)]">
+                    <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Name</th>
+                    <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Email</th>
+                    <th className="px-3 py-2 font-semibold text-[var(--admin-text)]">Role</th>
+                    <th className="px-3 py-2 font-semibold text-[var(--admin-text)] w-24" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {draftMembers.map((m) => (
+                    <tr key={m.userId} className="border-b border-[var(--admin-border)]">
+                      <td className="px-3 py-2 text-[var(--admin-text)]">{m.full_name?.trim() || "—"}</td>
+                      <td className="px-3 py-2 text-[var(--admin-text-muted)]">{m.email}</td>
+                      <td className="px-3 py-2 capitalize text-[var(--admin-text)]">{m.role}</td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => removeDraftMember(m.userId)}
+                          className="text-sm font-semibold text-red-400 hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="m-0 text-sm text-[var(--admin-text-muted)]">No members queued yet — optional.</p>
+          )}
+        </div>
+      ) : null}
 
       <div className="flex justify-end gap-2 pt-2">
         <button
