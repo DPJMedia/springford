@@ -1,4 +1,7 @@
-import { fallbackTransactionalEmailBranding } from "./emailBranding";
+import {
+  fallbackTransactionalEmailBranding,
+  type TransactionalEmailBranding,
+} from "./emailBranding";
 import { buildNewsletterUnsubscribeConfirmationHtml } from "./newsletterUnsubscribeConfirmation";
 import { buildNewsletterWelcomeEmailHtml } from "./newsletterWelcome";
 import { buildSupportCancelConfirmationHtml } from "./supportCancelConfirmation";
@@ -15,16 +18,14 @@ export type TransactionalEmailPreview = {
 
 const SAMPLE_RECEIPT = "https://invoice.stripe.com/i/sample-receipt-link";
 
-function previewBranding() {
-  return fallbackTransactionalEmailBranding();
-}
-
 /**
  * Every user-action email sent via SendGrid from this app (excluding bulk newsletter *campaigns*).
  * Includes subscribe/unsubscribe *confirmations* (transactional); not editorial campaign blasts.
  */
-export function getTransactionalEmailPreviews(): TransactionalEmailPreview[] {
-  const branding = previewBranding();
+export function getTransactionalEmailPreviews(
+  brandingArg?: TransactionalEmailBranding,
+): TransactionalEmailPreview[] {
+  const branding = brandingArg ?? fallbackTransactionalEmailBranding();
   const baseUrl = branding.siteUrl.replace(/\/$/, "");
 
   const cancelSample = `${baseUrl}/api/support/cancel-from-email?token=sample_token_preview_only`;

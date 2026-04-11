@@ -1,5 +1,5 @@
 import type { TenantRow } from "@/lib/types/database";
-import { getSiteConfig } from "@/lib/seo/site";
+import { getSiteConfig, SITE_NAME } from "@/lib/seo/site";
 
 /** Site name + canonical URL + default From for transactional SendGrid emails (per tenant). */
 export type TransactionalEmailBranding = {
@@ -27,8 +27,23 @@ export function fallbackTransactionalEmailBranding(): TransactionalEmailBranding
   const siteUrl = String(raw).replace(/\/$/, "");
   return {
     siteUrl,
-    siteName: "DPJ Media",
+    siteName: SITE_NAME,
     from_email: "admin@dpjmedia.com",
-    from_name: "DPJ Media",
+    from_name: SITE_NAME,
   };
+}
+
+/** Client-side: build transactional branding from `TenantProvider` context (admin previews). */
+export function transactionalEmailBrandingFromTenantContext(ctx: {
+  name: string;
+  domain: string;
+  from_email: string;
+  from_name: string;
+}): TransactionalEmailBranding {
+  const domain = ctx.domain.trim().toLowerCase();
+  const siteUrl = `https://www.${domain}`;
+  const siteName = ctx.name.trim();
+  const from_email = ctx.from_email?.trim() || "admin@dpjmedia.com";
+  const from_name = ctx.from_name?.trim() || siteName;
+  return { siteUrl, siteName, from_email, from_name };
 }

@@ -11,6 +11,9 @@ import {
   TransactionalEmailTypesList,
   TransactionalEmailsMain,
 } from "@/components/admin/TransactionalEmailSection";
+import {
+  transactionalEmailBrandingFromTenantContext,
+} from "@/lib/emails/emailBranding";
 import { getTransactionalEmailPreviews } from "@/lib/emails/transactionalPreviews";
 import { useTenant } from "@/lib/tenant/TenantProvider";
 
@@ -156,9 +159,14 @@ function NewsletterInner() {
   const [templateSearch, setTemplateSearch] = useState("");
 
   const supabase = createClient();
-  const { id: tenantId } = useTenant();
+  const tenant = useTenant();
+  const { id: tenantId } = tenant;
 
-  const transactionalPreviews = useMemo(() => getTransactionalEmailPreviews(), []);
+  const transactionalPreviews = useMemo(
+    () =>
+      getTransactionalEmailPreviews(transactionalEmailBrandingFromTenantContext(tenant)),
+    [tenant.name, tenant.domain, tenant.from_email, tenant.from_name],
+  );
   const [transactionalEmailId, setTransactionalEmailId] = useState(
     () => transactionalPreviews[0]?.id ?? ""
   );

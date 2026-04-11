@@ -9,16 +9,20 @@ import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { TenantForm } from "@/components/admin/TenantForm";
 import type { TenantRow } from "@/lib/types/database";
 
-type AllMembersRow = {
-  user_id: string;
+type MemberMembership = {
   tenant_id: string;
-  full_name: string | null;
-  email: string;
-  role: string;
-  is_super_admin?: boolean;
   tenant_name: string;
   tenant_slug: string;
+  role: string;
   created_at: string;
+};
+
+type AllMembersRow = {
+  user_id: string;
+  full_name: string | null;
+  email: string;
+  is_super_admin: boolean;
+  memberships: MemberMembership[];
 };
 
 type SortKey = "tenant_name" | "role";
@@ -48,11 +52,21 @@ function SortHeader({
   );
 }
 
-function memberRoleDisplay(m: AllMembersRow): string {
-  if (m.is_super_admin) return "Super Admin";
-  if (m.role === "admin") return "Admin";
-  if (m.role === "editor") return "Editor";
-  return m.role;
+function membershipRoleLabel(role: string): string {
+  if (role === "admin") return "Admin";
+  if (role === "editor") return "Editor";
+  return role;
+}
+
+function sortKeyRoleDisplay(r: AllMembersRow): string {
+  if (r.is_super_admin) return "Super Admin";
+  const first = r.memberships[0];
+  return first ? membershipRoleLabel(first.role) : "";
+}
+
+function latestMembershipDate(r: AllMembersRow): number {
+  if (r.memberships.length === 0) return 0;
+  return Math.max(...r.memberships.map((m) => new Date(m.created_at).getTime()));
 }
 
 export default function TenantsAdminPage() {
@@ -105,10 +119,12 @@ export default function TenantsAdminPage() {
     const mult = sortDir === "asc" ? 1 : -1;
     rows.sort((a, b) => {
       if (sortKey === "tenant_name") {
-        const c = a.tenant_name.localeCompare(b.tenant_name, undefined, { sensitivity: "base" });
+        const ta = a.memberships[0]?.tenant_name ?? "";
+        const tb = b.memberships[0]?.tenant_name ?? "";
+        const c = ta.localeCompare(tb, undefined, { sensitivity: "base" });
         return c * mult;
       }
-      const c = memberRoleDisplay(a).localeCompare(memberRoleDisplay(b), undefined, { sensitivity: "base" });
+      const c = sortKeyRoleDisplay(a).localeCompare(sortKeyRoleDisplay(b), undefined, { sensitivity: "base" });
       return c * mult;
     });
     return rows;
@@ -160,7 +176,6 @@ export default function TenantsAdminPage() {
     <>
       <AdminPageHeader
         title="Tenants"
-        description="Manage sites and staff access (super admin only)."
         actions={
           !showCreate ? (
             <button
@@ -177,11 +192,7 @@ export default function TenantsAdminPage() {
         }
       />
       <AdminPageLayout>
-        <section className="mb-10">
-          <h2 className="m-0 border-b border-[var(--admin-border)] pb-3 text-lg font-semibold text-[var(--admin-text)]">
-            Tenants
-          </h2>
-
+        <section className="mb-10 space-y-6">
           {loadError && (
             <div className="mt-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
               {loadError}
@@ -239,7 +250,7 @@ export default function TenantsAdminPage() {
             </div>
           )}
 
-          <div className="mt-6 overflow-x-auto rounded-lg border border-[var(--admin-border)]">
+          <div className="overflow-x-auto rounded-lg border border-[var(--admin-border)]">
             <table className="w-full min-w-[680px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--admin-border)] bg-[var(--admin-table-header-bg)]">
@@ -284,27 +295,19 @@ export default function TenantsAdminPage() {
           </div>
         </section>
 
-        <div className="border-t border-[var(--admin-border)] pt-10" />
-
-        <section>
-          <h2 className="m-0 border-b border-[var(--admin-border)] pb-3 text-lg font-semibold text-[var(--admin-text)]">
-            Members
-          </h2>
-          <p className="mt-3 mb-4 text-sm text-[var(--admin-text-muted)] m-0">
-            Everyone with admin or editor access on any tenant. To add or remove someone, open the site from the table
-            above.
-          </p>
+        <section className="mt-12">
+          <h2 className="m-0 text-2xl font-semibold text-[var(--admin-text)]">Members</h2>
           {membersError && (
-            <div className="mb-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
+            <div className="mt-4 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
               {membersError}
             </div>
           )}
           {membersLoading ? (
-            <div className="flex justify-center py-12">
+            <div className="flex justify-center py-12 mt-6">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--admin-accent)] border-r-transparent" />
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-[var(--admin-border)]">
+            <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--admin-border)]">
               <table className="w-full min-w-[720px] border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-[var(--admin-border)] bg-[var(--admin-table-header-bg)]">
@@ -328,32 +331,40 @@ export default function TenantsAdminPage() {
                 <tbody>
                   {sortedMembers.map((r) => (
                     <tr
-                      key={`${r.tenant_id}-${r.user_id}`}
+                      key={r.user_id}
                       className="border-b border-[var(--admin-border)] hover:bg-[var(--admin-table-row-hover)]"
                     >
                       <td className="px-3 py-2 text-[var(--admin-text)]">{r.full_name || "—"}</td>
                       <td className="px-3 py-2 text-[var(--admin-text-muted)]">{r.email}</td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={
-                            r.is_super_admin
-                              ? "inline-block rounded border border-violet-500/40 bg-violet-950/50 px-2 py-0.5 text-xs font-semibold text-violet-200"
-                              : "text-[var(--admin-text-muted)]"
-                          }
-                        >
-                          {memberRoleDisplay(r)}
-                        </span>
+                      <td className="px-3 py-2 align-top">
+                        {r.is_super_admin ? (
+                          <span className="inline-block rounded border border-violet-500/40 bg-violet-950/50 px-2 py-0.5 text-xs font-semibold text-violet-200">
+                            Super Admin
+                          </span>
+                        ) : (
+                          <div className="flex flex-col gap-1.5 text-[var(--admin-text-muted)]">
+                            {r.memberships.map((m) => (
+                              <span key={m.tenant_id}>{membershipRoleLabel(m.role)}</span>
+                            ))}
+                          </div>
+                        )}
                       </td>
-                      <td className="px-3 py-2">
-                        <Link
-                          href={`/admin/tenants/${r.tenant_id}`}
-                          className="font-medium text-[var(--admin-accent)] hover:underline"
-                        >
-                          {r.tenant_name || r.tenant_slug}
-                        </Link>
+                      <td className="px-3 py-2 align-top">
+                        <div className="flex flex-col gap-1.5">
+                          {r.memberships.map((m) => (
+                            <div key={m.tenant_id} className="leading-snug">
+                              <Link
+                                href={`/admin/tenants/${m.tenant_id}`}
+                                className="font-medium text-[var(--admin-accent)] hover:underline"
+                              >
+                                {m.tenant_name || m.tenant_slug}
+                              </Link>
+                            </div>
+                          ))}
+                        </div>
                       </td>
-                      <td className="px-3 py-2 text-[var(--admin-text-muted)] tabular-nums">
-                        {new Date(r.created_at).toLocaleString()}
+                      <td className="px-3 py-2 text-[var(--admin-text-muted)] tabular-nums align-top">
+                        {new Date(latestMembershipDate(r)).toLocaleString()}
                       </td>
                     </tr>
                   ))}

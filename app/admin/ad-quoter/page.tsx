@@ -386,12 +386,10 @@ function AdQuoterPageInner() {
     );
   }
 
-  const livePanel = (
-    <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-4 sm:p-5">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
-        Live quote
-      </h2>
-      <div className="mt-3 space-y-3 text-sm text-[var(--admin-text)]">
+  const liveQuoteSection = (
+    <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-4 sm:p-5">
+      <h2 className="text-lg font-semibold text-[var(--admin-text)] mb-4">4. Live quote</h2>
+      <div className="space-y-3 text-sm text-[var(--admin-text)]">
         <div>
           <p className="font-semibold text-base">{quote.pkg.name}</p>
           <ul className="mt-1.5 list-inside list-disc space-y-0.5 text-[var(--admin-text-muted)]">
@@ -488,7 +486,7 @@ function AdQuoterPageInner() {
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 
   const iconRefresh = (
@@ -658,8 +656,6 @@ function AdQuoterPageInner() {
             )}
           </div>
 
-          <div className="space-y-4 xl:hidden">{livePanel}</div>
-
           <div className="space-y-6">
               <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-4 sm:p-5">
                 <h2 className="text-lg font-semibold text-[var(--admin-text)] mb-4">1. Package</h2>
@@ -773,8 +769,10 @@ function AdQuoterPageInner() {
                 </div>
               </section>
 
+              {liveQuoteSection}
+
               <section className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] p-4 sm:p-5">
-                <h2 className="text-lg font-semibold text-[var(--admin-text)] mb-3">4. Proposal summary</h2>
+                <h2 className="text-lg font-semibold text-[var(--admin-text)] mb-3">5. Proposal summary</h2>
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-[var(--admin-text-muted)] mb-1">
@@ -839,10 +837,8 @@ function AdQuoterPageInner() {
           </div>
           </div>
 
-          {/* Desktop: live quote (middle) + actions (right), one sticky unit */}
-          <aside className="hidden shrink-0 xl:flex xl:flex-row xl:items-start xl:gap-4 xl:sticky xl:top-6 xl:z-[5]">
-            <div className="w-[20rem] shrink-0">{livePanel}</div>
-            <div className="w-64 shrink-0">{actionsPanel}</div>
+          <aside className="hidden shrink-0 xl:block xl:w-64 xl:sticky xl:top-6 xl:z-[5]">
+            {actionsPanel}
           </aside>
         </div>
       </AdminPageLayout>
