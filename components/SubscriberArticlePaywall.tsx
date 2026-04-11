@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import { normalizeArticleBodyTextForMarkdown } from "@/lib/article/normalizeArticleBodyText";
 import remarkGfm from "remark-gfm";
 import { Fragment } from "react";
 import type { ComponentProps, ReactNode } from "react";
@@ -87,7 +88,7 @@ function BlurredArticleBody({
                     remarkPlugins={[remarkGfm]}
                     components={blurMarkdownComponents}
                   >
-                    {block.content || ""}
+                    {normalizeArticleBodyTextForMarkdown(block.content)}
                   </ReactMarkdown>
                 </div>
               ) : block.type === "image" && block.url ? (
@@ -109,7 +110,7 @@ function BlurredArticleBody({
       ) : legacyBody ? (
         <div className="markdown-content text-lg leading-relaxed">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={blurMarkdownComponents}>
-            {legacyBody}
+            {normalizeArticleBodyTextForMarkdown(legacyBody)}
           </ReactMarkdown>
         </div>
       ) : (

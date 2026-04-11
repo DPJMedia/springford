@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ContentBlock } from "@/components/BlockEditor";
+import { normalizeArticleBodyTextForMarkdown } from "@/lib/article/normalizeArticleBodyText";
 
 /** Same markdown component map as `app/article/[slug]/ArticleContent.tsx` (reader view). */
 const markdownComponents = {
@@ -141,7 +142,7 @@ export function ArticlePreviewModal({
                     {block.type === "text" ? (
                       <div className="article-text-block markdown-content mb-6 text-lg leading-relaxed text-[color:var(--color-dark)]">
                         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                          {block.content || ""}
+                          {normalizeArticleBodyTextForMarkdown(block.content)}
                         </ReactMarkdown>
                       </div>
                     ) : block.type === "image" && block.url ? (
@@ -164,7 +165,7 @@ export function ArticlePreviewModal({
               ) : (
                 <div className="markdown-content mb-8 text-lg leading-relaxed text-[color:var(--color-dark)]">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                    {legacyContent || "_No content yet._"}
+                    {normalizeArticleBodyTextForMarkdown(legacyContent) || "_No content yet._"}
                   </ReactMarkdown>
                 </div>
               )}

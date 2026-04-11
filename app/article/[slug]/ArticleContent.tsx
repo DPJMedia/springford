@@ -28,6 +28,7 @@ import {
   DIFFUSE_AI_AVATAR_PUBLIC_PATH,
   DIFFUSE_AI_BYLINE_DISPLAY,
 } from "@/lib/branding/diffuse";
+import { normalizeArticleBodyTextForMarkdown } from "@/lib/article/normalizeArticleBodyText";
 
 type ArticleContentProps = {
   initialArticle: Article;
@@ -526,7 +527,7 @@ export function ArticleContent({
                                   ),
                                 }}
                               >
-                                {block.content || ''}
+                                {normalizeArticleBodyTextForMarkdown(block.content)}
                               </ReactMarkdown>
                             </div>
                           ) : block.type === "image" ? (
@@ -599,7 +600,7 @@ export function ArticleContent({
                         ),
                       }}
                     >
-                      {article.content || ''}
+                      {normalizeArticleBodyTextForMarkdown(article.content)}
                     </ReactMarkdown>
                   </div>
                   {/* Legacy single-body: both ads at bottom */}
