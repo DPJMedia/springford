@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import type { TenantRow } from "@/lib/types/database";
 import { requireSuperAdminApi } from "@/lib/api/requireSuperAdmin";
+import { PROTECTED_TENANT_SLUG } from "@/lib/tenant/protectedTenant";
 
 export const dynamic = "force-dynamic";
 
@@ -115,4 +116,49 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   return NextResponse.json({ tenant: data as TenantRow });
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireSuperAdminApi();
+  if (!auth.ok) return auth.response;
+
+  const { id } = await params;
+  const admin = createAdminClient();
+
+  const { data: row, error: fetchErr } = await admin
+    .from("tenants")
+    .select("id, slug")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchErr) {
+    return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+  }
+  if (!row) {
+    return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  }
+  if (row.slug === PROTECTED_TENANT_SLUG) {
+    return NextResponse.json(
+      { error: "The Spring-Ford Press tenant cannot be deleted." },
+      { status: 403 },
+    );
+  }
+
+  const { error: rpcErr } = await admin.rpc("delete_tenant_fully", { p_tenant_id: id });
+
+  if (rpcErr) {
+    const msg = rpcErr.message || "";
+    if (msg.includes("Spring-Ford") || msg.includes("spring-ford")) {
+      return NextResponse.json(
+        { error: "The Spring-Ford Press tenant cannot be deleted." },
+        { status: 403 },
+      );
+    }
+    if (msg.includes("Tenant not found")) {
+      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+    }
+    return NextResponse.json({ error: msg || "Delete failed" }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { TenantForm } from "@/components/admin/TenantForm";
+import { TenantDeleteSection } from "@/components/admin/TenantDeleteSection";
 import { TenantMembersSection } from "@/components/admin/TenantMembersSection";
 import type { TenantRow } from "@/lib/types/database";
 
@@ -119,6 +120,7 @@ export default function TenantDetailAdminPage() {
             onUpdated={(t) => setTenant(t)}
           />
           <TenantMembersSection tenantId={id} />
+          <TenantDeleteSection tenantId={id} tenantSlug={tenant.slug} />
         </div>
       </AdminPageLayout>
     </>
