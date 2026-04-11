@@ -12,6 +12,7 @@ import {
   TransactionalEmailsMain,
 } from "@/components/admin/TransactionalEmailSection";
 import { getTransactionalEmailPreviews } from "@/lib/emails/transactionalPreviews";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,7 @@ function NewsletterInner() {
   const [templateSearch, setTemplateSearch] = useState("");
 
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   const transactionalPreviews = useMemo(() => getTransactionalEmailPreviews(), []);
   const [transactionalEmailId, setTransactionalEmailId] = useState(
@@ -174,13 +176,21 @@ function NewsletterInner() {
       await loadData();
     }
     init();
-  }, [router, supabase]);
+  }, [router, supabase, tenantId]);
 
   async function loadData() {
     setLoading(true);
     const [{ data: tmplData }, { data: campData }] = await Promise.all([
-      supabase.from("newsletter_templates").select("*").order("updated_at", { ascending: false }),
-      supabase.from("newsletter_campaigns").select("*").order("updated_at", { ascending: false }),
+      supabase
+        .from("newsletter_templates")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("newsletter_campaigns")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("updated_at", { ascending: false }),
     ]);
     const tmplList: Template[] = tmplData || [];
     setTemplates(tmplList);
@@ -205,7 +215,11 @@ function NewsletterInner() {
       onConfirm: async () => {
         setConfirmModal(null);
         setDeletingId(c.id);
-        await supabase.from("newsletter_campaigns").delete().eq("id", c.id);
+        await supabase
+          .from("newsletter_campaigns")
+          .delete()
+          .eq("id", c.id)
+          .eq("tenant_id", tenantId);
         setCampaigns((prev) => prev.filter((camp) => camp.id !== c.id));
         setSelectedCampaignId((prev) => (prev === c.id ? null : prev));
         setDeletingId(null);
@@ -222,7 +236,11 @@ function NewsletterInner() {
       onConfirm: async () => {
         setConfirmModal(null);
         setDeletingId(tmpl.id);
-        await supabase.from("newsletter_templates").delete().eq("id", tmpl.id);
+        await supabase
+          .from("newsletter_templates")
+          .delete()
+          .eq("id", tmpl.id)
+          .eq("tenant_id", tenantId);
         setTemplates((prev) => prev.filter((t) => t.id !== tmpl.id));
         setDeletingId(null);
       },
@@ -240,6 +258,7 @@ function NewsletterInner() {
         setDuplicatingId(c.id);
         try {
           const { data, error } = await supabase.from("newsletter_campaigns").insert({
+            tenant_id: tenantId,
             name, subject: c.subject, preview_text: c.preview_text, recipients_type: c.recipients_type,
             template_id: c.template_id, status: "draft", blocks: [],
           }).select("id").single();
@@ -262,6 +281,7 @@ function NewsletterInner() {
         setDuplicatingId(tmpl.id);
         try {
           const { data, error } = await supabase.from("newsletter_templates").insert({
+            tenant_id: tenantId,
             name, blocks: tmpl.blocks,
             settings: (tmpl as unknown as Record<string, unknown>).settings || {},
           }).select("id").single();

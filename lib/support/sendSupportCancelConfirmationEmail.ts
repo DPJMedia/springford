@@ -1,3 +1,4 @@
+import type { TransactionalEmailBranding } from "@/lib/emails/emailBranding";
 import {
   buildSupportCancelConfirmationHtml,
   buildSupportCancelConfirmationPlain,
@@ -8,18 +9,20 @@ const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 /**
  * Sent after recurring support is canceled (profile or email link).
  */
-export async function sendSupportCancelConfirmationEmail(toEmail: string): Promise<void> {
+export async function sendSupportCancelConfirmationEmail(
+  toEmail: string,
+  branding: TransactionalEmailBranding,
+  from: { email: string; name: string },
+): Promise<void> {
   const apiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || "admin@dpjmedia.com";
-  const fromName = process.env.SENDGRID_FROM_NAME || "Spring-Ford Press";
 
   if (!apiKey) {
     console.warn("SENDGRID_API_KEY not set; skipping cancel confirmation email");
     return;
   }
 
-  const html = buildSupportCancelConfirmationHtml();
-  const plain = buildSupportCancelConfirmationPlain();
+  const html = buildSupportCancelConfirmationHtml(branding);
+  const plain = buildSupportCancelConfirmationPlain(branding);
 
   const res = await fetch(SENDGRID_API_URL, {
     method: "POST",
@@ -29,9 +32,12 @@ export async function sendSupportCancelConfirmationEmail(toEmail: string): Promi
     },
     body: JSON.stringify({
       personalizations: [
-        { to: [{ email: toEmail }], subject: "Your Spring-Ford Press support has been canceled" },
+        {
+          to: [{ email: toEmail }],
+          subject: `Your ${branding.siteName} support has been canceled`,
+        },
       ],
-      from: { email: fromEmail, name: fromName },
+      from: { email: from.email, name: from.name },
       content: [
         { type: "text/plain", value: plain },
         { type: "text/html", value: html },

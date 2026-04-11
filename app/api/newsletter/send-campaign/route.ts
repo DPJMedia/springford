@@ -1,15 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { buildEmailHtml } from '@/lib/newsletter/buildEmailHtml';
+import { buildEmailHtml, newsletterBrandingFromTenant } from '@/lib/newsletter/buildEmailHtml';
 import type { NewsletterBlock, ArticleLayout } from '@/lib/newsletter/buildEmailHtml';
 import { enrichArticleBlocksWithAdvertisementFlags } from '@/lib/newsletter/enrichArticleBlocksForEmail';
 import {
-  SENDGRID_NEWSLETTER_GLOBAL_CATEGORY,
+  sendGridNewsletterGlobalCategory,
   sendGridCategoryForCampaign,
 } from '@/lib/newsletter/sendGridCampaign';
+import { getTenantById, getTenantBySlug } from '@/lib/tenant/getTenant';
+import { getSiteConfig } from '@/lib/seo/site';
 
 const SENDGRID_API_URL = 'https://api.sendgrid.com/v3/mail/send';
-const SITE_URL = 'https://www.springford.press';
 
 // Test recipient used only when the "Send Test" button is clicked (testOnly: true)
 const TEST_RECIPIENT = 'dylancobb2525@gmail.com';
@@ -51,9 +52,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
+    let tenant =
+      campaign.tenant_id != null ? await getTenantById(campaign.tenant_id as string) : null;
+    if (!tenant) {
+      tenant = await getTenantBySlug('spring-ford');
+    }
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant not found for campaign' }, { status: 500 });
+    }
+
+    const { siteUrl, siteName } = getSiteConfig(tenant);
+    const emailBranding = newsletterBrandingFromTenant(tenant);
+
     const apiKey = process.env.SENDGRID_API_KEY;
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.NEXT_PUBLIC_NEWSLETTER_FROM_EMAIL || 'admin@dpjmedia.com';
-    const fromName = process.env.SENDGRID_FROM_NAME || 'Spring-Ford Press';
+    const fromEmail =
+      tenant.from_email ||
+      process.env.SENDGRID_FROM_EMAIL ||
+      process.env.NEXT_PUBLIC_NEWSLETTER_FROM_EMAIL ||
+      'admin@dpjmedia.com';
+    const fromName =
+      tenant.from_name || process.env.SENDGRID_FROM_NAME || siteName;
 
     if (!apiKey) {
       return NextResponse.json({ error: 'SendGrid API key not configured' }, { status: 500 });
@@ -61,8 +79,8 @@ export async function POST(request: Request) {
 
     // Use blocks from campaign (which are a snapshot of the template at send time)
     let blocks: NewsletterBlock[] = Array.isArray(campaign.blocks) ? campaign.blocks : [];
-    blocks = await enrichArticleBlocksWithAdvertisementFlags(supabase, blocks);
-    const subject = campaign.subject || 'Spring-Ford Press Newsletter';
+    blocks = await enrichArticleBlocksWithAdvertisementFlags(supabase, blocks, tenant.id);
+    const subject = campaign.subject || `${siteName} Newsletter`;
     const previewText = campaign.preview_text || '';
 
     // Article layout lives in the template settings, not the campaign
@@ -82,14 +100,21 @@ export async function POST(request: Request) {
     }
 
     // Build the email HTML
-    const unsubscribeUrl = `${SITE_URL}/profile?tab=newsletter`;
-    const html = buildEmailHtml(blocks, subject, previewText, unsubscribeUrl, articleLayout);
+    const unsubscribeUrl = `${siteUrl}/profile?tab=newsletter`;
+    const html = buildEmailHtml(
+      blocks,
+      subject,
+      emailBranding,
+      previewText,
+      unsubscribeUrl,
+      articleLayout,
+    );
 
     // Build plain-text fallback
     const plainBody = blocks
       .map((b: NewsletterBlock) => {
         if (b.type === 'hero_text') return [b.headline, b.subheadline, b.introText].filter(Boolean).join('\n\n');
-        if (b.type === 'article') return `${b.articleTitle}\n${b.articleExcerpt || ''}\n${SITE_URL}/article/${b.articleSlug}`;
+        if (b.type === 'article') return `${b.articleTitle}\n${b.articleExcerpt || ''}\n${siteUrl}/article/${b.articleSlug}`;
         if (b.type === 'text') return [b.textTitle, b.textBody].filter(Boolean).join('\n\n');
         if (b.type === 'button') return `${b.buttonText}: ${b.buttonLink}`;
         return '';
@@ -110,20 +135,42 @@ export async function POST(request: Request) {
       recipientCount = 1;
     } else {
       // Real send — fetch based on recipients_type
-      let query = supabase.from('user_profiles').select('email, full_name').not('email', 'is', null);
       if (recipientsType === 'newsletter') {
-        query = query.eq('newsletter_subscribed', true);
-      } else if (recipientsType === 'super_admins') {
-        query = query.eq('is_super_admin', true);
-      }
-      // 'all_users' sends to every registered user with an email (no extra filter)
-      const { data: subscribers } = await query;
+        const { data: subs } = await supabase
+          .from('tenant_newsletter_subscriptions')
+          .select('user_id')
+          .eq('tenant_id', tenant.id)
+          .eq('subscribed', true);
 
-      if (subscribers && subscribers.length > 0) {
-        recipients = subscribers
-          .filter((s) => s.email)
-          .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
-        recipientCount = recipients.length;
+        const userIds = (subs || []).map((s) => s.user_id).filter(Boolean);
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('user_profiles')
+            .select('email, full_name')
+            .in('id', userIds)
+            .not('email', 'is', null);
+
+          if (profiles && profiles.length > 0) {
+            recipients = profiles
+              .filter((s) => s.email)
+              .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
+            recipientCount = recipients.length;
+          }
+        }
+      } else {
+        let query = supabase.from('user_profiles').select('email, full_name').not('email', 'is', null);
+        if (recipientsType === 'super_admins') {
+          query = query.eq('is_super_admin', true);
+        }
+        // 'all_users' sends to every registered user with an email (no extra filter)
+        const { data: subscribers } = await query;
+
+        if (subscribers && subscribers.length > 0) {
+          recipients = subscribers
+            .filter((s) => s.email)
+            .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
+          recipientCount = recipients.length;
+        }
       }
     }
 
@@ -135,6 +182,7 @@ export async function POST(request: Request) {
     // and cannot see other recipients (a single `to: [ ...many ]` exposes everyone in the headers).
     // Up to 1000 personalizations per API request per SendGrid limits.
     const categoryTag = sendGridCategoryForCampaign(campaignId);
+    const globalCategory = sendGridNewsletterGlobalCategory(tenant);
     const BATCH_SIZE = 1000;
     for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
       const batch = recipients.slice(i, i + BATCH_SIZE);
@@ -145,7 +193,7 @@ export async function POST(request: Request) {
         })),
         from: { email: fromEmail, name: fromName },
         subject,
-        categories: [SENDGRID_NEWSLETTER_GLOBAL_CATEGORY, categoryTag],
+        categories: [globalCategory, categoryTag],
         content: [
           { type: 'text/plain', value: plainText || subject },
           { type: 'text/html', value: html },

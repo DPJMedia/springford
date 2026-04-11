@@ -7,9 +7,8 @@ import {
   canReadFullArticleContent,
   normalizeVisibility,
 } from "@/lib/articles/visibilityAccess";
-import { SITE_URL } from "@/lib/seo/site";
-
-const FALLBACK_LOGO_URL = `${SITE_URL}/springford-press-logo.svg`;
+import { getSiteConfig } from "@/lib/seo/site";
+import { loadTenantForPage } from "@/lib/tenant/loadTenantForPage";
 
 export async function generateMetadata({
   params,
@@ -17,6 +16,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+  const tenant = await loadTenantForPage();
+  const { siteUrl, siteName } = getSiteConfig(tenant);
   const supabase = await createClient();
 
   const { data: article } = await supabase
@@ -25,34 +26,36 @@ export async function generateMetadata({
       "title, meta_title, meta_description, excerpt, image_url, slug, published_at, updated_at"
     )
     .eq("slug", slug)
+    .eq("tenant_id", tenant.id)
     .eq("status", "published")
     .single();
 
   if (!article) {
     return {
-      title: "Article Not Found | Spring-Ford Press",
+      title: `Article Not Found | ${siteName}`,
       description: "The article you're looking for could not be found.",
     };
   }
 
   const title = article.meta_title || article.title;
   const description = article.meta_description || article.excerpt || article.title;
-  
-  // Ensure image URL is absolute
+
+  const origin = new URL(siteUrl).origin;
+
   let imageUrl: string;
   if (article.image_url) {
-    if (article.image_url.startsWith('http://') || article.image_url.startsWith('https://')) {
+    if (article.image_url.startsWith("http://") || article.image_url.startsWith("https://")) {
       imageUrl = article.image_url;
-    } else if (article.image_url.startsWith('/')) {
-      imageUrl = `https://springford.press${article.image_url}`;
+    } else if (article.image_url.startsWith("/")) {
+      imageUrl = `${origin}${article.image_url}`;
     } else {
-      imageUrl = `https://springford.press/${article.image_url}`;
+      imageUrl = `${origin}/${article.image_url}`;
     }
   } else {
-    imageUrl = `https://springford.press${FALLBACK_LOGO_URL}`;
+    imageUrl = `${origin}/springford-press-logo.svg`;
   }
-  
-  const articleUrl = `${SITE_URL}/article/${article.slug}`;
+
+  const articleUrl = `${siteUrl}/article/${article.slug}`;
   const publishedTime = article.published_at
     ? new Date(article.published_at).toISOString()
     : undefined;
@@ -61,13 +64,13 @@ export async function generateMetadata({
     : publishedTime;
 
   return {
-    title: `${title} | Spring-Ford Press`,
+    title: `${title} | ${siteName}`,
     description,
     openGraph: {
       title,
       description,
       url: articleUrl,
-      siteName: "Spring-Ford Press",
+      siteName,
       images: [
         {
           url: imageUrl,
@@ -96,12 +99,14 @@ export default async function ArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const tenant = await loadTenantForPage();
   const supabase = await createClient();
 
   const { data: article, error } = await supabase
     .from("articles")
     .select("*")
     .eq("slug", slug)
+    .eq("tenant_id", tenant.id)
     .eq("status", "published")
     .single();
 
@@ -139,7 +144,7 @@ export default async function ArticlePage({
 
   return (
     <>
-      <ArticleJsonLd article={article} />
+      <ArticleJsonLd article={article} tenant={tenant} />
       <ArticleContent
         initialArticle={articleForClient}
         slug={slug}

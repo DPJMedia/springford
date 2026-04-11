@@ -16,6 +16,7 @@ import { TagSelector } from "@/components/TagSelector";
 import type { ArticleVisibility } from "@/lib/types/database";
 import { ArticleVisibilitySelector } from "@/components/ArticleVisibilitySelector";
 import { ArticlePreviewModal } from "@/components/admin/ArticlePreviewModal";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 export default function NewArticlePage() {
   const [title, setTitle] = useState("");
@@ -56,6 +57,7 @@ export default function NewArticlePage() {
   const [showCoAuthor, setShowCoAuthor] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   useEffect(() => {
     checkAdmin();
@@ -187,6 +189,7 @@ export default function NewArticlePage() {
       const { data, error: insertError } = await supabase
         .from("articles")
         .insert({
+          tenant_id: tenantId,
           title,
           slug,
           subtitle: subtitle || null,

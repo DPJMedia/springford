@@ -140,8 +140,23 @@ export interface DiffuseImportedArticle {
 }
 
 /** Admin ad quoter — saved packages (JSON) + client / campaign dates */
+/** Row from public.tenants — multi-tenant site configuration */
+export interface TenantRow {
+  id: string;
+  name: string;
+  slug: string;
+  domain: string;
+  from_email: string;
+  from_name: string;
+  /** JSON array of { slug, label } from DB */
+  section_config: unknown;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface SavedAdQuote {
   id: string;
+  tenant_id?: string | null;
   created_at: string;
   updated_at: string;
   created_by: string;
@@ -181,6 +196,11 @@ export interface Database {
         Row: AdSetting;
         Insert: Omit<AdSetting, 'id' | 'updated_at'>;
         Update: Partial<Omit<AdSetting, 'id' | 'updated_at'>>;
+      };
+      tenants: {
+        Row: TenantRow;
+        Insert: Omit<TenantRow, 'id' | 'created_at'>;
+        Update: Partial<Omit<TenantRow, 'id' | 'created_at'>>;
       };
     };
   };

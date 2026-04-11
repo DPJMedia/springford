@@ -10,6 +10,7 @@ import { SubscribeSuccessModal } from "@/components/SubscribeSuccessModal";
 import { NoAccountModal } from "@/components/NoAccountModal";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 const SUBSCRIBER_TERMS = [
   "First to know when new articles publish",
@@ -32,6 +33,7 @@ function SubscribePageContent() {
   const [confirming, setConfirming] = useState(false);
   const hasOpenedWelcomeModal = useRef(false);
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   useEffect(() => {
     checkUserStatus();
@@ -80,14 +82,29 @@ function SubscribePageContent() {
     if (!user) return;
     setConfirming(true);
     try {
+      const subscribedAt = new Date().toISOString();
       const { error: updateError } = await supabase
         .from("user_profiles")
         .update({
           newsletter_subscribed: true,
-          newsletter_subscribed_at: new Date().toISOString(),
+          newsletter_subscribed_at: subscribedAt,
         })
         .eq("id", user.id);
       if (updateError) throw updateError;
+
+      const { error: tenantSubErr } = await supabase
+        .from("tenant_newsletter_subscriptions")
+        .upsert(
+          {
+            user_id: user.id,
+            tenant_id: tenantId,
+            subscribed: true,
+            subscribed_at: subscribedAt,
+            unsubscribed_at: null,
+          },
+          { onConflict: "user_id,tenant_id" },
+        );
+      if (tenantSubErr) throw tenantSubErr;
       setShowConfirmModal(false);
       try {
         await fetch("/api/newsletter/subscribe", {

@@ -1,15 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { buildEmailHtml } from "@/lib/newsletter/buildEmailHtml";
+import { buildEmailHtml, newsletterBrandingFromTenant } from "@/lib/newsletter/buildEmailHtml";
 import type { NewsletterBlock, ArticleLayout } from "@/lib/newsletter/buildEmailHtml";
 import { enrichArticleBlocksWithAdvertisementFlags } from "@/lib/newsletter/enrichArticleBlocksForEmail";
 import {
-  SENDGRID_NEWSLETTER_GLOBAL_CATEGORY,
+  sendGridNewsletterGlobalCategory,
   sendGridCategoryForCampaign,
 } from "@/lib/newsletter/sendGridCampaign";
+import { getTenantById, getTenantBySlug } from "@/lib/tenant/getTenant";
+import { getSiteConfig } from "@/lib/seo/site";
 
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
-const SITE_URL = "https://www.springford.press";
 
 export const runtime = "edge";
 
@@ -61,11 +62,6 @@ export async function GET(request: Request) {
   }
 
   const apiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail =
-    process.env.SENDGRID_FROM_EMAIL ||
-    process.env.NEXT_PUBLIC_NEWSLETTER_FROM_EMAIL ||
-    "admin@dpjmedia.com";
-  const fromName = process.env.SENDGRID_FROM_NAME || "Spring-Ford Press";
 
   if (!apiKey) {
     return NextResponse.json({ error: "SendGrid API key not configured" }, { status: 500 });
@@ -75,9 +71,34 @@ export async function GET(request: Request) {
 
   for (const campaign of campaigns) {
     try {
+      let tenant =
+        campaign.tenant_id != null ? await getTenantById(campaign.tenant_id as string) : null;
+      if (!tenant) {
+        tenant = await getTenantBySlug("spring-ford");
+      }
+      if (!tenant) {
+        results.push({
+          id: campaign.id,
+          name: campaign.name,
+          success: false,
+          error: "Tenant not found for campaign",
+        });
+        continue;
+      }
+
+      const { siteUrl, siteName } = getSiteConfig(tenant);
+      const emailBranding = newsletterBrandingFromTenant(tenant);
+      const fromEmail =
+        tenant.from_email ||
+        process.env.SENDGRID_FROM_EMAIL ||
+        process.env.NEXT_PUBLIC_NEWSLETTER_FROM_EMAIL ||
+        "admin@dpjmedia.com";
+      const fromName =
+        tenant.from_name || process.env.SENDGRID_FROM_NAME || siteName;
+
       let blocks: NewsletterBlock[] = Array.isArray(campaign.blocks) ? campaign.blocks : [];
-      blocks = await enrichArticleBlocksWithAdvertisementFlags(supabase, blocks);
-      const subject = campaign.subject || "Spring-Ford Press Newsletter";
+      blocks = await enrichArticleBlocksWithAdvertisementFlags(supabase, blocks, tenant.id);
+      const subject = campaign.subject || `${siteName} Newsletter`;
       const previewText = campaign.preview_text || "";
       const recipientsType: string = campaign.recipients_type || "newsletter";
 
@@ -95,13 +116,20 @@ export async function GET(request: Request) {
         }
       }
 
-      const unsubscribeUrl = `${SITE_URL}/profile?tab=newsletter`;
-      const html = buildEmailHtml(blocks, subject, previewText, unsubscribeUrl, articleLayout);
+      const unsubscribeUrl = `${siteUrl}/profile?tab=newsletter`;
+      const html = buildEmailHtml(
+        blocks,
+        subject,
+        emailBranding,
+        previewText,
+        unsubscribeUrl,
+        articleLayout,
+      );
 
       const plainBody = blocks
         .map((b: NewsletterBlock) => {
           if (b.type === "hero_text") return [b.headline, b.subheadline, b.introText].filter(Boolean).join("\n\n");
-          if (b.type === "article") return `${b.articleTitle}\n${b.articleExcerpt || ""}\n${SITE_URL}/article/${b.articleSlug}`;
+          if (b.type === "article") return `${b.articleTitle}\n${b.articleExcerpt || ""}\n${siteUrl}/article/${b.articleSlug}`;
           if (b.type === "text") return [b.textTitle, b.textBody].filter(Boolean).join("\n\n");
           if (b.type === "button") return `${b.buttonText}: ${b.buttonLink}`;
           return "";
@@ -111,18 +139,37 @@ export async function GET(request: Request) {
       const plainText = `${plainBody || subject}\n\n---\nUnsubscribe: ${unsubscribeUrl}`;
 
       // Fetch recipients
-      let query = supabase.from("user_profiles").select("email, full_name").not("email", "is", null);
-      if (recipientsType === "newsletter") {
-        query = query.eq("newsletter_subscribed", true);
-      } else if (recipientsType === "super_admins") {
-        query = query.eq("is_super_admin", true);
-      }
-      // all_users: no extra filter
+      let recipients: Array<{ email: string; name?: string }> = [];
 
-      const { data: subscribers } = await query;
-      const recipients = (subscribers || [])
-        .filter((s) => s.email)
-        .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
+      if (recipientsType === "newsletter") {
+        const { data: subs } = await supabase
+          .from("tenant_newsletter_subscriptions")
+          .select("user_id")
+          .eq("tenant_id", tenant.id)
+          .eq("subscribed", true);
+
+        const userIds = (subs || []).map((s) => s.user_id).filter(Boolean);
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("user_profiles")
+            .select("email, full_name")
+            .in("id", userIds)
+            .not("email", "is", null);
+
+          recipients = (profiles || [])
+            .filter((s) => s.email)
+            .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
+        }
+      } else {
+        let query = supabase.from("user_profiles").select("email, full_name").not("email", "is", null);
+        if (recipientsType === "super_admins") {
+          query = query.eq("is_super_admin", true);
+        }
+        const { data: subscribers } = await query;
+        recipients = (subscribers || [])
+          .filter((s) => s.email)
+          .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
+      }
 
       if (recipients.length === 0) {
         await supabase
@@ -134,6 +181,7 @@ export async function GET(request: Request) {
       }
 
       const categoryTag = sendGridCategoryForCampaign(campaign.id);
+      const globalCategory = sendGridNewsletterGlobalCategory(tenant);
       // Send in batches of 1000 (SendGrid limit per request)
       const BATCH_SIZE = 1000;
       let sendError: string | null = null;
@@ -146,7 +194,7 @@ export async function GET(request: Request) {
           })),
           from: { email: fromEmail, name: fromName },
           subject,
-          categories: [SENDGRID_NEWSLETTER_GLOBAL_CATEGORY, categoryTag],
+          categories: [globalCategory, categoryTag],
           content: [
             { type: "text/plain", value: plainText || subject },
             { type: "text/html", value: html },

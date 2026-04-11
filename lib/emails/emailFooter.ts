@@ -1,18 +1,16 @@
 /**
- * Standard footer for every user-facing SendGrid email:
- * Spring-Ford Press | Terms | Privacy | Contact
+ * Standard footer for user-facing SendGrid emails: site name | Terms | Privacy | Contact
  */
 
-export function getEmailFooterUrls(): {
+import type { TransactionalEmailBranding } from "./emailBranding";
+
+export function getEmailFooterUrls(branding: TransactionalEmailBranding): {
   site: string;
   tos: string;
   privacy: string;
   contact: string;
 } {
-  const SITE_URL =
-    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL) ||
-    "https://www.springford.press";
-  const base = String(SITE_URL).replace(/\/$/, "");
+  const base = String(branding.siteUrl).replace(/\/$/, "");
   return {
     site: base,
     tos: `${base}/terms-of-service`,
@@ -22,11 +20,15 @@ export function getEmailFooterUrls(): {
 }
 
 /** HTML block placed below the main email card (same across all transactional emails). */
-export function buildStandardEmailFooterHtml(options?: {
-  /** When set, adds "| Unsubscribe" after Contact (e.g. profile Newsletter tab). */
-  unsubscribeUrl?: string | null;
-}): string {
-  const { site, tos, privacy, contact } = getEmailFooterUrls();
+export function buildStandardEmailFooterHtml(
+  branding: TransactionalEmailBranding,
+  options?: {
+    /** When set, adds "| Unsubscribe" after Contact (e.g. profile Newsletter tab). */
+    unsubscribeUrl?: string | null;
+  },
+): string {
+  const { site, tos, privacy, contact } = getEmailFooterUrls(branding);
+  const siteLabel = branding.siteName;
   const unsub =
     options?.unsubscribeUrl && options.unsubscribeUrl.length > 0
       ? `
@@ -34,7 +36,7 @@ export function buildStandardEmailFooterHtml(options?: {
   <a href="${options.unsubscribeUrl}" style="color: #2b8aa8; text-decoration: underline;">Unsubscribe</a>`
       : "";
   return `<p style="margin: 24px 0 0; font-size: 13px; color: #666666; text-align: center; font-family: 'Red Hat Display', 'Inter', system-ui, sans-serif;">
-  <a href="${site}" style="color: #2b8aa8; text-decoration: underline;">Spring-Ford Press</a>
+  <a href="${site}" style="color: #2b8aa8; text-decoration: underline;">${siteLabel}</a>
   &nbsp;|&nbsp;
   <a href="${tos}" style="color: #2b8aa8; text-decoration: underline;">Terms of Service</a>
   &nbsp;|&nbsp;
@@ -45,12 +47,15 @@ export function buildStandardEmailFooterHtml(options?: {
 }
 
 /** Plain-text footer for multipart/alternative emails. */
-export function buildStandardEmailFooterPlain(options?: {
-  unsubscribeUrl?: string | null;
-}): string {
-  const { site, tos, privacy, contact } = getEmailFooterUrls();
+export function buildStandardEmailFooterPlain(
+  branding: TransactionalEmailBranding,
+  options?: {
+    unsubscribeUrl?: string | null;
+  },
+): string {
+  const { site, tos, privacy, contact } = getEmailFooterUrls(branding);
   const lines = [
-    `Spring-Ford Press: ${site}`,
+    `${branding.siteName}: ${site}`,
     `Terms of Service: ${tos}`,
     `Privacy Policy: ${privacy}`,
     `Contact Us: ${contact}`,

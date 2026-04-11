@@ -1,5 +1,6 @@
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 /** Node runtime: cookie-based admin auth for browser; cron uses CRON_SECRET bearer. */
@@ -52,11 +53,20 @@ export async function GET(request: NextRequest) {
 
     const now = new Date().toISOString();
 
-    const { data: scheduledArticles, error: fetchError } = await supabase
+    const h = await headers();
+    const tenantFromHeader = h.get("x-tenant-id");
+
+    let articlesQuery = supabase
       .from("articles")
       .select("id, title, scheduled_for")
       .eq("status", "scheduled")
       .lte("scheduled_for", now);
+
+    if (tenantFromHeader) {
+      articlesQuery = articlesQuery.eq("tenant_id", tenantFromHeader);
+    }
+
+    const { data: scheduledArticles, error: fetchError } = await articlesQuery;
 
     if (fetchError) {
       console.error("Error fetching scheduled articles:", fetchError);

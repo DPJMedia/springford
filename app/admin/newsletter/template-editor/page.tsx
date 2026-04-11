@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { getAdSlotLabel } from "@/lib/advertising/adSlots";
 import type { NewsletterBlock, BlockType, Alignment, ArticleLayout } from "@/lib/newsletter/buildEmailHtml";
-import { buildEmailHtml } from "@/lib/newsletter/buildEmailHtml";
+import { buildEmailHtml, newsletterBrandingFromTenant } from "@/lib/newsletter/buildEmailHtml";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 // ─── Types / Helpers ──────────────────────────────────────────────────────────
 
@@ -16,14 +17,14 @@ interface Article {
   is_advertisement?: boolean | null;
 }
 
-function newBlock(type: BlockType): NewsletterBlock {
+function newBlock(type: BlockType, defaultButtonLink: string): NewsletterBlock {
   const id = `block_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   switch (type) {
     case "hero_text": return { id, type, headline: "This Week in Spring Ford", subheadline: "", introText: "", alignment: "left" };
     case "article":   return { id, type, articleTitle: "", articleExcerpt: "", articleImageUrl: "", articleSlug: "", articleSection: "", articleIsAdvertisement: false };
     case "text":      return { id, type, textTitle: "", textBody: "", alignment: "left" };
     case "image":     return { id, type, imageUrl: "", imageLink: "", imageAlt: "" };
-    case "button":        return { id, type, buttonText: "Read More", buttonLink: "https://www.springford.press", buttonColor: "#2b8aa8", alignment: "center" };
+    case "button":        return { id, type, buttonText: "Read More", buttonLink: defaultButtonLink, buttonColor: "#2b8aa8", alignment: "center" };
     case "advertisement": return { id, type, adId: "", adImageUrl: "", adLinkUrl: "", adTitle: "" };
     case "divider":       return { id, type };
     case "spacer":        return { id, type, spacerHeight: 24 };
@@ -214,11 +215,13 @@ function ArticlePickerModal({ onSelect, onClose }: { onSelect: (a: Article) => v
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
   useEffect(() => {
     supabase.from("articles").select("id,title,slug,excerpt,image_url,section,sections,published_at,is_advertisement")
+      .eq("tenant_id", tenantId)
       .eq("status", "published").order("published_at", { ascending: false }).limit(60)
       .then(({ data }) => { setArticles(data || []); setLoading(false); });
-  }, [supabase]);
+  }, [supabase, tenantId]);
   const filtered = articles.filter((a) => a.title.toLowerCase().includes(query.toLowerCase()));
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -275,6 +278,7 @@ function AdPickerModal({ onSelect, onClose }: { onSelect: (ad: AdOption) => void
   const [ads, setAds] = useState<AdOption[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   useEffect(() => {
     async function fetchAds() {
@@ -283,6 +287,7 @@ function AdPickerModal({ onSelect, onClose }: { onSelect: (ad: AdOption) => void
       const { data } = await supabase
         .from("ad_slot_assignments")
         .select("ad_slot, ads!inner(id, title, image_url, link_url, is_active, start_date, end_date)")
+        .eq("tenant_id", tenantId)
         .not("ads.image_url", "is", null);
 
       if (!data) { setLoading(false); return; }
@@ -311,7 +316,7 @@ function AdPickerModal({ onSelect, onClose }: { onSelect: (ad: AdOption) => void
       setLoading(false);
     }
     fetchAds();
-  }, [supabase]);
+  }, [supabase, tenantId]);
 
   const leaderboards = ads.filter((a) => a.ratio === "8:1");
   const mobileBanners = ads.filter((a) => a.ratio === "2:1");
@@ -621,6 +626,8 @@ function TemplateEditorInner() {
   const currentTemplateId = useRef<string | null>(templateId);
   const autosaveTimer = useRef<NodeJS.Timeout | null>(null);
   const supabase = createClient();
+  const tenant = useTenant();
+  const emailBranding = useMemo(() => newsletterBrandingFromTenant(tenant), [tenant]);
 
   useEffect(() => {
     async function init() {
@@ -629,7 +636,12 @@ function TemplateEditorInner() {
       const { data: p } = await supabase.from("user_profiles").select("is_admin,is_super_admin").eq("id", user.id).single();
       if (!p?.is_admin && !p?.is_super_admin) { router.push("/admin/articles"); return; }
       if (templateId) {
-        const { data: t } = await supabase.from("newsletter_templates").select("*").eq("id", templateId).single();
+        const { data: t } = await supabase
+          .from("newsletter_templates")
+          .select("*")
+          .eq("id", templateId)
+          .eq("tenant_id", tenant.id)
+          .single();
         if (t) {
           setTemplateName(t.name);
           setBlocks(Array.isArray(t.blocks) ? t.blocks : []);
@@ -640,11 +652,11 @@ function TemplateEditorInner() {
       setLoading(false);
     }
     init();
-  }, [templateId, router, supabase]);
+  }, [templateId, router, supabase, tenant.id]);
 
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null;
   const articleCount = blocks.filter((b) => b.type === "article").length;
-  const previewHtml = buildEmailHtml(blocks, templateName, undefined, undefined, articleLayout);
+  const previewHtml = buildEmailHtml(blocks, templateName, emailBranding, undefined, undefined, articleLayout);
 
   const saveNow = useCallback(async (
     name: string, blks: NewsletterBlock[], layout: ArticleLayout, tId: string | null,
@@ -655,11 +667,14 @@ function TemplateEditorInner() {
       if (tId) {
         const { error } = await supabase.from("newsletter_templates").update({
           name, blocks: blks, settings, updated_at: new Date().toISOString(),
-        }).eq("id", tId);
+        }).eq("id", tId).eq("tenant_id", tenant.id);
         if (error) throw error;
         setSaveStatus("saved"); return tId;
       } else {
-        const { data, error } = await supabase.from("newsletter_templates").insert({ name, blocks: blks, settings }).select("id").single();
+        const { data, error } = await supabase.from("newsletter_templates").insert({
+          tenant_id: tenant.id,
+          name, blocks: blks, settings,
+        }).select("id").single();
         if (error || !data) throw error;
         currentTemplateId.current = data.id;
         const newUrl = returnTo
@@ -670,7 +685,7 @@ function TemplateEditorInner() {
       }
     } catch { setSaveStatus("error"); return null; }
     finally { setSaving(false); }
-  }, [supabase, router, returnTo]);
+  }, [supabase, router, returnTo, tenant.id]);
 
   function scheduleSave(name: string, blks: NewsletterBlock[], layout: ArticleLayout) {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
@@ -691,7 +706,7 @@ function TemplateEditorInner() {
     saveNow(name, blocks, articleLayout, currentTemplateId.current);
   }
 
-  function addBlock(type: BlockType) { const nb = newBlock(type); const u = [...blocks, nb]; setBlocks(u); setSelectedBlockId(nb.id); scheduleSave(templateName, u, articleLayout); }
+  function addBlock(type: BlockType) { const nb = newBlock(type, emailBranding.siteUrl); const u = [...blocks, nb]; setBlocks(u); setSelectedBlockId(nb.id); scheduleSave(templateName, u, articleLayout); }
   function updateBlock(id: string, changes: Partial<NewsletterBlock>) { const u = blocks.map((b) => b.id === id ? { ...b, ...changes } : b); setBlocks(u); scheduleSave(templateName, u, articleLayout); }
   function deleteBlock(id: string) { const u = blocks.filter((b) => b.id !== id); setBlocks(u); setSelectedBlockId(null); scheduleSave(templateName, u, articleLayout); }
   function moveBlock(i: number, dir: "up" | "down") { const nb = [...blocks]; const t = dir === "up" ? i - 1 : i + 1; if (t < 0 || t >= nb.length) return; [nb[i], nb[t]] = [nb[t], nb[i]]; setBlocks(nb); scheduleSave(templateName, nb, articleLayout); }

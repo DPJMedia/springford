@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminBottomNav } from "@/components/admin/AdminBottomNav";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
@@ -12,10 +13,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = createClient();
+  const tenant = useTenant();
 
   useEffect(() => {
     checkUser();
-  }, []);
+  }, [tenant.id]);
 
   async function checkUser() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -31,8 +33,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       .eq("id", user.id)
       .single();
 
-    if (!profileData?.is_admin && !profileData?.is_super_admin) {
+    if (!profileData) {
       alert("You don't have admin access!");
+      router.push("/");
+      return;
+    }
+
+    if (profileData.is_super_admin) {
+      setUser(user);
+      setProfile(profileData);
+      setLoading(false);
+      return;
+    }
+
+    if (!profileData.is_admin) {
+      alert("You don't have admin access!");
+      router.push("/");
+      return;
+    }
+
+    const { data: membership } = await supabase
+      .from("tenant_memberships")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+
+    const roleOk =
+      membership &&
+      (membership.role === "admin" || membership.role === "editor");
+
+    if (!roleOk) {
+      alert("You don't have admin access for this site!");
       router.push("/");
       return;
     }

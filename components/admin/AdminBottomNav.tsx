@@ -41,6 +41,7 @@ export function AdminBottomNav({ profile }: AdminBottomNavProps) {
     ...(profile?.is_super_admin ? [
       { icon: "megaphone", label: "Ad Manager", href: "/admin/ads" },
       { icon: "users", label: "Users", href: "/admin/users" },
+      { icon: "building", label: "Tenants", href: "/admin/tenants" },
     ] : []),
   ];
 
@@ -57,8 +58,6 @@ export function AdminBottomNav({ profile }: AdminBottomNavProps) {
   };
 
   const isMoreActive = moreNavItems.some(item => isActive(item));
-
-  const hasUsersInMore = moreNavItems.some((item) => item.label === "Users");
 
   const getIcon = (iconName: string, className = "w-6 h-6") => {
     const icons: Record<string, ReactElement> = {
@@ -100,6 +99,11 @@ export function AdminBottomNav({ profile }: AdminBottomNavProps) {
       users: (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ),
+      building: (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
       ),
       diffuse: (
@@ -230,9 +234,7 @@ export function AdminBottomNav({ profile }: AdminBottomNavProps) {
                     </Link>
                   );
 
-                  const insertBack =
-                    item.label === "Users" ||
-                    (!hasUsersInMore && idx === moreNavItems.length - 1);
+                  const insertBack = idx === moreNavItems.length - 1;
 
                   if (!insertBack) return [row];
 

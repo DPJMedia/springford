@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { buildEmailHtml } from "@/lib/newsletter/buildEmailHtml";
+import { buildEmailHtml, newsletterBrandingFromTenant } from "@/lib/newsletter/buildEmailHtml";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 import type { NewsletterBlock, ArticleLayout } from "@/lib/newsletter/buildEmailHtml";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -306,6 +307,8 @@ function CampaignNewInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("id");
+  const tenant = useTenant();
+  const emailBranding = useMemo(() => newsletterBrandingFromTenant(tenant), [tenant]);
 
   const [campaignName, setCampaignName] = useState("Weekly Newsletter");
   const [subject, setSubject] = useState("");
@@ -345,13 +348,22 @@ function CampaignNewInner() {
       const { data: p } = await supabase.from("user_profiles").select("is_admin,is_super_admin").eq("id", user.id).single();
       if (!p?.is_admin && !p?.is_super_admin) { router.push("/admin/articles"); return; }
 
-      const { data: tmplData } = await supabase.from("newsletter_templates").select("*").order("updated_at", { ascending: false });
+      const { data: tmplData } = await supabase
+        .from("newsletter_templates")
+        .select("*")
+        .eq("tenant_id", tenant.id)
+        .order("updated_at", { ascending: false });
       const tmplList: Template[] = (tmplData || []).map((t) => ({ ...t, settings: (t.settings as Record<string, unknown>) || {} }));
       setTemplates(tmplList);
       setLoadingTemplates(false);
 
       if (editId) {
-        const { data: c } = await supabase.from("newsletter_campaigns").select("*").eq("id", editId).single();
+        const { data: c } = await supabase
+          .from("newsletter_campaigns")
+          .select("*")
+          .eq("id", editId)
+          .eq("tenant_id", tenant.id)
+          .single();
         if (c) {
           setCampaignName(c.name);
           setSubject(c.subject || "");
@@ -374,7 +386,7 @@ function CampaignNewInner() {
       }
     }
     init();
-  }, [editId, router, supabase]);
+  }, [editId, router, supabase, tenant.id]);
 
   // ── Campaign name prompt ──────────────────────────────────────────────────────
 
@@ -401,11 +413,12 @@ function CampaignNewInner() {
           name, subject: subj, preview_text: pvText, recipients_type: rt,
           template_id: tmplId, scheduled_at: schedAt, status,
           updated_at: new Date().toISOString(),
-        }).eq("id", currentCampaignId.current);
+        }).eq("id", currentCampaignId.current).eq("tenant_id", tenant.id);
         if (error) throw error;
         setSaveStatus("saved"); return currentCampaignId.current;
       } else {
         const { data, error } = await supabase.from("newsletter_campaigns").insert({
+          tenant_id: tenant.id,
           name, subject: subj, preview_text: pvText, recipients_type: rt,
           template_id: tmplId, scheduled_at: schedAt, status: "draft",
           blocks: selectedTemplate?.blocks || [],
@@ -447,6 +460,7 @@ function CampaignNewInner() {
     setDuplicating(true);
     try {
       const { data, error } = await supabase.from("newsletter_templates").insert({
+        tenant_id: tenant.id,
         name: dupName, blocks: tmpl.blocks, settings: tmpl.settings,
       }).select("*").single();
       if (error || !data) throw error;
@@ -481,6 +495,7 @@ function CampaignNewInner() {
         ? encodeURIComponent(`/admin/newsletter/campaigns/new?id=${campaignId}`)
         : encodeURIComponent(`/admin/newsletter/campaigns/new`);
       const { data, error } = await supabase.from("newsletter_templates").insert({
+        tenant_id: tenant.id,
         name: templateName.trim(),
         blocks: [],
         settings: {},
@@ -515,7 +530,11 @@ function CampaignNewInner() {
     setSending(true); setSendResult(null);
     const id = await saveNow(campaignName, subject, previewText, recipientsType, selectedTemplate.id, scheduledAt, "scheduled");
     if (!id) { setSending(false); return; }
-    await supabase.from("newsletter_campaigns").update({ blocks: selectedTemplate.blocks }).eq("id", id);
+    await supabase
+      .from("newsletter_campaigns")
+      .update({ blocks: selectedTemplate.blocks })
+      .eq("id", id)
+      .eq("tenant_id", tenant.id);
     setSending(false);
     setIsScheduled(true);
     setSendResult({ success: true, sentTo: `scheduled for ${formatScheduledAt(scheduledAt)}` });
@@ -526,7 +545,11 @@ function CampaignNewInner() {
     if (!selectedTemplate) return;
     const id = await saveNow(campaignName, subject, previewText, recipientsType, selectedTemplate.id, scheduledAt);
     if (!id) return;
-    await supabase.from("newsletter_campaigns").update({ blocks: selectedTemplate.blocks }).eq("id", id);
+    await supabase
+      .from("newsletter_campaigns")
+      .update({ blocks: selectedTemplate.blocks })
+      .eq("id", id)
+      .eq("tenant_id", tenant.id);
 
     setSending(true); setSendResult(null);
     try {
@@ -581,7 +604,14 @@ function CampaignNewInner() {
   // ── Computed ──────────────────────────────────────────────────────────────────
 
   const previewHtml = selectedTemplate
-    ? buildEmailHtml(selectedTemplate.blocks, subject || selectedTemplate.name, previewText, undefined, articleLayout)
+    ? buildEmailHtml(
+        selectedTemplate.blocks,
+        subject || selectedTemplate.name,
+        emailBranding,
+        previewText,
+        undefined,
+        articleLayout,
+      )
     : "";
 
   function formatScheduledAt(iso: string) {
@@ -712,7 +742,14 @@ function CampaignNewInner() {
                     <button key={tmpl.id} onClick={() => setTemplatePickModal(tmpl)}
                       className="text-left bg-[var(--admin-card-bg)] rounded-lg border-2 border-[var(--admin-border)] hover:border-[var(--admin-accent)] hover:shadow-md transition p-5 group">
                       <div className="w-full h-32 bg-[var(--admin-table-header-bg)] rounded-lg border border-[var(--admin-border)] mb-4 overflow-hidden relative">
-                        <iframe srcDoc={buildEmailHtml(tmpl.blocks, tmpl.name)} title={tmpl.name}
+                        <iframe srcDoc={buildEmailHtml(
+                          tmpl.blocks,
+                          tmpl.name,
+                          emailBranding,
+                          undefined,
+                          undefined,
+                          (tmpl.settings?.articleLayout as ArticleLayout) || "stack",
+                        )} title={tmpl.name}
                           className="w-full h-full pointer-events-none"
                           style={{ transform: "scale(0.45)", transformOrigin: "top left", width: "222%", height: "222%" }}
                           sandbox="allow-same-origin" />

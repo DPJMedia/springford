@@ -8,6 +8,7 @@ import type { Article } from "@/lib/types/database";
 import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
 import Link from "next/link";
 import { usePageTracking } from "@/lib/analytics/usePageTracking";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 // Define category filters for Town Council section
 const TOWN_COUNCIL_FILTERS = [
@@ -42,6 +43,7 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState("all");
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   // Track section page view
   usePageTracking({
@@ -57,6 +59,7 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
       const { data } = await supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", [section])
         .lte("published_at", new Date().toISOString())
@@ -70,7 +73,7 @@ export default function SectionPage({ params }: { params: Promise<{ section: str
     }
 
     fetchArticlesBySection();
-  }, [section, supabase]);
+  }, [section, supabase, tenantId]);
 
   useEffect(() => {
     if (selectedFilter === "all") {

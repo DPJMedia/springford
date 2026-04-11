@@ -11,6 +11,7 @@ import { SavedQuoteDocumentModal } from "@/components/ad-quoter/SavedQuoteDocume
 import { buildProposalTextFromSavedQuote } from "@/lib/advertising/packageQuoterModel";
 import { formatSavedQuoteUpdatedAt } from "@/lib/advertising/formatQuoteDates";
 import type { SavedAdQuote } from "@/lib/types/database";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 function supabaseErrorMessage(err: unknown): string {
   if (err == null) return "Unknown error";
@@ -28,6 +29,7 @@ function supabaseErrorMessage(err: unknown): string {
 export default function SavedAdQuotesPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<SavedAdQuote[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -43,6 +45,7 @@ export default function SavedAdQuotesPage() {
       const { data, error } = await supabase
         .from("saved_ad_quotes")
         .select("*")
+        .eq("tenant_id", tenantId)
         .order("updated_at", { ascending: false });
       if (error) {
         setFetchError(supabaseErrorMessage(error));
@@ -54,7 +57,7 @@ export default function SavedAdQuotesPage() {
       setFetchError(supabaseErrorMessage(e));
       setRows([]);
     }
-  }, [supabase]);
+  }, [supabase, tenantId]);
 
   useEffect(() => {
     (async () => {
@@ -81,7 +84,11 @@ export default function SavedAdQuotesPage() {
 
   async function performDelete(row: SavedAdQuote) {
     try {
-      const { error } = await supabase.from("saved_ad_quotes").delete().eq("id", row.id);
+      const { error } = await supabase
+        .from("saved_ad_quotes")
+        .delete()
+        .eq("id", row.id)
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       setDocumentQuote((q) => (q?.id === row.id ? null : q));
       await load();

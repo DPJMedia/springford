@@ -7,6 +7,7 @@ import {
   sumSendGridCategoryStats,
 } from "@/lib/newsletter/sendGridCampaign";
 import { isSendGridCategoryNotYetRegistered } from "@/lib/newsletter/sendGridStatsFetch";
+import { getTenantForApiRoute } from "@/lib/tenant/getTenantForApiRoute";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const tenant = await getTenantForApiRoute();
+
     const { searchParams } = new URL(request.url);
     const timeRange = searchParams.get("timeRange") || "30d";
     const { start: windowStart, end: windowEnd } = rangeFromTimeRange(timeRange);
@@ -61,6 +64,7 @@ export async function GET(request: Request) {
     const { data: campaigns, error: listErr } = await supabase
       .from("newsletter_campaigns")
       .select("id, name, sent_at")
+      .eq("tenant_id", tenant.id)
       .eq("status", "sent")
       .not("sent_at", "is", null)
       .gte("sent_at", windowStart.toISOString())

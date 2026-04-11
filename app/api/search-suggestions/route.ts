@@ -1,20 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { allowRateLimit, getClientIp } from "@/lib/rate-limit";
+import { getTenantForApiRoute } from "@/lib/tenant/getTenantForApiRoute";
 import { NextRequest, NextResponse } from "next/server";
 
 const SUGGESTIONS_PER_MIN = 120;
-
-const SECTIONS = [
-  { label: "Spring City", query: "Spring City", slug: "spring-city" },
-  { label: "Royersford", query: "Royersford", slug: "royersford" },
-  { label: "Limerick", query: "Limerick", slug: "limerick" },
-  { label: "Upper Providence", query: "Upper Providence", slug: "upper-providence" },
-  { label: "School District", query: "School District", slug: "school-district" },
-  { label: "Politics", query: "Politics", slug: "politics" },
-  { label: "Business", query: "Business", slug: "business" },
-  { label: "Events", query: "Events", slug: "events" },
-  { label: "Opinion", query: "Opinion", slug: "opinion" },
-];
 
 export type SuggestionItem = {
   label: string;
@@ -40,13 +29,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ suggestions: [] });
   }
 
+  const tenant = await getTenantForApiRoute();
   const suggestions: SuggestionItem[] = [];
   const seen = new Set<string>();
 
+  const rawConfig = tenant.section_config;
+  const sectionRows: { label: string; slug: string; query: string }[] = [];
+  if (Array.isArray(rawConfig)) {
+    for (const item of rawConfig) {
+      if (!item || typeof item !== "object") continue;
+      const slug = String((item as { slug?: string }).slug || "").trim();
+      const label = String((item as { label?: string }).label || slug).trim();
+      if (!slug) continue;
+      sectionRows.push({ label: label || slug, slug, query: label || slug });
+    }
+  }
+
   // 1. Section matches (label or slug)
-  for (const s of SECTIONS) {
+  for (const s of sectionRows) {
     if (suggestions.length >= 5) break;
-    if (s.label.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q.replace(/\s/g, "-"))) {
+    if (
+      s.label.toLowerCase().includes(q) ||
+      s.slug.toLowerCase().includes(q.replace(/\s/g, "-"))
+    ) {
       const key = `section:${s.query}`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -64,6 +69,7 @@ export async function GET(request: NextRequest) {
     const { data: articles } = await supabase
       .from("articles")
       .select("title, slug, image_url")
+      .eq("tenant_id", tenant.id)
       .eq("status", "published")
       .lte("published_at", now)
       .ilike("title", `%${escaped}%`)
@@ -92,6 +98,7 @@ export async function GET(request: NextRequest) {
     const { data: tagRows } = await supabase
       .from("articles")
       .select("tags")
+      .eq("tenant_id", tenant.id)
       .eq("status", "published")
       .lte("published_at", now)
       .not("tags", "is", null)

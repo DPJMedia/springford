@@ -1,5 +1,9 @@
-/** Stable SendGrid category tag per campaign (alphanumeric + underscore; max 255). Used with Stats API + Event Webhook. */
-export const SENDGRID_NEWSLETTER_GLOBAL_CATEGORY = "springford_newsletter";
+import type { TenantRow } from "@/lib/types/database";
+
+/** Per-tenant SendGrid category for newsletter sends (Stats API + Event Webhook). */
+export function sendGridNewsletterGlobalCategory(tenant: TenantRow): string {
+  return `${tenant.slug}_newsletter`;
+}
 
 export function sendGridCategoryForCampaign(campaignId: string): string {
   return `sfpc_${campaignId.replace(/-/g, "")}`;

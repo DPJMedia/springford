@@ -8,6 +8,7 @@ import type { NewsletterBlock } from "@/lib/newsletter/buildEmailHtml";
 export async function enrichArticleBlocksWithAdvertisementFlags(
   supabase: SupabaseClient,
   blocks: NewsletterBlock[],
+  tenantId: string,
 ): Promise<NewsletterBlock[]> {
   const ids = [
     ...new Set(
@@ -21,6 +22,7 @@ export async function enrichArticleBlocksWithAdvertisementFlags(
   const { data: rows } = await supabase
     .from("articles")
     .select("id, is_advertisement")
+    .eq("tenant_id", tenantId)
     .in("id", ids);
 
   const byId = new Map((rows || []).map((r) => [r.id, r.is_advertisement === true]));

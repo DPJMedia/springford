@@ -1,5 +1,7 @@
+import type { TransactionalEmailBranding } from "./emailBranding";
 import {
   emailHeadlineHtml,
+  escapeHtml,
   FONT_BODY,
   wrapTransactionalEmailHtml,
 } from "./emailLayout";
@@ -11,18 +13,19 @@ const P = `font-family: ${FONT_BODY};`;
 export function buildThankYouEmailHtml(
   amountDollars: string,
   receiptUrl: string | null,
+  branding: TransactionalEmailBranding,
   opts: {
     isRecurring: boolean;
     intervalLabel?: string;
     cancelAtLabel?: string | null;
     cancelViaEmailUrl?: string | null;
-  }
+  },
 ): string {
   const recurringNote = opts.isRecurring
     ? `
     <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.65; color: #1a1a1a; ${P}">
       <strong>This is a recurring contribution.</strong> Your receipt from Stripe reflects recurring billing${opts.intervalLabel ? ` (${opts.intervalLabel})` : ""}.
-      ${opts.cancelAtLabel ? `Your current commitment ends around <strong>${opts.cancelAtLabel}</strong> unless you change or cancel it from your profile.` : "You can manage or cancel anytime from your Spring-Ford Press profile."}
+      ${opts.cancelAtLabel ? `Your current commitment ends around <strong>${opts.cancelAtLabel}</strong> unless you change or cancel it from your profile.` : `You can manage or cancel anytime from your ${escapeHtml(branding.siteName)} profile.`}
     </p>`
     : "";
 
@@ -42,21 +45,21 @@ export function buildThankYouEmailHtml(
   const cancelBlock = opts.cancelViaEmailUrl
     ? `
               <p style="margin: 28px 0 0; padding-top: 20px; border-top: 1px solid #e8e8e8; font-size: 11px; line-height: 1.55; color: #888888; ${P}">
-                Need to cancel this recurring contribution? <a href="${opts.cancelViaEmailUrl}" style="color: #888888; text-decoration: underline;">Cancel from this email</a> (link valid 90 days). You can also cancel anytime from your Spring-Ford Press profile under Support.
+                Need to cancel this recurring contribution? <a href="${opts.cancelViaEmailUrl}" style="color: #888888; text-decoration: underline;">Cancel from this email</a> (link valid 90 days). You can also cancel anytime from your ${escapeHtml(branding.siteName)} profile under Support.
               </p>`
     : "";
 
   const inner = `
     ${emailHeadlineHtml("Thank you for your contribution")}
     <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333333; ${P}">
-      Your support helps us keep independent, neighborhood-first reporting in the Spring-Ford area.
+      Your support helps us keep independent, neighborhood-first reporting for ${escapeHtml(branding.siteName)} readers.
     </p>
     <p style="margin: 0 0 8px; font-size: 15px; color: #666666; ${P}">Amount${opts.isRecurring ? " (first billing period)" : ""}:</p>
     <p style="margin: 0 0 24px; font-size: 28px; font-weight: 700; color: #1a1a1a; ${P}">${amountDollars}</p>
     ${recurringNote}
     ${receiptSection}
     <p style="margin: 0; font-size: 15px; color: #333333; ${P}">
-      — The Spring-Ford Press team
+      — The ${escapeHtml(branding.siteName)} team
     </p>
     ${cancelBlock}
   `;
@@ -64,5 +67,6 @@ export function buildThankYouEmailHtml(
   return wrapTransactionalEmailHtml({
     documentTitle: "Thank you for your support",
     innerContentHtml: inner,
+    branding,
   });
 }

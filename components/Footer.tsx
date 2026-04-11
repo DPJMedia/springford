@@ -1,19 +1,38 @@
+"use client";
+
+import { useMemo } from "react";
+import { useTenant } from "@/lib/tenant/TenantProvider";
+
 export function Footer() {
+  const { name, section_config: sectionConfig } = useTenant();
+
+  const sectionLinks = useMemo(() => {
+    if (!Array.isArray(sectionConfig)) return [];
+    return sectionConfig.map((entry) => {
+      const slug = String((entry as { slug?: string }).slug || "").trim();
+      const label = String((entry as { label?: string }).label || slug).trim();
+      return {
+        label: label || slug,
+        href: slug ? `/#${encodeURIComponent(slug)}` : "/",
+      };
+    });
+  }, [sectionConfig]);
+
   return (
     <footer className="mt-8 border-t border-[color:var(--color-border)] bg-white text-sm text-[color:var(--color-medium)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
         {/* Top row: brand + columns */}
-        <div className="grid grid-cols-2 gap-8 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-2 lg:grid-cols-6">
           {/* Brand */}
           <div className="col-span-2 lg:col-span-2">
             <span
               className="masthead font-semibold text-[color:var(--color-dark)] text-lg"
               style={{ letterSpacing: "-0.02em" }}
             >
-              Spring-Ford Press
+              {name}
             </span>
             <p className="mt-2 text-xs leading-relaxed max-w-xs">
-              Independent, neighborhood-first reporting from the Spring-Ford area.
+              Independent, neighborhood-first reporting for your community.
             </p>
             {/* Social */}
             <div className="mt-4">
@@ -30,6 +49,23 @@ export function Footer() {
               </a>
             </div>
           </div>
+
+          {sectionLinks.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[color:var(--color-dark)] mb-3">
+                Sections
+              </h3>
+              <ul className="space-y-2 text-xs">
+                {sectionLinks.map((item) => (
+                  <li key={item.href + item.label}>
+                    <a href={item.href} className="hover:text-[color:var(--color-dark)] transition">
+                      {item.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Company */}
           <div>

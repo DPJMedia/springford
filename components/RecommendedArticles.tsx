@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Article } from "@/lib/types/database";
 import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 import Link from "next/link";
 
 type RecommendedArticlesProps = {
@@ -15,6 +16,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   useEffect(() => {
     async function fetchRecommended() {
@@ -23,6 +25,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
         let { data: taggedArticles } = await supabase
           .from("articles")
           .select(ARTICLE_LIST_COLUMNS)
+          .eq("tenant_id", tenantId)
           .eq("status", "published")
           .neq("id", currentArticle.id)
           .lte("published_at", new Date().toISOString())
@@ -44,6 +47,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
           const { data: sectionArticles } = await supabase
             .from("articles")
             .select(ARTICLE_LIST_COLUMNS)
+            .eq("tenant_id", tenantId)
             .eq("status", "published")
             .eq("section", currentArticle.section)
             .neq("id", currentArticle.id)
@@ -65,6 +69,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
           const { data: recentArticles } = await supabase
             .from("articles")
             .select(ARTICLE_LIST_COLUMNS)
+            .eq("tenant_id", tenantId)
             .eq("status", "published")
             .neq("id", currentArticle.id)
             .lte("published_at", new Date().toISOString())
@@ -88,7 +93,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
     }
 
     fetchRecommended();
-  }, [currentArticle.id, currentArticle.tags, currentArticle.section, limit, supabase]);
+  }, [currentArticle.id, currentArticle.tags, currentArticle.section, limit, supabase, tenantId]);
 
   if (loading) {
     return (

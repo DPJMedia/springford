@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { Newsreader, Playfair_Display, Red_Hat_Display, Space_Grotesk } from "next/font/google";
+import { headers } from "next/headers";
 import { OrganizationJsonLd } from "@/components/seo/OrganizationJsonLd";
 import { SITE_KEYWORDS } from "@/lib/seo/site";
+import { getTenantById } from "@/lib/tenant/getTenant";
+import { getTenantFromHeaders } from "@/lib/tenant/getTenantFromHeaders";
+import { parseTenantSectionConfig } from "@/lib/tenant/parseSectionConfig";
+import { TenantProvider } from "@/lib/tenant/TenantProvider";
 import "./globals.css";
 
 const redHatDisplay = Red_Hat_Display({
@@ -64,18 +69,37 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const h = await headers();
+  const { tenantId } = getTenantFromHeaders(h);
+  const tenantRow = await getTenantById(tenantId);
+  if (!tenantRow) {
+    throw new Error(`Tenant not found for id: ${tenantId}`);
+  }
+
+  const tenantContext = {
+    id: tenantRow.id,
+    name: tenantRow.name,
+    slug: tenantRow.slug,
+    domain: tenantRow.domain,
+    from_email: tenantRow.from_email,
+    from_name: tenantRow.from_name,
+    section_config: parseTenantSectionConfig(tenantRow),
+  };
+
   return (
     <html lang="en">
       <body
         className={`${redHatDisplay.variable} ${newsreader.variable} ${playfair.variable} ${spaceGrotesk.variable} antialiased bg-[color:var(--color-surface)] text-[color:var(--color-text)]`}
       >
-        <OrganizationJsonLd />
-        {children}
+        <TenantProvider value={tenantContext}>
+          <OrganizationJsonLd tenant={tenantRow} />
+          {children}
+        </TenantProvider>
       </body>
     </html>
   );

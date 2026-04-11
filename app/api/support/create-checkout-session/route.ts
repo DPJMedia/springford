@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
+import { getTenantById } from "@/lib/tenant/getTenant";
+import { getTenantFromHeaders } from "@/lib/tenant/getTenantFromHeaders";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -31,6 +33,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Sign in required" }, { status: 401 });
     }
 
+    const { tenantId } = getTenantFromHeaders(request.headers);
+    const tenant = await getTenantById(tenantId);
+    if (!tenant) {
+      return NextResponse.json({ error: "Tenant not found" }, { status: 500 });
+    }
+
     const body = await request.json();
     const amountCents = Math.round(Number(body.amountCents) || 0);
     const plan = (body.plan as RecurringPlan) || "one_time";
@@ -55,7 +63,7 @@ export async function POST(request: NextRequest) {
     const origin =
       request.headers.get("origin") || request.nextUrl.origin || "";
 
-    const metadata = { supabase_user_id: user.id };
+    const metadata = { supabase_user_id: user.id, tenant_id: tenant.id };
 
     if (plan === "one_time") {
       const session = await stripe.checkout.sessions.create({
@@ -68,7 +76,7 @@ export async function POST(request: NextRequest) {
               currency: "usd",
               unit_amount: amountCents,
               product_data: {
-                name: "Support Spring-Ford Press",
+                name: `Support ${tenant.name}`,
                 description:
                   "One-time contribution to independent, neighborhood-first reporting.",
                 images: origin ? [`${origin}/favicon.ico`] : undefined,
@@ -93,7 +101,7 @@ export async function POST(request: NextRequest) {
           ? { interval: "year", interval_count: 1 }
           : { interval: "month", interval_count: 1 },
       product_data: {
-        name: "Support Spring-Ford Press (recurring)",
+        name: `Support ${tenant.name} (recurring)`,
         description:
           plan === "annual"
             ? "Annual recurring support — renews each year until canceled."

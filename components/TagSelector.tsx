@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 type TagSelectorProps = {
   selectedTags: string[];
@@ -16,6 +17,7 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
   const [loading, setLoading] = useState(true);
   const [processingTag, setProcessingTag] = useState<string | null>(null);
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   useEffect(() => {
     async function fetchAllTags() {
@@ -23,12 +25,14 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
       const { data: articlesData } = await supabase
         .from("articles")
         .select("tags")
+        .eq("tenant_id", tenantId)
         .not("tags", "is", null);
 
       // Fetch hidden tags
       const { data: hiddenData } = await supabase
         .from("hidden_tags")
-        .select("tag_name");
+        .select("tag_name")
+        .eq("tenant_id", tenantId);
 
       const hiddenTagNames = hiddenData?.map((ht) => ht.tag_name) || [];
       setHiddenTags(hiddenTagNames);
@@ -50,7 +54,7 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
     }
 
     fetchAllTags();
-  }, [supabase]);
+  }, [supabase, tenantId]);
 
   const handleToggleTag = (tag: string) => {
     if (selectedTags.includes(tag)) {
@@ -82,7 +86,7 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
     try {
       const { error } = await supabase
         .from("hidden_tags")
-        .insert({ tag_name: tagToHide });
+        .insert({ tag_name: tagToHide, tenant_id: tenantId });
 
       if (error) {
         console.error("Error hiding tag:", error);
@@ -116,6 +120,7 @@ export function TagSelector({ selectedTags, onChange }: TagSelectorProps) {
       const { error } = await supabase
         .from("hidden_tags")
         .delete()
+        .eq("tenant_id", tenantId)
         .eq("tag_name", tagToUnhide);
 
       if (error) {

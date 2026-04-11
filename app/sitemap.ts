@@ -1,11 +1,20 @@
 import type { MetadataRoute } from "next";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { PUBLIC_SECTION_SLUGS, SITE_URL } from "@/lib/seo/site";
+import { getSiteConfig } from "@/lib/seo/site";
+import { getTenantById } from "@/lib/tenant/getTenant";
+import { getTenantFromHeaders } from "@/lib/tenant/getTenantFromHeaders";
 
 const MAX_ARTICLES = 5000;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = SITE_URL;
+  const h = await headers();
+  const { tenantId } = getTenantFromHeaders(h);
+  const tenantRow = await getTenantById(tenantId);
+  if (!tenantRow) {
+    throw new Error(`Tenant not found for sitemap: ${tenantId}`);
+  }
+  const { siteUrl: base, sectionSlugs } = getSiteConfig(tenantRow);
   const now = new Date();
 
   const staticEntries: MetadataRoute.Sitemap = [
@@ -17,7 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/advertise`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/privacy-policy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${base}/terms-of-service`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
-    ...PUBLIC_SECTION_SLUGS.map((slug) => ({
+    ...sectionSlugs.map((slug) => ({
       url: `${base}/section/${slug}`,
       lastModified: now,
       changeFrequency: "daily" as const,
@@ -38,7 +47,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const articleEntries: MetadataRoute.Sitemap = (articles || []).map((a) => ({
     url: `${base}/article/${a.slug}`,
     lastModified: a.updated_at ? new Date(a.updated_at) : now,
-    changeFrequency: "weekly", 
+    changeFrequency: "weekly",
     priority: 0.8,
   }));
 

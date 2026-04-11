@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { transactionalEmailBrandingFromTenant } from "@/lib/emails/emailBranding";
 import { createClient } from "@/lib/supabase/server";
 import { sendSupportCancelConfirmationEmail } from "@/lib/support/sendSupportCancelConfirmationEmail";
+import { getTenantForApiRoute } from "@/lib/tenant/getTenantForApiRoute";
 import { cancelSupportSubscription } from "@/lib/support/stripeCancelSupportSubscription";
 import {
   clearStripeSubscriptionFromProfile,
@@ -65,7 +67,19 @@ export async function POST() {
     }
 
     if (outcome === "updated") {
-      await sendSupportCancelConfirmationEmail(user.email);
+      const tenant = await getTenantForApiRoute();
+      const branding = transactionalEmailBrandingFromTenant(tenant);
+      await sendSupportCancelConfirmationEmail(user.email, branding, {
+        email:
+          tenant.from_email ||
+          process.env.SENDGRID_FROM_EMAIL ||
+          process.env.NEXT_PUBLIC_NEWSLETTER_FROM_EMAIL ||
+          "admin@dpjmedia.com",
+        name:
+          tenant.from_name ||
+          process.env.SENDGRID_FROM_NAME ||
+          tenant.name,
+      });
     }
 
     return NextResponse.json({ ok: true, noop: outcome === "noop" });

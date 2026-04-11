@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type ReactElement } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { SITE_NAME } from "@/lib/seo/site";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 interface NavItem {
   icon: string;
@@ -26,6 +26,7 @@ function formatRoleLabel(profile: any): string {
 }
 
 export function AdminSidebar({ profile }: AdminSidebarProps) {
+  const { name: siteName } = useTenant();
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -38,6 +39,7 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
     { icon: "dollar", label: "Ad Quoter", href: "/admin/ad-quoter" },
     { icon: "megaphone", label: "Ad Manager", href: "/admin/ads", superAdminOnly: true },
     { icon: "users", label: "Users", href: "/admin/users", superAdminOnly: true },
+    { icon: "building", label: "Tenants", href: "/admin/tenants", superAdminOnly: true },
   ];
 
   const isActive = (item: NavItem) => {
@@ -94,6 +96,11 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
         </svg>
       ),
+      building: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      ),
       diffuse: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -114,8 +121,6 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
     }
     return true;
   });
-
-  const hasUsersNavItem = filteredNavItems.some((item) => item.label === "Users");
 
   const backToSiteNavLink = (
     <Link
@@ -155,7 +160,7 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
               <span className="text-[var(--admin-accent)] font-semibold text-xl leading-none">.AI</span>
             </span>
             <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-tight">
-              {SITE_NAME.toUpperCase()}
+              {siteName.toUpperCase()}
             </span>
           </Link>
         </div>
@@ -186,9 +191,7 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
                 </Link>
               );
 
-              const insertBack =
-                item.label === "Users" ||
-                (!hasUsersNavItem && idx === filteredNavItems.length - 1);
+              const insertBack = idx === filteredNavItems.length - 1;
 
               return insertBack ? [navLink, backToSiteNavLink] : [navLink];
             })}

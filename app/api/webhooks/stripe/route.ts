@@ -4,11 +4,13 @@ import {
   clearStripeSubscriptionFromProfile,
   syncStripeSubscriptionToProfile,
 } from "@/lib/support/stripeSubscriptionProfile";
-import { buildThankYouEmailHtml } from "@/lib/emails/supportThankYou";
 import {
-  buildStandardEmailFooterPlain,
-  getEmailFooterUrls,
-} from "@/lib/emails/emailFooter";
+  fallbackTransactionalEmailBranding,
+  transactionalEmailBrandingFromTenant,
+} from "@/lib/emails/emailBranding";
+import { buildStandardEmailFooterPlain } from "@/lib/emails/emailFooter";
+import { buildThankYouEmailHtml } from "@/lib/emails/supportThankYou";
+import { getTenantById, getTenantBySlug } from "@/lib/tenant/getTenant";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
@@ -70,6 +72,26 @@ export async function POST(request: NextRequest) {
 
   const isSubscription = session.mode === "subscription";
 
+  let tenant =
+    session.metadata?.tenant_id != null && session.metadata.tenant_id !== ""
+      ? await getTenantById(String(session.metadata.tenant_id))
+      : null;
+  if (!tenant) {
+    tenant = await getTenantBySlug("spring-ford");
+  }
+  const branding = tenant
+    ? transactionalEmailBrandingFromTenant(tenant)
+    : fallbackTransactionalEmailBranding();
+  const fromEmail =
+    tenant?.from_email ||
+    process.env.SENDGRID_FROM_EMAIL ||
+    process.env.NEXT_PUBLIC_NEWSLETTER_FROM_EMAIL ||
+    "admin@dpjmedia.com";
+  const fromName =
+    tenant?.from_name ||
+    process.env.SENDGRID_FROM_NAME ||
+    branding.siteName;
+
   let receiptUrl: string | null = null;
   let intervalLabel: string | undefined;
   let cancelAtLabel: string | null = null;
@@ -129,8 +151,11 @@ export async function POST(request: NextRequest) {
       if (uid && customerEmail) {
         try {
           const { createSupportCancelToken } = await import("@/lib/support/cancelToken");
-          const tok = createSupportCancelToken(fullSub.id, uid, customerEmail);
-          cancelViaEmailUrl = `${getEmailFooterUrls().site}/api/support/cancel-from-email?token=${encodeURIComponent(tok)}`;
+          const tok = createSupportCancelToken(fullSub.id, uid, customerEmail, {
+            siteUrl: branding.siteUrl,
+            siteName: branding.siteName,
+          });
+          cancelViaEmailUrl = `${branding.siteUrl.replace(/\/$/, "")}/api/support/cancel-from-email?token=${encodeURIComponent(tok)}`;
         } catch (e) {
           console.warn("Could not build email cancel link (set SUPPORT_CANCEL_TOKEN_SECRET or STRIPE_WEBHOOK_SECRET):", e);
         }
@@ -162,8 +187,6 @@ export async function POST(request: NextRequest) {
   }
 
   const apiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || "admin@dpjmedia.com";
-  const fromName = process.env.SENDGRID_FROM_NAME || "Spring-Ford Press";
 
   if (!apiKey) {
     console.warn("SENDGRID_API_KEY not set; skipping thank-you email");
@@ -171,10 +194,10 @@ export async function POST(request: NextRequest) {
   }
 
   const subject = isSubscription
-    ? "Thank you — your recurring support is set up"
-    : "Thank you for supporting Spring-Ford Press";
+    ? `Thank you — your recurring support is set up — ${branding.siteName}`
+    : `Thank you for supporting ${branding.siteName}`;
 
-  const html = buildThankYouEmailHtml(amountDollars, receiptUrl, {
+  const html = buildThankYouEmailHtml(amountDollars, receiptUrl, branding, {
     isRecurring: isSubscription,
     intervalLabel,
     cancelAtLabel,
@@ -185,7 +208,7 @@ export async function POST(request: NextRequest) {
     ? `\n\nThis is a recurring contribution. Your Stripe receipt shows recurring billing.${intervalLabel ? ` (${intervalLabel})` : ""}${cancelAtLabel ? ` Scheduled end: ${cancelAtLabel}.` : ""} Manage or cancel from your profile.${cancelViaEmailUrl ? `\n\nCancel from email: ${cancelViaEmailUrl}` : ""}`
     : "";
 
-  const plainText = `Thank you for your contribution to Spring-Ford Press.\n\nAmount: ${amountDollars}${plainRecurring}\n\n${receiptUrl ? `View your receipt: ${receiptUrl}\n\n` : ""}— The Spring-Ford Press team\n\n${buildStandardEmailFooterPlain()}`;
+  const plainText = `Thank you for your contribution to ${branding.siteName}.\n\nAmount: ${amountDollars}${plainRecurring}\n\n${receiptUrl ? `View your receipt: ${receiptUrl}\n\n` : ""}— The ${branding.siteName} team\n\n${buildStandardEmailFooterPlain(branding)}`;
 
   try {
     const res = await fetch(SENDGRID_API_URL, {

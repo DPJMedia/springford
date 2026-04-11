@@ -75,8 +75,19 @@ export async function POST(request: Request) {
           : null;
     const sgEventId = typeof ev.sg_event_id === "string" ? ev.sg_event_id : null;
 
+    let tenantId: string | null = null;
+    const { data: campaignRow } = await supabase
+      .from("newsletter_campaigns")
+      .select("tenant_id")
+      .eq("id", campaignIdRaw)
+      .maybeSingle();
+    if (campaignRow?.tenant_id) {
+      tenantId = campaignRow.tenant_id as string;
+    }
+
     const row = {
       campaign_id: campaignIdRaw,
+      tenant_id: tenantId,
       email,
       event: eventName,
       url: urlVal,

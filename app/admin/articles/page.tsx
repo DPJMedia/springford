@@ -8,6 +8,7 @@ import { ScheduledPublisher } from "@/components/ScheduledPublisher";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 interface Article {
   id: string;
@@ -54,6 +55,7 @@ export default function ArticlesManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   const ROWS_PER_PAGE = 10;
 
@@ -76,12 +78,13 @@ export default function ArticlesManagementPage() {
       clearInterval(refreshInterval);
       clearInterval(timeInterval);
     };
-  }, []);
+  }, [tenantId]);
 
   async function fetchEditorsPicks() {
     const { data } = await supabase
       .from("editors_picks")
       .select("article_id, position")
+      .eq("tenant_id", tenantId)
       .order("position", { ascending: true });
     
     if (data && data.length > 0) {
@@ -113,6 +116,7 @@ export default function ArticlesManagementPage() {
     const { data, error } = await supabase
       .from("articles")
       .select("id, title, section, status, published_at, scheduled_for, created_at, author_name, view_count, share_count, visibility")
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -220,7 +224,11 @@ export default function ArticlesManagementPage() {
     )
       return;
 
-    const { error } = await supabase.from("articles").update({ status: "archived" }).in("id", ids);
+    const { error } = await supabase
+      .from("articles")
+      .update({ status: "archived" })
+      .eq("tenant_id", tenantId)
+      .in("id", ids);
 
     if (error) {
       alert("Error archiving articles: " + error.message);
@@ -242,7 +250,11 @@ export default function ArticlesManagementPage() {
     )
       return;
 
-    const { error } = await supabase.from("articles").delete().in("id", ids);
+    const { error } = await supabase
+      .from("articles")
+      .delete()
+      .eq("tenant_id", tenantId)
+      .in("id", ids);
 
     if (error) {
       alert("Error deleting articles: " + error.message);
@@ -715,11 +727,16 @@ export default function ArticlesManagementPage() {
                     onClick={async () => {
                       const filteredPicks = editorsPicks.filter(Boolean);
                       try {
-                        await supabase.from("editors_picks").delete().in("position", [1, 2, 3]);
+                        await supabase
+                          .from("editors_picks")
+                          .delete()
+                          .eq("tenant_id", tenantId)
+                          .in("position", [1, 2, 3]);
                         for (let i = 0; i < filteredPicks.length; i++) {
                           await supabase.from("editors_picks").insert({
                             article_id: filteredPicks[i],
                             position: i + 1,
+                            tenant_id: tenantId,
                           });
                         }
                         alert(`Editor's Picks saved successfully! (${filteredPicks.length} articles selected)`);

@@ -15,6 +15,7 @@ import { DateTimePicker } from "@/components/DateTimePicker";
 import { AuthorSelector } from "@/components/AuthorSelector";
 import { TagSelector } from "@/components/TagSelector";
 import { ArticlePreviewModal } from "@/components/admin/ArticlePreviewModal";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 export default function EditArticlePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -58,10 +59,11 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   useEffect(() => {
     checkAdminAndLoad();
-  }, [id]);
+  }, [id, tenantId]);
 
   async function checkAdminAndLoad() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -92,6 +94,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
         .from("articles")
         .select("*")
         .eq("id", id)
+        .eq("tenant_id", tenantId)
         .single();
 
       if (error) throw error;
@@ -332,7 +335,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
             : (showCoAuthor && coAuthorName ? `${authorName} & ${coAuthorName}` : (authorName || null)),
           updated_by: user.id,
         })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
 
       if (updateError) throw updateError;
 

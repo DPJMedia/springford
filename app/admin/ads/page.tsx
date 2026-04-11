@@ -14,6 +14,7 @@ import {
   sortAdSlotIdsByInventoryOrder,
   UNASSIGNED_AD_SLOT,
 } from "@/lib/advertising/adSlots";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 const ET_TIMEZONE = "America/New_York";
 
@@ -183,6 +184,7 @@ export default function AdsManagerPage() {
   const [editingAd, setEditingAd] = useState<Ad | null>(null);
   const router = useRouter();
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Enhanced form state
@@ -272,7 +274,7 @@ export default function AdsManagerPage() {
 
   useEffect(() => {
     checkSuperAdmin();
-  }, []);
+  }, [tenantId]);
 
   // Auto-refresh ads every 30 seconds to update status
   useEffect(() => {
@@ -283,7 +285,7 @@ export default function AdsManagerPage() {
     }, 30000); // Every 30 seconds
 
     return () => clearInterval(interval);
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, tenantId]);
 
   // Track previous statuses to detect changes
   const previousStatusesRef = useRef<{ [key: string]: string }>({});
@@ -382,6 +384,7 @@ export default function AdsManagerPage() {
     const { data } = await supabase
       .from("ads")
       .select("*")
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
 
     if (data) {
@@ -391,7 +394,8 @@ export default function AdsManagerPage() {
           const { data: assignments } = await supabase
             .from("ad_slot_assignments")
             .select("ad_slot, fill_section")
-            .eq("ad_id", ad.id);
+            .eq("ad_id", ad.id)
+            .eq("tenant_id", tenantId);
 
           const slotSettings: Record<string, { fill_section: boolean }> = {};
           assignments?.forEach((a) => {
@@ -629,14 +633,20 @@ export default function AdsManagerPage() {
             ? formData.ad_label_position
             : "bottom-right",
         })
-        .eq("id", editingAd.id);
+        .eq("id", editingAd.id)
+        .eq("tenant_id", tenantId);
       if (updateError) throw updateError;
-      await supabase.from("ad_slot_assignments").delete().eq("ad_id", editingAd.id);
+      await supabase
+        .from("ad_slot_assignments")
+        .delete()
+        .eq("ad_id", editingAd.id)
+        .eq("tenant_id", tenantId);
       if (formData.selectedSlots.length > 0) {
         const assignments = formData.selectedSlots.map((slot) => ({
           ad_id: editingAd.id,
           ad_slot: slot,
           fill_section: true,
+          tenant_id: tenantId,
         }));
         const { error: assignError } = await supabase.from("ad_slot_assignments").insert(assignments);
         if (assignError) throw assignError;
@@ -645,6 +655,7 @@ export default function AdsManagerPage() {
       const { data: newAd, error: insertError } = await supabase
         .from("ads")
         .insert({
+          tenant_id: tenantId,
           title: formData.title || null,
           image_url: finalImageUrl,
           link_url: formData.link_url,
@@ -669,6 +680,7 @@ export default function AdsManagerPage() {
           ad_id: newAd.id,
           ad_slot: slot,
           fill_section: true,
+          tenant_id: tenantId,
         }));
         const { error: assignError } = await supabase.from("ad_slot_assignments").insert(assignments);
         if (assignError) throw assignError;
@@ -717,10 +729,19 @@ export default function AdsManagerPage() {
     const { data: assignments } = await supabase
       .from("ad_slot_assignments")
       .select("ad_slot, fill_section")
-      .eq("ad_id", adId);
+      .eq("ad_id", adId)
+      .eq("tenant_id", tenantId);
     try {
-      await supabase.from("ad_slot_assignments").delete().eq("ad_id", adId);
-      const { error } = await supabase.from("ads").delete().eq("id", adId);
+      await supabase
+        .from("ad_slot_assignments")
+        .delete()
+        .eq("ad_id", adId)
+        .eq("tenant_id", tenantId);
+      const { error } = await supabase
+        .from("ads")
+        .delete()
+        .eq("id", adId)
+        .eq("tenant_id", tenantId);
       if (error) throw error;
       // If any slot now has only one ad, clear that ad's runtime (rotation no longer applies)
       const slotsToCheck = (assignments ?? []).map((a: { ad_slot: string }) => a.ad_slot);
@@ -728,9 +749,14 @@ export default function AdsManagerPage() {
         const { data: remaining } = await supabase
           .from("ad_slot_assignments")
           .select("ad_id")
-          .eq("ad_slot", slot);
+          .eq("ad_slot", slot)
+          .eq("tenant_id", tenantId);
         if (remaining?.length === 1) {
-          await supabase.from("ads").update({ runtime_seconds: null }).eq("id", remaining[0].ad_id);
+          await supabase
+            .from("ads")
+            .update({ runtime_seconds: null })
+            .eq("id", remaining[0].ad_id)
+            .eq("tenant_id", tenantId);
         }
       }
       loadAds();
@@ -739,6 +765,7 @@ export default function AdsManagerPage() {
         const { data: restored, error: insertErr } = await supabase
           .from("ads")
           .insert({
+            tenant_id: tenantId,
             title: adSnapshot.title,
             image_url: adSnapshot.image_url,
             link_url: adSnapshot.link_url,
@@ -762,6 +789,7 @@ export default function AdsManagerPage() {
               ad_id: restored.id,
               ad_slot: a.ad_slot,
               fill_section: a.fill_section ?? true,
+              tenant_id: tenantId,
             }))
           );
         }
@@ -779,6 +807,7 @@ export default function AdsManagerPage() {
       const { data: maxRow } = await supabase
         .from("ads")
         .select("display_order")
+        .eq("tenant_id", tenantId)
         .order("display_order", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -787,6 +816,7 @@ export default function AdsManagerPage() {
       const { data: newAd, error: insertError } = await supabase
         .from("ads")
         .insert({
+          tenant_id: tenantId,
           title: "Copy of " + (ad.title || "Untitled Ad"),
           image_url: ad.image_url,
           link_url: ad.link_url,
@@ -809,21 +839,27 @@ export default function AdsManagerPage() {
       const { data: assignments } = await supabase
         .from("ad_slot_assignments")
         .select("ad_slot, fill_section")
-        .eq("ad_id", ad.id);
+        .eq("ad_id", ad.id)
+        .eq("tenant_id", tenantId);
       if (assignments?.length) {
         await supabase.from("ad_slot_assignments").insert(
           assignments.map((a) => ({
             ad_id: newAd.id,
             ad_slot: a.ad_slot,
             fill_section: a.fill_section ?? true,
+            tenant_id: tenantId,
           }))
         );
       }
       loadAds();
       const newAdId = newAd.id;
       showToast("Ad duplicated.", async () => {
-        await supabase.from("ad_slot_assignments").delete().eq("ad_id", newAdId);
-        await supabase.from("ads").delete().eq("id", newAdId);
+        await supabase
+          .from("ad_slot_assignments")
+          .delete()
+          .eq("ad_id", newAdId)
+          .eq("tenant_id", tenantId);
+        await supabase.from("ads").delete().eq("id", newAdId).eq("tenant_id", tenantId);
         loadAds();
       });
     } catch (error: any) {
@@ -837,12 +873,17 @@ export default function AdsManagerPage() {
       const { error } = await supabase
         .from("ads")
         .update({ is_active: !ad.is_active })
-        .eq("id", ad.id);
+        .eq("id", ad.id)
+        .eq("tenant_id", tenantId);
 
       if (error) throw error;
       loadAds();
       showToast(previousActive ? "Ad disabled." : "Ad enabled.", async () => {
-        await supabase.from("ads").update({ is_active: previousActive }).eq("id", ad.id);
+        await supabase
+          .from("ads")
+          .update({ is_active: previousActive })
+          .eq("id", ad.id)
+          .eq("tenant_id", tenantId);
         loadAds();
       });
     } catch (error: any) {

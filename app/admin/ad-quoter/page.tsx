@@ -26,6 +26,7 @@ import {
 } from "@/lib/advertising/packageQuoterModel";
 import { getAdSlotTableLabel } from "@/lib/advertising/adSlots";
 import type { SavedAdQuote } from "@/lib/types/database";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 function supabaseErrorMessage(err: unknown): string {
   if (err == null) return "Unknown error";
@@ -51,6 +52,7 @@ function AdQuoterPageInner() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
   const [loading, setLoading] = useState(true);
   const [packageId, setPackageId] = useState<AdPackageId>("article-premier");
   const [addOns, setAddOns] = useState<AddOnQuantities>(() => defaultAddOns());
@@ -104,6 +106,7 @@ function AdQuoterPageInner() {
       const { count, error } = await supabase
         .from("page_views")
         .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .gte("viewed_at", iso);
       if (!error && count != null && count > 0) {
         setMonthlyViews(count);
@@ -118,7 +121,7 @@ function AdQuoterPageInner() {
     } finally {
       setViewsLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, tenantId]);
 
   useEffect(() => {
     (async () => {
@@ -156,7 +159,12 @@ function AdQuoterPageInner() {
     (async () => {
       setEditHydrating(true);
       setEditLoadError(null);
-      const { data, error } = await supabase.from("saved_ad_quotes").select("*").eq("id", editId).single();
+      const { data, error } = await supabase
+        .from("saved_ad_quotes")
+        .select("*")
+        .eq("id", editId)
+        .eq("tenant_id", tenantId)
+        .single();
       if (cancelled) return;
       if (error || !data) {
         setEditLoadError(supabaseErrorMessage(error ?? new Error("Quote not found.")));
@@ -190,7 +198,7 @@ function AdQuoterPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [loading, editId, supabase]);
+  }, [loading, editId, supabase, tenantId]);
 
   function updateAddOn<K extends keyof AddOnQuantities>(key: K, value: AddOnQuantities[K]) {
     setAddOns((prev) => clampAddOns({ ...prev, [key]: value }));
@@ -263,6 +271,7 @@ function AdQuoterPageInner() {
           .from("saved_ad_quotes")
           .update(payload)
           .eq("id", existingRowId)
+          .eq("tenant_id", tenantId)
           .select()
           .single();
         if (error) throw error;
@@ -270,7 +279,7 @@ function AdQuoterPageInner() {
       } else {
         const { data, error } = await supabase
           .from("saved_ad_quotes")
-          .insert({ ...payload, created_by: user.id })
+          .insert({ ...payload, created_by: user.id, tenant_id: tenantId })
           .select()
           .single();
         if (error) throw error;

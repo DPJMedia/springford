@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getTenantForApiRoute } from "@/lib/tenant/getTenantForApiRoute";
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -67,11 +68,16 @@ function computeChart(chartTimeRange: string) {
   };
 }
 
-async function loadCurrentAdsStats(supabase: SupabaseClient, nowIso: string) {
+async function loadCurrentAdsStats(
+  supabase: SupabaseClient,
+  nowIso: string,
+  tenantId: string,
+) {
   const now = new Date(nowIso);
   const { data: assignments } = await supabase
     .from("ad_slot_assignments")
-    .select("ad_id, ad_slot, ads!inner(id, title, start_date, end_date, is_active)");
+    .select("ad_id, ad_slot, ads!inner(id, title, start_date, end_date, is_active)")
+    .eq("tenant_id", tenantId);
   const activeAssignments = (assignments || []).filter((a: Record<string, unknown>) => {
     const ad = a.ads as { is_active?: boolean; start_date: string; end_date: string } | undefined;
     if (!ad) return false;
@@ -96,6 +102,7 @@ async function loadCurrentAdsStats(supabase: SupabaseClient, nowIso: string) {
     const { data: legacyAds } = await supabase
       .from("ads")
       .select("id, title, start_date, ad_slot")
+      .eq("tenant_id", tenantId)
       .eq("is_active", true)
       .lte("start_date", nowIso)
       .gte("end_date", nowIso);
@@ -113,12 +120,14 @@ async function loadCurrentAdsStats(supabase: SupabaseClient, nowIso: string) {
       const { count: impCount } = await supabase
         .from("ad_impressions")
         .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .eq("ad_id", row.ad_id)
         .eq("ad_slot", row.ad_slot)
         .gte("viewed_at", row.start_date);
       const { count: clickCount } = await supabase
         .from("ad_clicks")
         .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .eq("ad_id", row.ad_id)
         .eq("ad_slot", row.ad_slot)
         .gte("clicked_at", row.start_date);
@@ -145,10 +154,12 @@ type SectionPerformanceItem = {
 async function loadSectionPerformance(
   supabase: SupabaseClient,
   rpcData: Record<string, unknown> | null,
+  tenantId: string,
 ): Promise<SectionPerformanceItem[]> {
   const { data: articleSections } = await supabase
     .from("articles")
     .select("section, view_count")
+    .eq("tenant_id", tenantId)
     .eq("status", "published")
     .not("section", "is", null);
 
@@ -225,6 +236,8 @@ export async function GET(request: NextRequest) {
     const { rangeStartIso, rangeEndIso } = computeRange(timeRange);
     const { chartStartIso, chartEndIso, granularity, bucketCount } = computeChart(chartTimeRange);
 
+    const tenant = await getTenantForApiRoute();
+
     const admin = createAdminClient();
     const { data: rpcData, error: rpcError } = await admin.rpc("get_admin_analytics_dashboard", {
       p_range_start: rangeStartIso,
@@ -233,6 +246,7 @@ export async function GET(request: NextRequest) {
       p_chart_end: chartEndIso,
       p_chart_granularity: granularity,
       p_chart_bucket_count: bucketCount,
+      p_tenant_id: tenant.id,
     });
 
     if (rpcError) {
@@ -240,12 +254,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: rpcError.message }, { status: 500 });
     }
 
-    const currentAdsStats = await loadCurrentAdsStats(admin, rangeEndIso);
-    const sectionPerformance = await loadSectionPerformance(admin, rpcData as Record<string, unknown> | null);
+    const currentAdsStats = await loadCurrentAdsStats(admin, rangeEndIso, tenant.id);
+    const sectionPerformance = await loadSectionPerformance(
+      admin,
+      rpcData as Record<string, unknown> | null,
+      tenant.id,
+    );
 
     const { count: allTimePageViews } = await admin
       .from("page_views")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id);
 
     const now = new Date();
     const thirtyDaysStart = new Date(now);
@@ -253,6 +272,7 @@ export async function GET(request: NextRequest) {
     const { count: pageViewsLast30Days } = await admin
       .from("page_views")
       .select("*", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
       .gte("viewed_at", thirtyDaysStart.toISOString())
       .lte("viewed_at", now.toISOString());
 

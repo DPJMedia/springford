@@ -1,0 +1,34 @@
+import type { TenantRow } from "@/lib/types/database";
+import { getSiteConfig } from "@/lib/seo/site";
+
+/** Site name + canonical URL + default From for transactional SendGrid emails (per tenant). */
+export type TransactionalEmailBranding = {
+  siteUrl: string;
+  siteName: string;
+  from_email: string;
+  from_name: string;
+};
+
+export function transactionalEmailBrandingFromTenant(
+  tenant: TenantRow,
+): TransactionalEmailBranding {
+  const { siteUrl, siteName } = getSiteConfig(tenant);
+  const from_email =
+    tenant.from_email?.trim() || "admin@dpjmedia.com";
+  const from_name = tenant.from_name?.trim() || siteName;
+  return { siteUrl, siteName, from_email, from_name };
+}
+
+/** Legacy tokens / previews when tenant is not available. */
+export function fallbackTransactionalEmailBranding(): TransactionalEmailBranding {
+  const raw =
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL) ||
+    "https://www.springford.press";
+  const siteUrl = String(raw).replace(/\/$/, "");
+  return {
+    siteUrl,
+    siteName: "DPJ Media",
+    from_email: "admin@dpjmedia.com",
+    from_name: "DPJ Media",
+  };
+}

@@ -12,6 +12,7 @@ import Link from "next/link";
 import { ArticleAudienceBookmark } from "@/components/ArticleAudienceBookmark";
 import { usePageTracking } from "@/lib/analytics/usePageTracking";
 import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 // Ad slot wrapper component
 function AdSlot({ 
@@ -295,6 +296,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   // After articles load, scroll to the hash section if one is in the URL
   useEffect(() => {
@@ -323,7 +325,7 @@ export default function Home() {
       }
     }
     checkAdminStatus();
-  }, []);
+  }, [tenantId]);
 
   async function fetchArticles() {
     const now = new Date().toISOString();
@@ -350,6 +352,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", ["hero"])
         .lte("published_at", now)
@@ -360,6 +363,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .eq("is_breaking", true)
         .lte("published_at", now)
@@ -370,6 +374,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .lte("published_at", now)
         .gte("published_at", new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString())
@@ -380,6 +385,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .lte("published_at", now)
         .order("published_at", { ascending: false })
@@ -389,6 +395,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .lte("published_at", now)
         .gte("published_at", new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString())
@@ -398,6 +405,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .lt("published_at", new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString())
         .gte("published_at", new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString())
@@ -408,6 +416,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", ["spring-city"])
         .lte("published_at", now)
@@ -417,6 +426,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", ["royersford"])
         .lte("published_at", now)
@@ -426,6 +436,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", ["limerick"])
         .lte("published_at", now)
@@ -435,6 +446,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", ["upper-providence"])
         .lte("published_at", now)
@@ -444,6 +456,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", ["school-district"])
         .lte("published_at", now)
@@ -453,6 +466,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", ["politics"])
         .lte("published_at", now)
@@ -462,6 +476,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", ["business"])
         .lte("published_at", now)
@@ -471,6 +486,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", ["events"])
         .lte("published_at", now)
@@ -480,6 +496,7 @@ export default function Home() {
       supabase
         .from("articles")
         .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
         .eq("status", "published")
         .contains("sections", ["opinion"])
         .lte("published_at", now)
@@ -512,6 +529,7 @@ export default function Home() {
     const { data: picksRows } = await supabase
       .from("editors_picks")
       .select("article_id, position")
+      .eq("tenant_id", tenantId)
       .order("position", { ascending: true });
     
     if (picksRows && picksRows.length > 0) {
@@ -519,6 +537,7 @@ export default function Home() {
       const { data: picksData } = await supabase
         .from("articles")
         .select("id, title, slug, published_at, excerpt, image_url, author_name, subtitle, section, sections, category, tags, visibility")
+        .eq("tenant_id", tenantId)
         .in("id", pickIds)
         .eq("status", "published");
       

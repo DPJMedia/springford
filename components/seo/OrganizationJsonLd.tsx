@@ -1,19 +1,25 @@
-import { SITE_KEYWORDS, SITE_NAME, SITE_URL } from "@/lib/seo/site";
+import { getSiteConfig, SITE_KEYWORDS } from "@/lib/seo/site";
+import type { TenantRow } from "@/lib/types/database";
 
-const LOGO_URL = `${SITE_URL}/springford-press-logo.svg`;
+type Props = {
+  tenant: TenantRow;
+};
 
 /**
  * Organization + WebSite (SearchAction) for brand context and discoverability.
- * Sitelinks in Google are automated; this helps Google understand site structure.
+ * Server-rendered JSON-LD for SEO.
  */
-export function OrganizationJsonLd() {
+export function OrganizationJsonLd({ tenant }: Props) {
+  const { siteUrl, siteName: name } = getSiteConfig(tenant);
+  const logoUrl = `${siteUrl}/springford-press-logo.svg`;
+
   const org = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "@id": `${SITE_URL}/#organization`,
-    name: SITE_NAME,
-    url: SITE_URL,
-    logo: LOGO_URL,
+    "@id": `${siteUrl}/#organization`,
+    name,
+    url: siteUrl,
+    logo: logoUrl,
     description:
       "Local news for Spring-Ford, Limerick, Royersford, Spring City, Upper Providence, and Montgomery & Chester County, Pennsylvania.",
     knowsAbout: SITE_KEYWORDS,
@@ -22,13 +28,13 @@ export function OrganizationJsonLd() {
   const website = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "@id": `${SITE_URL}/#website`,
-    name: SITE_NAME,
-    url: SITE_URL,
-    publisher: { "@id": `${SITE_URL}/#organization` },
+    "@id": `${siteUrl}/#website`,
+    name,
+    url: siteUrl,
+    publisher: { "@id": `${siteUrl}/#organization` },
     potentialAction: {
       "@type": "SearchAction",
-      target: `${SITE_URL}/search?q={search_term_string}`,
+      target: `${siteUrl}/search?q={search_term_string}`,
       "query-input": "required name=search_term_string",
     },
   };

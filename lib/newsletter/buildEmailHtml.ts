@@ -1,3 +1,33 @@
+import type { TenantContextValue } from "@/lib/tenant/TenantProvider";
+import type { TenantRow } from "@/lib/types/database";
+import { getSiteConfig } from "@/lib/seo/site";
+
+/** URLs and labels for newsletter HTML (per-tenant). */
+export type NewsletterEmailBranding = {
+  siteUrl: string;
+  siteName: string;
+  termsUrl: string;
+  privacyUrl: string;
+  contactUrl: string;
+  /** Short host for footer link text */
+  domainLabel: string;
+};
+
+/** Works with full DB row or client `TenantProvider` context (same domain/name/slug). */
+export function newsletterBrandingFromTenant(
+  tenant: TenantRow | TenantContextValue,
+): NewsletterEmailBranding {
+  const { siteUrl, siteName } = getSiteConfig(tenant as TenantRow);
+  return {
+    siteUrl,
+    siteName,
+    termsUrl: `${siteUrl}/terms-of-service`,
+    privacyUrl: `${siteUrl}/privacy-policy`,
+    contactUrl: `${siteUrl}/contact`,
+    domainLabel: tenant.domain,
+  };
+}
+
 export type BlockType =
   | 'hero_text'
   | 'article'
@@ -51,10 +81,6 @@ export interface NewsletterBlock {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const SITE_URL = 'https://www.springford.press';
-const TOS_URL = 'https://www.springford.press/terms-of-service';
-const PRIVACY_URL = 'https://www.springford.press/privacy-policy';
-const CONTACT_URL = 'https://www.springford.press/contact';
 const FONTS_LINK =
   'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Newsreader:ital,wght@0,400;0,600;0,700;1,400&family=Red+Hat+Display:wght@400;500;600;700&display=swap';
 
@@ -82,13 +108,13 @@ function align(a?: Alignment): string {
 
 // ─── Fixed blocks ────────────────────────────────────────────────────────────
 
-function renderHeader(): string {
+function renderHeader(b: NewsletterEmailBranding): string {
   return `
   <tr>
     <td align="center" style="padding: 28px 24px 20px; background-color: ${WHITE}; border-bottom: 3px solid ${BLUE};">
-      <a href="${SITE_URL}" style="text-decoration: none;">
+      <a href="${esc(b.siteUrl)}" style="text-decoration: none;">
         <div class="sfp-site-name" style="font-family: 'Playfair Display', Didot, 'Bodoni MT', Georgia, serif; font-size: 30px; font-weight: 700; color: ${DARK}; letter-spacing: -0.02em; line-height: 1.1;">
-          Spring-Ford Press
+          ${esc(b.siteName)}
         </div>
         <div style="font-family: 'Red Hat Display', -apple-system, sans-serif; font-size: 11px; font-weight: 500; color: ${MEDIUM}; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 5px;">
           Neighborhood-First Reporting
@@ -98,8 +124,8 @@ function renderHeader(): string {
   </tr>`;
 }
 
-function renderFooter(unsubscribeUrl?: string): string {
-  const manageUrl = unsubscribeUrl || `${SITE_URL}/profile?tab=newsletter`;
+function renderFooter(b: NewsletterEmailBranding, unsubscribeUrl?: string): string {
+  const manageUrl = unsubscribeUrl || `${b.siteUrl}/profile?tab=newsletter`;
   return `
   <tr>
     <td style="padding: 28px 32px 24px; background-color: ${DARK}; border-top: 3px solid ${BLUE};">
@@ -107,20 +133,20 @@ function renderFooter(unsubscribeUrl?: string): string {
         <tr>
           <td align="center" style="padding-bottom: 14px;">
             <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 700; color: ${WHITE}; letter-spacing: -0.01em;">
-              Spring-Ford Press
+              ${esc(b.siteName)}
             </div>
           </td>
         </tr>
         <tr>
           <td align="center" style="padding-bottom: 16px;">
             <table role="presentation" cellspacing="0" cellpadding="0"><tr>
-              <td style="padding: 0 8px;"><a href="${SITE_URL}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">springford.press</a></td>
+              <td style="padding: 0 8px;"><a href="${esc(b.siteUrl)}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">${esc(b.domainLabel)}</a></td>
               <td style="color: #555; font-size: 12px;">|</td>
-              <td style="padding: 0 8px;"><a href="${TOS_URL}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">Terms</a></td>
+              <td style="padding: 0 8px;"><a href="${esc(b.termsUrl)}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">Terms</a></td>
               <td style="color: #555; font-size: 12px;">|</td>
-              <td style="padding: 0 8px;"><a href="${PRIVACY_URL}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">Privacy</a></td>
+              <td style="padding: 0 8px;"><a href="${esc(b.privacyUrl)}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">Privacy</a></td>
               <td style="color: #555; font-size: 12px;">|</td>
-              <td style="padding: 0 8px;"><a href="${CONTACT_URL}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">Contact</a></td>
+              <td style="padding: 0 8px;"><a href="${esc(b.contactUrl)}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">Contact</a></td>
               <td style="color: #555; font-size: 12px;">|</td>
               <td style="padding: 0 8px;"><a href="${esc(manageUrl)}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: underline;">Unsubscribe</a></td>
             </tr></table>
@@ -129,7 +155,7 @@ function renderFooter(unsubscribeUrl?: string): string {
         <tr>
           <td align="center">
             <p style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-size: 11px; color: #666666;">
-              &copy; ${new Date().getFullYear()} Spring-Ford Press. All rights reserved.
+              &copy; ${new Date().getFullYear()} ${esc(b.siteName)}. All rights reserved.
             </p>
           </td>
         </tr>
@@ -197,13 +223,13 @@ function renderImage(block: NewsletterBlock): string {
   </tr>`;
 }
 
-function renderButton(block: NewsletterBlock): string {
+function renderButton(block: NewsletterBlock, b: NewsletterEmailBranding): string {
   const bg = block.buttonColor || BLUE;
   const a = align(block.alignment || 'center');
   return `
   <tr>
     <td align="${a}" style="padding: 24px 40px; background-color: ${WHITE};">
-      <a href="${esc(block.buttonLink || SITE_URL)}"
+      <a href="${esc(block.buttonLink || b.siteUrl)}"
         style="display: inline-block; padding: 14px 36px; background-color: ${esc(bg)}; color: ${WHITE}; font-family: 'Red Hat Display', sans-serif; font-size: 15px; font-weight: 700; text-decoration: none; letter-spacing: 0.03em; border-radius: 5px;">
         ${esc(block.buttonText || 'Read More')}
       </a>
@@ -260,8 +286,8 @@ function renderSpacer(block: NewsletterBlock): string {
 // ─── Article rendering ────────────────────────────────────────────────────────
 
 /** Full-width stacked article (current default) */
-function renderArticleFull(block: NewsletterBlock): string {
-  const articleUrl = block.articleSlug ? `${SITE_URL}/article/${block.articleSlug}` : SITE_URL;
+function renderArticleFull(block: NewsletterBlock, b: NewsletterEmailBranding): string {
+  const articleUrl = block.articleSlug ? `${b.siteUrl}/article/${block.articleSlug}` : b.siteUrl;
   const sectionLabel = block.articleSection && block.articleSection !== 'hero'
     ? block.articleSection.replace(/-/g, ' ').toUpperCase()
     : 'NEWS';
@@ -300,8 +326,8 @@ function renderArticleFull(block: NewsletterBlock): string {
  * Fixed structure: image (160px tall) → section label → title (capped at 4 lines) → Read button.
  * Uses webkit-line-clamp for iOS Mail and fixed max-height as fallback for other clients.
  */
-function renderArticleCard(block: NewsletterBlock): string {
-  const articleUrl = block.articleSlug ? `${SITE_URL}/article/${block.articleSlug}` : SITE_URL;
+function renderArticleCard(block: NewsletterBlock, b: NewsletterEmailBranding): string {
+  const articleUrl = block.articleSlug ? `${b.siteUrl}/article/${block.articleSlug}` : b.siteUrl;
   const sectionLabel = block.articleSection && block.articleSection !== 'hero'
     ? block.articleSection.replace(/-/g, ' ').toUpperCase()
     : 'NEWS';
@@ -346,12 +372,16 @@ function renderArticleCard(block: NewsletterBlock): string {
 }
 
 /** Render a group of article blocks according to layout */
-function renderArticleGroup(articles: NewsletterBlock[], layout: ArticleLayout): string {
+function renderArticleGroup(
+  articles: NewsletterBlock[],
+  layout: ArticleLayout,
+  b: NewsletterEmailBranding,
+): string {
   if (articles.length === 0) return '';
 
   // Stack: render each as full-width
   if (layout === 'stack' || articles.length === 1) {
-    return `<tr><td style="background-color: ${WHITE};">${articles.map(renderArticleFull).join('')}</td></tr>`;
+    return `<tr><td style="background-color: ${WHITE};">${articles.map((blk) => renderArticleFull(blk, b)).join('')}</td></tr>`;
   }
 
   // Determine columns
@@ -367,7 +397,7 @@ function renderArticleGroup(articles: NewsletterBlock[], layout: ArticleLayout):
     const colWidth = Math.floor((600 - 80 - gutter * (cols - 1)) / cols); // account for outer padding
     const cells = rowArticles.map((a, idx) => {
       const paddingRight = idx < rowArticles.length - 1 ? `padding-right: ${gutter}px;` : '';
-      return `<td width="${colWidth}" valign="top" style="${paddingRight} width: ${colWidth}px;">${renderArticleCard(a)}</td>`;
+      return `<td width="${colWidth}" valign="top" style="${paddingRight} width: ${colWidth}px;">${renderArticleCard(a, b)}</td>`;
     });
 
     // If last row has fewer items than cols, add empty cells to balance
@@ -392,13 +422,17 @@ function renderArticleGroup(articles: NewsletterBlock[], layout: ArticleLayout):
 
 // ─── Main renderer ────────────────────────────────────────────────────────────
 
-function renderBlocks(blocks: NewsletterBlock[], articleLayout: ArticleLayout): string {
+function renderBlocks(
+  blocks: NewsletterBlock[],
+  articleLayout: ArticleLayout,
+  b: NewsletterEmailBranding,
+): string {
   const rows: string[] = [];
   let articleBuffer: NewsletterBlock[] = [];
 
   function flushArticles() {
     if (articleBuffer.length === 0) return;
-    rows.push(renderArticleGroup(articleBuffer, articleLayout));
+    rows.push(renderArticleGroup(articleBuffer, articleLayout, b));
     articleBuffer = [];
   }
 
@@ -411,7 +445,7 @@ function renderBlocks(blocks: NewsletterBlock[], articleLayout: ArticleLayout): 
         case 'hero_text':      rows.push(renderHeroText(block)); break;
         case 'text':           rows.push(renderText(block)); break;
         case 'image':          rows.push(renderImage(block)); break;
-        case 'button':         rows.push(renderButton(block)); break;
+        case 'button':         rows.push(renderButton(block, b)); break;
         case 'divider':        rows.push(renderDivider()); break;
         case 'spacer':         rows.push(renderSpacer(block)); break;
         case 'advertisement':  rows.push(renderAdvertisement(block)); break;
@@ -427,11 +461,12 @@ function renderBlocks(blocks: NewsletterBlock[], articleLayout: ArticleLayout): 
 export function buildEmailHtml(
   blocks: NewsletterBlock[],
   subject: string,
+  branding: NewsletterEmailBranding,
   previewText?: string,
   unsubscribeUrl?: string,
   articleLayout: ArticleLayout = 'stack',
 ): string {
-  const bodyRows = renderBlocks(blocks, articleLayout);
+  const bodyRows = renderBlocks(blocks, articleLayout, branding);
 
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -476,9 +511,9 @@ export function buildEmailHtml(
       <td class="sfp-outer-pad" align="center" style="padding: 24px 16px 40px;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
           style="max-width: 600px; background-color: ${WHITE}; border: 1px solid ${BORDER}; border-radius: 4px; overflow: hidden;">
-          ${renderHeader()}
+          ${renderHeader(branding)}
           ${bodyRows}
-          ${renderFooter(unsubscribeUrl)}
+          ${renderFooter(branding, unsubscribeUrl)}
         </table>
       </td>
     </tr>

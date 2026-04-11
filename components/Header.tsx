@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import Link from "next/link";
@@ -9,6 +9,7 @@ import { normalizeAvatarUrl } from "@/lib/user/display";
 import { NotificationBell } from "./NotificationBell";
 import { SearchDropdown } from "./SearchDropdown";
 import { trackSectionClick } from "@/lib/analytics/tracker";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 export function Header() {
   const [user, setUser] = useState<User | null>(null);
@@ -26,18 +27,20 @@ export function Header() {
   const [notificationCount, setNotificationCount] = useState(0);
   const mobileUserMenuRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+  const { id: tenantId, section_config: sectionConfig } = useTenant();
 
-  const allNavItems = [
-    { label: "Spring City", href: "/#spring-city", slug: "spring-city" },
-    { label: "Royersford", href: "/#royersford", slug: "royersford" },
-    { label: "Limerick", href: "/#limerick", slug: "limerick" },
-    { label: "Upper Providence", href: "/#upper-providence", slug: "upper-providence" },
-    { label: "School District", href: "/#school-district", slug: "school-district" },
-    { label: "Politics", href: "/#politics", slug: "politics" },
-    { label: "Business", href: "/#business", slug: "business" },
-    { label: "Events", href: "/#events", slug: "events" },
-    { label: "Opinion", href: "/#opinion", slug: "opinion" },
-  ];
+  const allNavItems = useMemo(() => {
+    if (!Array.isArray(sectionConfig)) return [];
+    return sectionConfig.map((entry) => {
+      const slug = String((entry as { slug?: string }).slug || "").trim();
+      const label = String((entry as { label?: string }).label || slug).trim();
+      return {
+        label: label || slug,
+        slug: slug.toLowerCase(),
+        href: slug ? `/#${encodeURIComponent(slug)}` : "/",
+      };
+    });
+  }, [sectionConfig]);
 
   const [sectionsWithContent, setSectionsWithContent] = useState<Set<string>>(new Set());
 
@@ -46,7 +49,8 @@ export function Header() {
       const { data } = await supabase
         .from("articles")
         .select("sections")
-        .eq("status", "published");
+        .eq("status", "published")
+        .eq("tenant_id", tenantId);
       const set = new Set<string>();
       (data || []).forEach((row: { sections?: string[] }) => {
         (row.sections || []).forEach((s: string) => set.add(String(s).toLowerCase().trim()));
@@ -54,7 +58,7 @@ export function Header() {
       setSectionsWithContent(set);
     }
     fetchSectionsWithContent();
-  }, [supabase]);
+  }, [supabase, tenantId]);
 
   const nav = allNavItems.filter((item) => sectionsWithContent.has(item.slug));
 

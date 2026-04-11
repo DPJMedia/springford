@@ -23,6 +23,7 @@ import { usePageTracking } from "@/lib/analytics/usePageTracking";
 import { ArticleAudienceBookmark } from "@/components/ArticleAudienceBookmark";
 import { SubscriberArticlePaywall } from "@/components/SubscriberArticlePaywall";
 import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 import {
   DIFFUSE_AI_AVATAR_PUBLIC_PATH,
   DIFFUSE_AI_BYLINE_DISPLAY,
@@ -51,6 +52,7 @@ export function ArticleContent({
   const [coAuthorUsername, setCoAuthorUsername] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
+  const { id: tenantId } = useTenant();
 
   // Analytics tracking
   const { sessionId, getCurrentScrollDepth, getTimeSpent } = usePageTracking({
@@ -272,6 +274,7 @@ export function ArticleContent({
     supabase
       .from("articles")
       .select(ARTICLE_LIST_COLUMNS)
+      .eq("tenant_id", tenantId)
       .eq("status", "published")
       .eq("section", sectionForRelated)
       .neq("id", article.id)
@@ -283,7 +286,7 @@ export function ArticleContent({
           setRelatedArticles(data as Article[]);
         }
       });
-  }, [article.id, article.section, article.sections, article.author_name, supabase]);
+  }, [article.id, article.section, article.sections, article.author_name, supabase, tenantId]);
 
   // Format dates with time in EST (e.g. "Jan 22, 2026 at 9:31 AM EST")
   const publishedDate = article.published_at
