@@ -7,7 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { TenantForm } from "@/components/admin/TenantForm";
-import { TenantDeleteSection } from "@/components/admin/TenantDeleteSection";
+import {
+  TenantDeleteConfirmModal,
+  TenantDeleteHeaderButton,
+} from "@/components/admin/TenantDeleteSection";
 import { TenantMembersSection } from "@/components/admin/TenantMembersSection";
 import type { TenantRow } from "@/lib/types/database";
 
@@ -21,6 +24,7 @@ export default function TenantDetailAdminPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [tenant, setTenant] = useState<TenantRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   const loadTenant = useCallback(async () => {
     if (!id) return;
@@ -101,13 +105,25 @@ export default function TenantDetailAdminPage() {
         title={tenant.name}
         description={`${tenant.slug} · ${tenant.domain}`}
         actions={
-          <Link
-            href="/admin/tenants"
-            className="rounded-md border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-header-bg)]"
-          >
-            Back to tenants
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/admin/tenants"
+              className="rounded-md border border-[var(--admin-border)] px-4 py-2 text-sm font-semibold text-[var(--admin-text)] hover:bg-[var(--admin-table-header-bg)]"
+            >
+              Back to tenants
+            </Link>
+            <TenantDeleteHeaderButton
+              tenantSlug={tenant.slug}
+              onOpen={() => setDeleteModalOpen(true)}
+            />
+          </div>
         }
+      />
+      <TenantDeleteConfirmModal
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        tenantId={id}
+        tenantSlug={tenant.slug}
       />
       <AdminPageLayout>
         <div className="space-y-8">
@@ -120,7 +136,6 @@ export default function TenantDetailAdminPage() {
             onUpdated={(t) => setTenant(t)}
           />
           <TenantMembersSection tenantId={id} />
-          <TenantDeleteSection tenantId={id} tenantSlug={tenant.slug} />
         </div>
       </AdminPageLayout>
     </>
