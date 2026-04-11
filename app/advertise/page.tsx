@@ -7,7 +7,8 @@ import Link from "next/link";
 import { useTenant } from "@/lib/tenant/TenantProvider";
 
 function AdvertisePageContent() {
-  const { name: siteName } = useTenant();
+  const { name: siteName, from_email } = useTenant();
+  const contactMail = from_email?.trim() || "news@dpjmedia.com";
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
@@ -27,7 +28,7 @@ function AdvertisePageContent() {
                     </span>
                   </Link>
                   <h1 className="headline text-2xl font-bold text-[color:var(--color-dark)] leading-tight">
-                    Unlock success with digital marketing solutions
+                    Advertise with {siteName}
                   </h1>
                   <div className="mt-4 h-1 w-16 bg-[color:var(--color-riviera-blue)] rounded" />
                   <p className="mt-6 text-sm text-[color:var(--color-medium)] leading-relaxed">
@@ -44,8 +45,11 @@ function AdvertisePageContent() {
                   </p>
                   <p className="mt-6 text-sm text-[color:var(--color-dark)] font-semibold">
                     Complete the form or email{" "}
-                    <a href="mailto:news@dpjmedia.com" className="text-[color:var(--color-riviera-blue)] hover:underline">
-                      news@dpjmedia.com
+                    <a
+                      href={`mailto:${contactMail}`}
+                      className="text-[color:var(--color-riviera-blue)] hover:underline"
+                    >
+                      {contactMail}
                     </a>
                   </p>
                 </div>
@@ -62,23 +66,33 @@ function AdvertisePageContent() {
                   </div>
                 )}
                   <form
-                    action="https://formspree.io/f/mqedqljw"
-                    method="POST"
                     onSubmit={async (e) => {
                       e.preventDefault();
                       setSubmitting(true);
                       const form = e.currentTarget;
-                      const formData = new FormData(form);
+                      const fd = new FormData(form);
+                      const payload = {
+                        firstName: String(fd.get("firstName") ?? ""),
+                        lastName: String(fd.get("lastName") ?? ""),
+                        email: String(fd.get("email") ?? ""),
+                        phone: String(fd.get("phone") ?? ""),
+                        company: String(fd.get("company") ?? ""),
+                        website: String(fd.get("website") ?? ""),
+                        postalCode: String(fd.get("postalCode") ?? ""),
+                        interest: String(fd.get("interest") ?? ""),
+                        message: String(fd.get("message") ?? ""),
+                      };
                       try {
-                        const res = await fetch("https://formspree.io/f/mqedqljw", {
+                        const res = await fetch("/api/advertise/inquiry", {
                           method: "POST",
-                          body: formData,
-                          headers: { Accept: "application/json" },
+                          headers: { "Content-Type": "application/json", Accept: "application/json" },
+                          body: JSON.stringify(payload),
+                          credentials: "same-origin",
                         });
                         if (res.ok) setSubmitSuccess(true);
                         else throw new Error();
                       } catch {
-                        form.submit();
+                        setSubmitSuccess(false);
                       } finally {
                         setSubmitting(false);
                       }

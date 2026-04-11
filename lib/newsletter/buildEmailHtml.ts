@@ -9,8 +9,6 @@ export type NewsletterEmailBranding = {
   termsUrl: string;
   privacyUrl: string;
   contactUrl: string;
-  /** Short host for footer link text */
-  domainLabel: string;
 };
 
 /** Works with full DB row or client `TenantProvider` context (same domain/name/slug). */
@@ -24,7 +22,6 @@ export function newsletterBrandingFromTenant(
     termsUrl: `${siteUrl}/terms-of-service`,
     privacyUrl: `${siteUrl}/privacy-policy`,
     contactUrl: `${siteUrl}/contact`,
-    domainLabel: tenant.domain,
   };
 }
 
@@ -140,7 +137,7 @@ function renderFooter(b: NewsletterEmailBranding, unsubscribeUrl?: string): stri
         <tr>
           <td align="center" style="padding-bottom: 16px;">
             <table role="presentation" cellspacing="0" cellpadding="0"><tr>
-              <td style="padding: 0 8px;"><a href="${esc(b.siteUrl)}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">${esc(b.domainLabel)}</a></td>
+              <td style="padding: 0 8px;"><a href="${esc(b.siteUrl)}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">${esc(b.siteName)}</a></td>
               <td style="color: #555; font-size: 12px;">|</td>
               <td style="padding: 0 8px;"><a href="${esc(b.termsUrl)}" style="font-family: 'Red Hat Display', sans-serif; font-size: 12px; color: #aaaaaa; text-decoration: none;">Terms</a></td>
               <td style="color: #555; font-size: 12px;">|</td>

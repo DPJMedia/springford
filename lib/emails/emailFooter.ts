@@ -1,10 +1,21 @@
 /**
- * Standard footer for user-facing SendGrid emails: site name | Terms | Privacy | Contact
+ * Standard footer for user-facing SendGrid emails.
+ * First link: tenant publication name (branding.siteName) → canonical public site URL (branding.siteUrl),
+ * then Terms | Privacy | Contact.
  */
 
 import type { TransactionalEmailBranding } from "./emailBranding";
 
+function escapeEmailFooterText(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export function getEmailFooterUrls(branding: TransactionalEmailBranding): {
+  /** Canonical tenant site origin (no trailing slash). */
   site: string;
   tos: string;
   privacy: string;
@@ -28,7 +39,7 @@ export function buildStandardEmailFooterHtml(
   },
 ): string {
   const { site, tos, privacy, contact } = getEmailFooterUrls(branding);
-  const siteLabel = branding.siteName;
+  const siteLabel = escapeEmailFooterText(branding.siteName);
   const unsub =
     options?.unsubscribeUrl && options.unsubscribeUrl.length > 0
       ? `

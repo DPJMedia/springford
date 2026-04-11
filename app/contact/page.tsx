@@ -1,27 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
-const FORMSPREE_ENDPOINT = "https://formspree.io/f/xbdazgzy";
-const CONTACT_EMAIL = "news@dpjmedia.com";
-
-export default function ContactPage() {
+function ContactPageContent() {
+  const { name: siteName } = useTenant();
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const formData = new FormData(form);
+    const fd = new FormData(form);
 
     setStatus("sending");
     try {
-      const res = await fetch(FORMSPREE_ENDPOINT, {
+      const res = await fetch("/api/contact/inquiry", {
         method: "POST",
-        body: formData,
-        headers: { Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          name: String(fd.get("name") ?? ""),
+          email: String(fd.get("email") ?? ""),
+          subject: String(fd.get("subject") ?? ""),
+          message: String(fd.get("message") ?? ""),
+        }),
+        credentials: "same-origin",
       });
 
       if (res.ok) {
@@ -41,16 +46,10 @@ export default function ContactPage() {
       <main className="min-h-screen bg-[color:var(--color-surface)]">
         <div className="mx-auto max-w-xl px-4 py-10 sm:py-12">
           <h1 className="masthead text-2xl font-black tracking-tight text-[color:var(--color-dark)] text-center sm:text-3xl">
-            How could we assist you?
+            Contact {siteName}
           </h1>
           <p className="mt-3 text-sm text-[color:var(--color-medium)] text-center">
-            Fill out the form or email us at{" "}
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              className="text-[color:var(--color-riviera-blue)] font-semibold hover:underline"
-            >
-              {CONTACT_EMAIL}
-            </a>
+            Send us a message. We&apos;ll get back to you as soon as we can.
           </p>
 
           {status === "success" ? (
@@ -59,7 +58,7 @@ export default function ContactPage() {
                 Thank you for reaching out.
               </p>
               <p className="mt-2 text-sm text-[color:var(--color-medium)]">
-                We&apos;ll get back to you as soon as we can.
+                We&apos;ve received your message.
               </p>
               <button
                 type="button"
@@ -84,6 +83,7 @@ export default function ContactPage() {
                     type="text"
                     name="name"
                     required
+                    autoComplete="name"
                     className="w-full rounded-lg border border-[color:var(--color-border)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]"
                     placeholder="Your name"
                   />
@@ -97,8 +97,22 @@ export default function ContactPage() {
                     type="email"
                     name="email"
                     required
+                    autoComplete="email"
                     className="w-full rounded-lg border border-[color:var(--color-border)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]"
                     placeholder="you@example.com"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="subject" className="block text-sm font-semibold text-[color:var(--color-dark)] mb-1.5">
+                    Subject
+                  </label>
+                  <input
+                    id="subject"
+                    type="text"
+                    name="subject"
+                    required
+                    className="w-full rounded-lg border border-[color:var(--color-border)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]"
+                    placeholder="What is this regarding?"
                   />
                 </div>
                 <div>
@@ -116,7 +130,7 @@ export default function ContactPage() {
                 </div>
                 {status === "error" && (
                   <p className="text-sm text-red-600">
-                    Something went wrong. Please try again or email us directly.
+                    Something went wrong. Please try again in a moment.
                   </p>
                 )}
                 <button
@@ -139,5 +153,23 @@ export default function ContactPage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+export default function ContactPage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <Header />
+          <main className="min-h-screen flex items-center justify-center bg-[color:var(--color-surface)]">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[color:var(--color-riviera-blue)] border-r-transparent" />
+          </main>
+          <Footer />
+        </>
+      }
+    >
+      <ContactPageContent />
+    </Suspense>
   );
 }

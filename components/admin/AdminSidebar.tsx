@@ -165,18 +165,19 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
           </div>
         </nav>
 
-        <div className="px-3 pb-3">
+        <div className="mt-auto shrink-0 border-t border-[var(--admin-border)]/50 px-3 pb-4 pt-4 space-y-3">
           <Link
             href="/"
-            className="flex min-h-[2.75rem] items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[var(--admin-card-bg)]"
+            className="flex min-h-[2.75rem] w-full min-w-0 max-w-full flex-col items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-center transition-colors hover:bg-[var(--admin-card-bg)]"
           >
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center text-white" aria-hidden>
+            <span className="inline-flex items-center justify-center gap-2">
               <svg
-                className="h-4 w-4"
+                className="h-4 w-4 shrink-0 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
                 strokeWidth={1.5}
+                aria-hidden
               >
                 <path
                   strokeLinecap="round"
@@ -184,15 +185,13 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
                   d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
                 />
               </svg>
-            </span>
-            <span className="text-sm font-medium uppercase tracking-wide text-[var(--admin-text-muted)]">
-              Back to site
+              <span className="text-sm font-medium uppercase tracking-wide text-[var(--admin-text-muted)]">
+                Back to site
+              </span>
             </span>
           </Link>
-        </div>
 
-        {/* User profile — menu opens upward, same width as grey card */}
-        <div className="p-4">
+          {/* User profile — menu opens upward, same width as grey card */}
           <div className="relative rounded-lg bg-[var(--admin-card-bg)] text-[var(--admin-text)]">
             <button
               type="button"
@@ -202,7 +201,7 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
               <div className="text-sm font-medium truncate">
                 {profile?.full_name || 'User'}
               </div>
-              <div className="text-[var(--admin-text-muted)] text-[11px] font-semibold tracking-wide">
+              <div className="text-orange-400 text-[11px] font-semibold tracking-wide">
                 {formatRoleLabel(profile)}
               </div>
             </button>

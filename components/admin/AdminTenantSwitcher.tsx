@@ -82,19 +82,21 @@ export function AdminTenantSwitcher({ compact = false }: { compact?: boolean }) 
     "min-h-[2.5rem] px-2 py-1.5 text-sm font-medium";
 
   return (
-    <div ref={rootRef} className={compact ? "relative px-2 pb-2" : "relative px-3 pb-3"}>
-      <span
-        className={`mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]`}
-      >
-        Site
-      </span>
+    <div
+      ref={rootRef}
+      className={
+        compact
+          ? "relative w-full min-w-0 max-w-full px-2 pb-2"
+          : "relative w-full min-w-0 max-w-full px-3 pb-3"
+      }
+    >
       <button
         type="button"
         id="admin-tenant-switcher"
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`${triggerBase} ${compact ? triggerCompact : "text-sm font-medium"}`}
+        className={`${triggerBase} max-w-full min-w-0 ${compact ? triggerCompact : "text-sm font-medium"}`}
       >
         <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>
         <svg
@@ -112,7 +114,7 @@ export function AdminTenantSwitcher({ compact = false }: { compact?: boolean }) 
         <ul
           role="listbox"
           aria-labelledby="admin-tenant-switcher"
-          className={`absolute left-0 right-0 z-[60] overflow-hidden rounded-lg border border-[var(--admin-border)] bg-[var(--admin-sidebar-bg)] shadow-lg ${
+          className={`absolute left-0 right-0 z-[60] w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-[var(--admin-border)] bg-[var(--admin-sidebar-bg)] shadow-lg ${
             compact
               ? "bottom-full mb-1 max-h-[min(50vh,16rem)]"
               : "top-full mt-1 max-h-[min(60vh,20rem)]"
