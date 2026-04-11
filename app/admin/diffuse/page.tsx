@@ -577,17 +577,7 @@ export default function DiffuseIntegrationPage() {
           console.log("✅ Found tags:", tags);
         }
         
-        // Sections (convert to lowercase slug format)
-        if (pd.suggested_sections) {
-          let rawSections: string[] = [];
-          if (typeof pd.suggested_sections === "string") {
-            rawSections = pd.suggested_sections.split(",").map((s: string) => s.trim()).filter(Boolean);
-          } else if (Array.isArray(pd.suggested_sections)) {
-            rawSections = pd.suggested_sections.filter((s): s is string => typeof s === "string");
-          }
-          sections = rawSections.map((s) => s.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
-          console.log("✅ Found sections:", rawSections, "→ converted to slugs:", sections);
-        }
+        // Sections are not imported from Diffuse — they are tenant-specific (set in the article editor).
         
         // Meta Title
         if (pd.meta_title && typeof pd.meta_title === "string") {
@@ -638,11 +628,7 @@ export default function DiffuseIntegrationPage() {
         excerpt = cleanContent.substring(0, 200).trim() + "...";
       }
       
-      // Ensure sections has at least one value
-      if (!sections || sections.length === 0) {
-        sections = ["general"];
-        console.log("⚠️ No sections found, defaulting to 'general'");
-      }
+      // Leave sections empty; author picks tenant sections after import.
 
       console.log("\n✅ ====== FINAL PARSED ARTICLE DATA ======");
       console.log("Title:", title);
@@ -884,7 +870,7 @@ export default function DiffuseIntegrationPage() {
         author_name: author, // Use Diffuse.AI as author (byline)
         author_id: user?.id ?? null, // Real user who imported
         updated_by: user?.id ?? null, // Real user who imported (actor for any future notifications)
-        section: sections[0] || "general",
+        section: "general",
         sections: sections,
         category: category,
         tags: tags.length > 0 ? tags : null,
