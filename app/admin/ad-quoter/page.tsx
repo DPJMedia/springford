@@ -409,21 +409,42 @@ function AdQuoterPageInner() {
             <span className="tabular-nums font-medium">${quote.basePackagePriceUsd.toLocaleString()}/mo</span>
           </div>
           {quote.trafficIndexActive ? (
-            <div className="flex justify-between gap-2">
-              <span>Traffic-adjusted package</span>
-              <span
-                className={`tabular-nums font-medium ${
-                  quote.indexedPackagePriceUsd > quote.basePackagePriceUsd
-                    ? "text-[var(--admin-accent)]"
-                    : "text-[var(--admin-text)]"
-                }`}
-              >
-                ${quote.indexedPackagePriceUsd.toLocaleString()}/mo
-                {quote.indexedPackagePriceUsd === quote.basePackagePriceUsd ? (
-                  <span className="ml-1 text-[10px] font-normal text-[var(--admin-text-muted)]">(same)</span>
-                ) : null}
-              </span>
-            </div>
+            <>
+              <div className="flex justify-between gap-2">
+                <span>Traffic-adjusted package</span>
+                <span
+                  className={`tabular-nums font-medium ${
+                    quote.indexedPackagePriceUsd > quote.basePackagePriceUsd
+                      ? "text-[var(--admin-accent)]"
+                      : "text-[var(--admin-text)]"
+                  }`}
+                >
+                  ${quote.indexedPackagePriceUsd.toLocaleString()}/mo
+                  {quote.indexedPackagePriceUsd === quote.basePackagePriceUsd ? (
+                    <span className="ml-1 text-[10px] font-normal text-[var(--admin-text-muted)]">(same)</span>
+                  ) : null}
+                </span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-[var(--admin-text-muted)]">
+                <span className="font-semibold text-[var(--admin-text)]">Fixed</span> (published list rate): $
+                {quote.basePackagePriceUsd.toLocaleString()}/mo.{" "}
+                <span className="font-semibold text-[var(--admin-text)]">Variable</span> (views-based):{" "}
+                {quote.indexedPackagePriceUsd > quote.basePackagePriceUsd ? (
+                  <>
+                    +$
+                    {(quote.indexedPackagePriceUsd - quote.basePackagePriceUsd).toLocaleString()}/mo when trailing
+                    30-day page views (
+                    {quote.monthlySiteViewsUsed != null
+                      ? quote.monthlySiteViewsUsed.toLocaleString()
+                      : "—"}
+                    ) exceed {PACKAGE_QUOTER_BASELINE_MONTHLY_VIEWS.toLocaleString()} (package list price × traffic
+                    index vs baseline).
+                  </>
+                ) : (
+                  <>$0/mo at or below the {PACKAGE_QUOTER_BASELINE_MONTHLY_VIEWS.toLocaleString()}-view baseline.</>
+                )}
+              </p>
+            </>
           ) : (
             <p className="text-xs text-[var(--admin-text-muted)]">
               Traffic data unavailable — published package rate is used.
@@ -499,13 +520,14 @@ function AdQuoterPageInner() {
       />
     </svg>
   );
-  const iconSave = (
+  /** Same stroke icon treatment as other admin action rows (e.g. Ad Manager). */
+  const iconDownloadQuote = (
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l3 3m0 0l3-3m-3 3V4"
+        d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-4m-4-4l-4 4m0 0l-4-4m4 4V4"
       />
     </svg>
   );
@@ -572,7 +594,7 @@ function AdQuoterPageInner() {
           items: [
             {
               label: "Save quote",
-              icon: iconSave,
+              icon: iconDownloadQuote,
               onClick: openSaveModal,
             },
             {

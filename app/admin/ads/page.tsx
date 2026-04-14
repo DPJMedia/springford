@@ -15,6 +15,8 @@ import {
   UNASSIGNED_AD_SLOT,
 } from "@/lib/advertising/adSlots";
 import { useTenant } from "@/lib/tenant/TenantProvider";
+import { AdminTableSortTh } from "@/components/admin/AdminTableSortTh";
+import { cycleSortTriPhase, type SortTriPhase } from "@/lib/admin/tableSort";
 
 const ET_TIMEZONE = "America/New_York";
 
@@ -214,6 +216,8 @@ export default function AdsManagerPage() {
   // Search, sort, filter for ad list
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name-az" | "name-za" | "date-newest" | "date-oldest">("date-newest");
+  const [adsHeaderSortCol, setAdsHeaderSortCol] = useState<string | null>(null);
+  const [adsHeaderSortPhase, setAdsHeaderSortPhase] = useState<SortTriPhase>(0);
   const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [deviceFilter, setDeviceFilter] = useState<"all" | "desktop" | "mobile">("all");
   const [selectedAdId, setSelectedAdId] = useState<string | null>(null);
@@ -1053,7 +1057,32 @@ export default function AdsManagerPage() {
   }, [ads, editingAd]);
 
   const sortedAds = useMemo(() => {
-    return [...filteredAds].sort((a: any, b: any) => {
+    const rows = [...filteredAds];
+    if (adsHeaderSortCol && adsHeaderSortPhase !== 0) {
+      const mul = adsHeaderSortPhase === 1 ? -1 : 1;
+      rows.sort((a: any, b: any) => {
+        if (adsHeaderSortCol === "ad") {
+          return mul * String(a.title || "").localeCompare(String(b.title || ""));
+        }
+        if (adsHeaderSortCol === "slots") {
+          const sa = sortAdSlotIdsByInventoryOrder(
+            (a.slots || (a.ad_slot ? [a.ad_slot] : [])) as string[],
+          ).join("|");
+          const sb = sortAdSlotIdsByInventoryOrder(
+            (b.slots || (b.ad_slot ? [b.ad_slot] : [])) as string[],
+          ).join("|");
+          return mul * sa.localeCompare(sb);
+        }
+        if (adsHeaderSortCol === "schedule") {
+          const ta = new Date(a.start_date || a.created_at).getTime();
+          const tb = new Date(b.start_date || b.created_at).getTime();
+          return mul * (ta - tb);
+        }
+        return 0;
+      });
+      return rows;
+    }
+    return rows.sort((a: any, b: any) => {
       if (sortBy === "name-az") return (a.title || "").localeCompare(b.title || "");
       if (sortBy === "name-za") return (b.title || "").localeCompare(a.title || "");
       const dateA = new Date(a.created_at).getTime();
@@ -1061,7 +1090,16 @@ export default function AdsManagerPage() {
       if (sortBy === "date-newest") return dateB - dateA;
       return dateA - dateB;
     });
-  }, [filteredAds, sortBy]);
+  }, [filteredAds, sortBy, adsHeaderSortCol, adsHeaderSortPhase]);
+
+  function adsSortThPhase(col: string): SortTriPhase {
+    return adsHeaderSortCol === col ? adsHeaderSortPhase : 0;
+  }
+  function onAdsSortTh(col: string) {
+    const n = cycleSortTriPhase(col, adsHeaderSortCol, adsHeaderSortPhase);
+    setAdsHeaderSortCol(n.key);
+    setAdsHeaderSortPhase(n.phase);
+  }
 
   useEffect(() => {
     setSelectedAdId((prev) => {
@@ -1086,8 +1124,6 @@ export default function AdsManagerPage() {
   /** `admin-native-select`: globals.css — SVG chevron inset + no blue focus stack (see globals). */
   const filterSelectClass =
     "admin-native-select h-10 w-full rounded-md border border-[var(--admin-border)] bg-[var(--admin-card-bg)] text-sm text-[var(--admin-text)] [color-scheme:dark] ring-offset-0 focus:border-[var(--admin-accent)] focus:outline-none focus-visible:outline-none focus:ring-1 focus:ring-[var(--admin-accent)] focus-visible:ring-1 focus-visible:ring-[var(--admin-accent)]";
-  const sortSelectClass = `${filterSelectClass} sm:col-span-1`;
-
   const sectionFilterSelect = (
     <select
       value={sectionFilter}
@@ -1188,6 +1224,27 @@ export default function AdsManagerPage() {
             <div className="space-y-2">
               {sectionFilterSelect}
               {deviceFilterSelect}
+              <div>
+                <label htmlFor="ads-sort-sidebar" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
+                  Sort
+                </label>
+                <select
+                  id="ads-sort-sidebar"
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value as typeof sortBy);
+                    setAdsHeaderSortCol(null);
+                    setAdsHeaderSortPhase(0);
+                  }}
+                  className={filterSelectClass}
+                  aria-label="Sort ads"
+                >
+                  <option value="date-newest">Date (newest)</option>
+                  <option value="date-oldest">Date (oldest)</option>
+                  <option value="name-az">Name (A-Z)</option>
+                  <option value="name-za">Name (Z-A)</option>
+                </select>
+              </div>
             </div>
           ),
         },
@@ -1224,29 +1281,43 @@ export default function AdsManagerPage() {
             <div className="space-y-2">
               {sectionFilterSelect}
               {deviceFilterSelect}
+              <div>
+                <label htmlFor="ads-sort-mobile" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)]">
+                  Sort
+                </label>
+                <select
+                  id="ads-sort-mobile"
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value as typeof sortBy);
+                    setAdsHeaderSortCol(null);
+                    setAdsHeaderSortPhase(0);
+                  }}
+                  className={filterSelectClass}
+                  aria-label="Sort ads"
+                >
+                  <option value="date-newest">Date (newest)</option>
+                  <option value="date-oldest">Date (oldest)</option>
+                  <option value="name-az">Name (A-Z)</option>
+                  <option value="name-za">Name (Z-A)</option>
+                </select>
+              </div>
             </div>
           </div>
           <AdminActionsPanel embedded sections={adActionsSections} />
         </div>
-        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="mb-4 w-full min-w-0">
+          <label htmlFor="ads-search" className="sr-only">
+            Search ads
+          </label>
           <input
+            id="ads-search"
             type="search"
             placeholder="Search by ad name…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-10 min-w-0 rounded-md border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-3 text-sm text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:border-[var(--admin-accent)] focus:outline-none focus-visible:outline-none focus:ring-1 focus:ring-[var(--admin-accent)] focus-visible:ring-1 focus-visible:ring-[var(--admin-accent)] sm:col-span-2"
+            className="h-10 w-full min-w-0 rounded-md border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-3 text-sm text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:border-[var(--admin-accent)] focus:outline-none focus-visible:outline-none focus:ring-1 focus:ring-[var(--admin-accent)] focus-visible:ring-1 focus-visible:ring-[var(--admin-accent)]"
           />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className={sortSelectClass}
-            aria-label="Sort ads"
-          >
-            <option value="date-newest">Sort: Date (newest)</option>
-            <option value="date-oldest">Sort: Date (oldest)</option>
-            <option value="name-az">Sort: Name (A-Z)</option>
-            <option value="name-za">Sort: Name (Z-A)</option>
-          </select>
         </div>
 
         {/* Ads Table */}
@@ -1260,15 +1331,26 @@ export default function AdsManagerPage() {
             </colgroup>
             <thead className="bg-[var(--admin-table-header-bg)]">
               <tr>
-                <th className="w-0 px-3 py-3 text-left text-xs font-semibold text-[var(--admin-text)]">
-                  Ad
-                </th>
-                <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--admin-text)]">
-                  Slots
-                </th>
-                <th className="w-0 whitespace-nowrap px-3 py-3 text-right text-xs font-semibold text-[var(--admin-text)]">
-                  Schedule
-                </th>
+                <AdminTableSortTh
+                  label="Ad"
+                  phase={adsSortThPhase("ad")}
+                  onClick={() => onAdsSortTh("ad")}
+                  className="w-0 px-3"
+                />
+                <AdminTableSortTh
+                  label="Slots"
+                  phase={adsSortThPhase("slots")}
+                  onClick={() => onAdsSortTh("slots")}
+                  align="right"
+                  className="px-3"
+                />
+                <AdminTableSortTh
+                  label="Schedule"
+                  phase={adsSortThPhase("schedule")}
+                  onClick={() => onAdsSortTh("schedule")}
+                  align="right"
+                  className="w-0 whitespace-nowrap px-3"
+                />
               </tr>
             </thead>
             <tbody>

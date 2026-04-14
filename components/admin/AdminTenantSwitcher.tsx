@@ -77,7 +77,7 @@ export function AdminTenantSwitcher({ compact = false }: { compact?: boolean }) 
   }
 
   const triggerBase =
-    "flex w-full min-h-[2.75rem] items-center justify-between gap-2 rounded-lg border border-transparent px-3 py-2 text-left transition-all bg-[var(--admin-accent)]/20 text-[var(--admin-accent)]";
+    "flex w-full min-h-[2.75rem] items-center justify-between gap-2 rounded-lg px-3 py-2 text-left transition-all bg-[var(--admin-accent)]/20 text-[var(--admin-accent)] ring-1 ring-inset ring-[var(--admin-accent)]/50";
   const triggerCompact =
     "min-h-[2.5rem] px-2 py-1.5 text-sm font-medium";
 
@@ -114,7 +114,7 @@ export function AdminTenantSwitcher({ compact = false }: { compact?: boolean }) 
         <ul
           role="listbox"
           aria-labelledby="admin-tenant-switcher"
-          className={`absolute left-0 right-0 z-[60] w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-[var(--admin-border)] bg-[var(--admin-sidebar-bg)] shadow-lg ${
+          className={`absolute left-0 z-[60] w-full min-w-0 overflow-hidden rounded-lg border border-[var(--admin-border)] bg-[var(--admin-sidebar-bg)] shadow-lg ${
             compact
               ? "bottom-full mb-1 max-h-[min(50vh,16rem)]"
               : "top-full mt-1 max-h-[min(60vh,20rem)]"

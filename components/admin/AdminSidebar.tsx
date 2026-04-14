@@ -148,7 +148,7 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
                   className={`
                     flex min-h-[2.75rem] items-center gap-3 px-3 py-2 rounded-lg transition-all
                     ${active 
-                      ? 'bg-[var(--admin-accent)]/20 text-[var(--admin-accent)]' 
+                      ? 'bg-[var(--admin-accent)]/20 text-[var(--admin-accent)] ring-1 ring-inset ring-[var(--admin-accent)]/50' 
                       : 'text-white hover:bg-[var(--admin-card-bg)]'
                     }
                   `}

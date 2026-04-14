@@ -371,6 +371,23 @@ export default function AnalyticsPage() {
     [currentAdsStats],
   );
 
+  const sortedSectionPerformanceByViews = useMemo(
+    () =>
+      [...sectionPerformance].sort(
+        (a, b) => Number(b.views ?? 0) - Number(a.views ?? 0),
+      ),
+    [sectionPerformance],
+  );
+
+  const sortedAuthorPerformanceByViews = useMemo(() => {
+    return [...authorPerformance].sort((a, b) => {
+      const va = Number(a.views ?? 0);
+      const vb = Number(b.views ?? 0);
+      if (va !== vb) return vb - va;
+      return Number(b.clicks ?? 0) - Number(a.clicks ?? 0);
+    });
+  }, [authorPerformance]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -566,7 +583,7 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-[var(--admin-text-muted)]">No section data yet</p>
               ) : (
                 <div className="space-y-3">
-                  {sectionPerformance.map((section) => (
+                  {sortedSectionPerformanceByViews.map((section) => (
                     <div key={section.name} className="flex items-center justify-between">
                       <span className="text-sm font-medium text-[var(--admin-text)] capitalize">{section.name}</span>
                       <div className="text-sm font-semibold text-[var(--admin-text)]">
@@ -586,7 +603,7 @@ export default function AnalyticsPage() {
                 <p className="text-sm text-[var(--admin-text-muted)]">No author click data yet</p>
               ) : (
                 <div className="space-y-3">
-                  {authorPerformance.map((author) => (
+                  {sortedAuthorPerformanceByViews.map((author) => (
                     <div key={author.name} className="flex items-center justify-between">
                       <span className="text-sm font-medium text-[var(--admin-text)]">{author.name}</span>
                       <span className="text-sm font-semibold text-[var(--admin-text)]">{author.clicks} clicks</span>
@@ -602,19 +619,14 @@ export default function AnalyticsPage() {
       {/* === NEWSLETTER (SENDGRID) === */}
       <div className="mb-8">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h2 className="text-xl font-semibold text-white min-w-0">Newsletter email (SendGrid)</h2>
+          <h2 className="text-xl font-semibold text-white min-w-0">Newsletter Email (SendGrid)</h2>
           <Link
             href="/admin/newsletter"
-            className="text-sm font-semibold text-[var(--admin-accent)] hover:underline shrink-0"
+            className="shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition bg-[var(--admin-accent)] text-black hover:opacity-90"
           >
-            Open Newsletter admin
+            Open Newsletter Admin
           </Link>
         </div>
-        {newsletterSendgrid?.statsInfo ? (
-          <div className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-4 py-3 text-sm text-[var(--admin-text)] mb-4">
-            {newsletterSendgrid.statsInfo}
-          </div>
-        ) : null}
         {newsletterSendgrid?.sendGridError ? (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 mb-4">
             {newsletterSendgrid.sendGridError}
@@ -622,53 +634,54 @@ export default function AnalyticsPage() {
         ) : null}
         {newsletterSendgrid?.totals ? (
           <>
-            <p className="text-sm text-[var(--admin-text-muted)] mb-3">
-              Sent campaigns in this period:{" "}
-              <span className="font-semibold text-[var(--admin-text)]">
-                {newsletterSendgrid.campaignsInRange}
-              </span>
-              . Metrics are summed from SendGrid category stats per campaign.
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
               <CompactStatCard
-                label="Delivered (sum)"
+                label="Delivered"
                 value={newsletterSendgrid.totals.delivered.toLocaleString()}
                 tooltip="Total delivered events across newsletter campaigns sent in this period (SendGrid)."
               />
               <CompactStatCard
-                label="Unique opens (sum)"
+                label="Opens (% of delivered)"
+                value={
+                  newsletterSendgrid.totals.delivered > 0
+                    ? `${((newsletterSendgrid.totals.unique_opens / newsletterSendgrid.totals.delivered) * 100).toFixed(1)}%`
+                    : "—"
+                }
+                tooltip="Unique opens ÷ delivered × 100 (uses summed SendGrid stats for campaigns in range)."
+              />
+              <CompactStatCard
+                label="Unique opens"
                 value={newsletterSendgrid.totals.unique_opens.toLocaleString()}
                 tooltip="Sum of per-campaign unique opens; the same person may be counted on multiple campaigns."
               />
               <CompactStatCard
-                label="Unique clicks (sum)"
+                label="Unique clicks"
                 value={newsletterSendgrid.totals.unique_clicks.toLocaleString()}
                 tooltip="Sum of per-campaign unique clicks."
               />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <CompactStatCard
-                label="Bounces (sum)"
+                label="Bounces"
                 value={newsletterSendgrid.totals.bounces.toLocaleString()}
                 tooltip="Hard bounces reported by SendGrid for these campaigns."
               />
               <CompactStatCard
-                label="Blocks / drops (sum)"
+                label="Blocks / drops"
                 value={(newsletterSendgrid.totals.blocks + newsletterSendgrid.totals.bounce_drops).toLocaleString()}
                 tooltip="Blocked or dropped delivery attempts (SendGrid definitions)."
               />
               <CompactStatCard
-                label="Spam reports (sum)"
+                label="Spam reports"
                 value={newsletterSendgrid.totals.spam_reports.toLocaleString()}
                 tooltip="Recipients who marked the message as spam (SendGrid)."
               />
               <CompactStatCard
-                label="Unsubscribes (sum)"
+                label="Unsubscribes"
                 value={newsletterSendgrid.totals.unsubscribes.toLocaleString()}
                 tooltip="Unsubscribe events attributed to these sends (includes one-click list unsub where applicable)."
               />
             </div>
-            {newsletterSendgrid.note ? (
-              <p className="text-xs text-[var(--admin-text-muted)] max-w-3xl">{newsletterSendgrid.note}</p>
-            ) : null}
           </>
         ) : !newsletterSendgrid?.sendGridError ? (
           <p className="text-sm text-[var(--admin-text-muted)]">

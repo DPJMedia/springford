@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, type RefObject } from "react";
+import { useEffect, useState, useRef, useMemo, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { UserProfile } from "@/lib/types/database";
@@ -17,6 +17,8 @@ import { EditUserModal } from "@/components/EditUserModal";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
+import { AdminTableSortTh } from "@/components/admin/AdminTableSortTh";
+import { cycleSortTriPhase, type SortTriPhase } from "@/lib/admin/tableSort";
 
 function roleLabel(u: UserProfile): string {
   if (u.is_super_admin) return "SUPER ADMIN";
@@ -35,6 +37,22 @@ const SORT_OPTIONS = [
   { value: "newsletters-desc", label: "Newsletters (Z–A)" },
 ] as const;
 
+type UserSortCol = "joined" | "name" | "email" | "newsletters" | "active";
+
+const PRESET_TO_SORT: Record<
+  (typeof SORT_OPTIONS)[number]["value"],
+  { col: UserSortCol; phase: SortTriPhase }
+> = {
+  "joined-desc": { col: "joined", phase: 1 },
+  "joined-asc": { col: "joined", phase: 2 },
+  "name-asc": { col: "name", phase: 2 },
+  "name-desc": { col: "name", phase: 1 },
+  "email-asc": { col: "email", phase: 2 },
+  "email-desc": { col: "email", phase: 1 },
+  "newsletters-asc": { col: "newsletters", phase: 2 },
+  "newsletters-desc": { col: "newsletters", phase: 1 },
+};
+
 export default function UsersAdminPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -43,8 +61,11 @@ export default function UsersAdminPage() {
   const [editingUser, setEditingUser] = useState<AdminUserRow | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<string>("joined-desc");
+  const [sortCol, setSortCol] = useState<UserSortCol | null>(null);
+  const [sortPhase, setSortPhase] = useState<SortTriPhase>(0);
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
+  const sortDropdownMobileRef = useRef<HTMLDivElement>(null);
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [newsletterFilter, setNewsletterFilter] = useState<string>("all");
@@ -88,31 +109,46 @@ export default function UsersAdminPage() {
     }
   }
 
-  const sortedUsers = [...users].sort((a, b) => {
-    const [key, dir] = sortOption.split("-") as [string, string];
-    const mul = dir === "asc" ? 1 : -1;
-    if (key === "name") {
-      const na = (a.full_name || "").toLowerCase();
-      const nb = (b.full_name || "").toLowerCase();
-      return mul * na.localeCompare(nb);
-    }
-    if (key === "newsletters") {
-      const na = newsletterSortKey(a);
-      const nb = newsletterSortKey(b);
-      return mul * na.localeCompare(nb);
-    }
-    if (key === "email") {
-      const ea = (a.email || "").toLowerCase();
-      const eb = (b.email || "").toLowerCase();
-      return mul * ea.localeCompare(eb);
-    }
-    if (key === "joined") {
-      const ta = new Date(a.created_at).getTime();
-      const tb = new Date(b.created_at).getTime();
-      return mul * (ta - tb);
-    }
-    return 0;
-  });
+  const sortedUsers = useMemo(() => {
+    const list = [...users];
+    list.sort((a, b) => {
+      if (sortCol !== null && sortPhase !== 0) {
+        const mul = sortPhase === 1 ? -1 : 1;
+        if (sortCol === "joined") {
+          return mul * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        }
+        if (sortCol === "name") {
+          return mul * (a.full_name || "").localeCompare(b.full_name || "");
+        }
+        if (sortCol === "email") {
+          return mul * (a.email || "").localeCompare(b.email || "");
+        }
+        if (sortCol === "newsletters") {
+          return mul * newsletterSortKey(a).localeCompare(newsletterSortKey(b));
+        }
+        if (sortCol === "active") {
+          return mul * (newsletterDisplayRows(a).length - newsletterDisplayRows(b).length);
+        }
+        return 0;
+      }
+      const [key, dir] = sortOption.split("-") as [string, string];
+      const mul = dir === "asc" ? 1 : -1;
+      if (key === "name") {
+        return mul * (a.full_name || "").localeCompare(b.full_name || "");
+      }
+      if (key === "newsletters") {
+        return mul * newsletterSortKey(a).localeCompare(newsletterSortKey(b));
+      }
+      if (key === "email") {
+        return mul * (a.email || "").localeCompare(b.email || "");
+      }
+      if (key === "joined") {
+        return mul * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      }
+      return 0;
+    });
+    return list;
+  }, [users, sortOption, sortCol, sortPhase]);
 
   const filteredUsers = sortedUsers.filter((user) => {
     if (roleFilter !== "all") {
@@ -145,7 +181,10 @@ export default function UsersAdminPage() {
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
-      if (sortDropdownOpen && sortDropdownRef.current && !sortDropdownRef.current.contains(target)) {
+      const inSort =
+        (sortDropdownRef.current?.contains(target) ?? false) ||
+        (sortDropdownMobileRef.current?.contains(target) ?? false);
+      if (sortDropdownOpen && !inSort) {
         setSortDropdownOpen(false);
       }
       const inFilter =
@@ -312,7 +351,27 @@ export default function UsersAdminPage() {
 
   const selectedUser = selectedUserId ? users.find((u) => u.id === selectedUserId) ?? null : null;
 
-  function userFilterCard(ref: RefObject<HTMLDivElement | null>, className: string) {
+  const subscriberCount = users.filter(
+    (u) => (u.newsletter_subscriptions?.length ?? 0) > 0 || u.newsletter_subscribed,
+  ).length;
+  const pctSubscribed =
+    users.length > 0 ? Math.round((subscriberCount / users.length) * 1000) / 10 : 0;
+
+  function userSortPhase(col: UserSortCol): SortTriPhase {
+    return sortCol === col ? sortPhase : 0;
+  }
+
+  function onUserSortHeader(col: UserSortCol) {
+    const next = cycleSortTriPhase(col, sortCol, sortPhase);
+    setSortCol(next.key as UserSortCol | null);
+    setSortPhase(next.phase);
+  }
+
+  function userFilterCard(
+    ref: RefObject<HTMLDivElement | null>,
+    sortRef: RefObject<HTMLDivElement | null>,
+    className: string,
+  ) {
     return (
       <div ref={ref} className={className}>
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--admin-text-muted)]">
@@ -423,6 +482,58 @@ export default function UsersAdminPage() {
             )}
           </div>
         </div>
+        <h3 className="mb-3 mt-5 text-xs font-semibold uppercase tracking-wider text-[var(--admin-text-muted)]">
+          Sort
+        </h3>
+        <div className="relative" ref={sortRef}>
+          <button
+            type="button"
+            onClick={() => {
+              setSortDropdownOpen(!sortDropdownOpen);
+              setRoleDropdownOpen(false);
+              setNewsletterDropdownOpen(false);
+            }}
+            className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] px-3 py-2 text-sm font-medium text-[var(--admin-text)] transition hover:bg-[var(--admin-table-row-hover)]"
+          >
+            <svg className="w-4 h-4 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+            </svg>
+            <span className="min-w-0 truncate">
+              {SORT_OPTIONS.find((o) => o.value === sortOption)?.label ?? "Date joined (latest)"}
+            </span>
+            <svg
+              className={`h-4 w-4 shrink-0 text-[var(--admin-text-muted)] transition ${sortDropdownOpen ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {sortDropdownOpen && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[min(50vh,16rem)] overflow-y-auto rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] py-1 shadow-lg">
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setSortOption(opt.value);
+                    const preset = PRESET_TO_SORT[opt.value];
+                    setSortCol(preset.col);
+                    setSortPhase(preset.phase);
+                    setSortDropdownOpen(false);
+                  }}
+                  className={`block w-full px-4 py-2 text-left text-sm ${
+                    sortOption === opt.value ? "bg-[var(--admin-accent)]/10 font-semibold text-[var(--admin-accent)]" : "text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -515,7 +626,7 @@ export default function UsersAdminPage() {
 
   const actionsPanel = (
     <div className="w-64 overflow-hidden rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)]">
-      {userFilterCard(filterDropdownRef, "border-b border-[var(--admin-border)] p-4")}
+      {userFilterCard(filterDropdownRef, sortDropdownRef, "border-b border-[var(--admin-border)] p-4")}
       <AdminActionsPanel embedded sections={userActionsSections} />
     </div>
   );
@@ -537,80 +648,42 @@ export default function UsersAdminPage() {
               <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Total Users</div>
             </div>
             <div className="min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
-              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">{users.filter(u => u.is_admin || u.is_super_admin).length}</div>
-              <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Admins</div>
-            </div>
-            <div className="min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
-              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">{users.filter(u => !u.is_admin && !u.is_super_admin).length}</div>
-              <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Regular Users</div>
+              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">{subscriberCount}</div>
+              <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Newsletter Subscribers</div>
             </div>
             <div className="min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
               <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">
-                {users.filter((u) => (u.newsletter_subscriptions?.length ?? 0) > 0 || u.newsletter_subscribed).length}
+                {pctSubscribed.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}%
               </div>
-              <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Newsletter Subscribers</div>
+              <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Percentage Subscribed</div>
+            </div>
+            <div className="min-w-0 bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] px-3 py-3 sm:px-4 sm:py-3.5 hover:border-[var(--admin-accent)]/50 transition-all">
+              <div className="text-base sm:text-lg font-semibold tabular-nums text-[var(--admin-accent)] leading-tight truncate">{users.filter(u => u.is_admin || u.is_super_admin).length}</div>
+              <div className="mt-1 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-[var(--admin-text-muted)] leading-snug">Admins</div>
             </div>
           </div>
         </div>
 
         {/* Search (2/3) + Sort (1/3); filters + user actions in right column (mobile: card below) */}
         <h2 className="text-xl font-semibold text-white mb-4">All Users</h2>
-        <div className="mb-3 flex w-full min-w-0 flex-row flex-wrap items-center gap-3">
-          <div className="min-w-0 flex-[2] basis-0">
-            <label htmlFor="user-search" className="sr-only">Search users</label>
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                id="user-search"
-                type="search"
-                placeholder="Search name, email, newsletters..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] py-2 pl-9 pr-3 text-sm text-[var(--admin-text)] placeholder-[var(--admin-text-muted)] focus:border-[var(--admin-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]/30"
-              />
-            </div>
-          </div>
-          <div className="relative min-w-0 flex-1 basis-0" ref={sortDropdownRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setSortDropdownOpen(!sortDropdownOpen);
-                setRoleDropdownOpen(false);
-                setNewsletterDropdownOpen(false);
-              }}
-              className="inline-flex w-full min-w-0 items-center justify-center gap-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-3 py-2 text-sm font-medium text-[var(--admin-text)] transition hover:bg-[var(--admin-table-row-hover)]"
-            >
-              <svg className="w-4 h-4 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-              </svg>
-              Sort: {SORT_OPTIONS.find((o) => o.value === sortOption)?.label ?? "Date joined (latest)"}
-              <svg className={`w-4 h-4 text-[var(--admin-text-muted)] transition ${sortDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {sortDropdownOpen && (
-              <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] py-1 shadow-lg">
-                {SORT_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setSortOption(opt.value);
-                      setSortDropdownOpen(false);
-                    }}
-                    className={`block w-full px-4 py-2 text-left text-sm ${sortOption === opt.value ? "bg-[var(--admin-accent)]/10 font-semibold text-[var(--admin-accent)]" : "text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)]"}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
+        <div className="mb-3 w-full min-w-0">
+          <label htmlFor="user-search" className="sr-only">Search users</label>
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              id="user-search"
+              type="search"
+              placeholder="Search name, email, newsletters..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] py-2 pl-9 pr-3 text-sm text-[var(--admin-text)] placeholder-[var(--admin-text-muted)] focus:border-[var(--admin-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]/30"
+            />
           </div>
         </div>
         <div className="mb-4 w-full max-w-md overflow-hidden rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] xl:hidden">
-          {userFilterCard(filterDropdownMobileRef, "border-b border-[var(--admin-border)] p-4")}
+          {userFilterCard(filterDropdownMobileRef, sortDropdownMobileRef, "border-b border-[var(--admin-border)] p-4")}
           <AdminActionsPanel embedded sections={userActionsSections} />
         </div>
 
@@ -620,14 +693,30 @@ export default function UsersAdminPage() {
           <table className="min-w-full">
             <thead className="bg-[var(--admin-table-header-bg)]">
               <tr>
-                <th className="pl-4 pr-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)]">User</th>
-                <th className="pl-2 pr-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)] min-w-[12rem]">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)] whitespace-nowrap min-w-[10rem]">
-                  Newsletters
-                </th>
-                <th className="px-4 py-3 text-left align-bottom w-24">
-                  <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--admin-text)]">ACTIVE</span>
-                </th>
+                <AdminTableSortTh
+                  label="User"
+                  phase={userSortPhase("name")}
+                  onClick={() => onUserSortHeader("name")}
+                  className="pl-4 pr-2"
+                />
+                <AdminTableSortTh
+                  label="Email"
+                  phase={userSortPhase("email")}
+                  onClick={() => onUserSortHeader("email")}
+                  className="pl-2 pr-4 min-w-[12rem]"
+                />
+                <AdminTableSortTh
+                  label="Newsletters"
+                  phase={userSortPhase("newsletters")}
+                  onClick={() => onUserSortHeader("newsletters")}
+                  className="px-4 whitespace-nowrap min-w-[10rem]"
+                />
+                <AdminTableSortTh
+                  label="Active"
+                  phase={userSortPhase("active")}
+                  onClick={() => onUserSortHeader("active")}
+                  className="px-4 w-24"
+                />
               </tr>
             </thead>
             <tbody>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense, useMemo } from "react";
+import { useEffect, useState, useRef, Suspense, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -16,6 +16,8 @@ import {
 } from "@/lib/emails/emailBranding";
 import { getTransactionalEmailPreviews } from "@/lib/emails/transactionalPreviews";
 import { useTenant } from "@/lib/tenant/TenantProvider";
+import { AdminTableSortTh } from "@/components/admin/AdminTableSortTh";
+import { cycleSortTriPhase, type SortTriPhase } from "@/lib/admin/tableSort";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +43,14 @@ interface Template {
   created_at: string;
   updated_at: string;
 }
+
+type TemplateMetricsRow = {
+  recipients: number;
+  sends: number;
+  openPct: number | null;
+  ctrPct: number | null;
+  lastSent: string | null;
+};
 
 type CampaignFilter = "all" | "draft" | "sent";
 
@@ -149,7 +159,12 @@ function NewsletterInner() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
-  const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [templateMetrics, setTemplateMetrics] = useState<Record<string, TemplateMetricsRow>>({});
+  const [tmplSortCol, setTmplSortCol] = useState<string | null>(null);
+  const [tmplSortPhase, setTmplSortPhase] = useState<SortTriPhase>(0);
+  const [campSortCol, setCampSortCol] = useState<string | null>(null); // "name" | "recipients" | "status"
+  const [campSortPhase, setCampSortPhase] = useState<SortTriPhase>(0);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void } | null>(null);
   const [inputModal, setInputModal] = useState<{ title: string; message: string; defaultValue?: string; confirmLabel?: string; onConfirm: (v: string) => void } | null>(null);
 
@@ -173,20 +188,10 @@ function NewsletterInner() {
 
   useEffect(() => {
     setSelectedCampaignId(null);
+    setSelectedTemplateId(null);
   }, [tab, campaignFilter]);
 
-  useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/login"); return; }
-      const { data: p } = await supabase.from("user_profiles").select("is_admin,is_super_admin").eq("id", user.id).single();
-      if (!p?.is_admin && !p?.is_super_admin) { router.push("/admin/articles"); return; }
-      await loadData();
-    }
-    init();
-  }, [router, supabase, tenantId]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     const [{ data: tmplData }, { data: campData }] = await Promise.all([
       supabase
@@ -202,14 +207,70 @@ function NewsletterInner() {
     ]);
     const tmplList: Template[] = tmplData || [];
     setTemplates(tmplList);
-    // Attach template name to campaigns
     const campList: Campaign[] = (campData || []).map((c) => ({
       ...c,
       template_name: tmplList.find((t) => t.id === c.template_id)?.name || null,
     }));
     setCampaigns(campList);
+
+    const sentIds = campList.filter((c) => c.status === "sent").map((c) => c.id);
+    const metrics: Record<string, TemplateMetricsRow> = {};
+    for (const t of tmplList) {
+      metrics[t.id] = { recipients: 0, sends: 0, openPct: null, ctrPct: null, lastSent: null };
+    }
+    const agg: Record<string, { o: number; d: number; c: number }> = {};
+    for (const id of sentIds) agg[id] = { o: 0, d: 0, c: 0 };
+    if (sentIds.length > 0) {
+      const { data: evs } = await supabase
+        .from("newsletter_email_events")
+        .select("campaign_id, event")
+        .in("campaign_id", sentIds);
+      for (const row of evs || []) {
+        const a = agg[row.campaign_id as string];
+        if (!a) continue;
+        const ev = row.event as string;
+        if (ev === "open") a.o++;
+        if (ev === "delivered") a.d++;
+        if (ev === "click") a.c++;
+      }
+    }
+    for (const t of tmplList) {
+      const sent = campList.filter((c) => c.template_id === t.id && c.status === "sent");
+      let rec = 0;
+      let o = 0;
+      let d = 0;
+      let c = 0;
+      let lastSent: string | null = null;
+      for (const camp of sent) {
+        rec += camp.recipient_count || 0;
+        const x = agg[camp.id] || { o: 0, d: 0, c: 0 };
+        o += x.o;
+        d += x.d;
+        c += x.c;
+        if (camp.sent_at && (!lastSent || camp.sent_at > lastSent)) lastSent = camp.sent_at;
+      }
+      metrics[t.id] = {
+        recipients: rec,
+        sends: sent.length,
+        openPct: d > 0 ? Math.round((o / d) * 1000) / 10 : null,
+        ctrPct: d > 0 ? Math.round((c / d) * 1000) / 10 : null,
+        lastSent,
+      };
+    }
+    setTemplateMetrics(metrics);
     setLoading(false);
-  }
+  }, [supabase, tenantId]);
+
+  useEffect(() => {
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
+      const { data: p } = await supabase.from("user_profiles").select("is_admin,is_super_admin").eq("id", user.id).single();
+      if (!p?.is_admin && !p?.is_super_admin) { router.push("/admin/articles"); return; }
+      await loadData();
+    }
+    init();
+  }, [router, supabase, tenantId, loadData]);
 
   function deleteCampaign(c: Campaign) {
     const isSent = c.status === "sent";
@@ -250,6 +311,12 @@ function NewsletterInner() {
           .eq("id", tmpl.id)
           .eq("tenant_id", tenantId);
         setTemplates((prev) => prev.filter((t) => t.id !== tmpl.id));
+        setTemplateMetrics((prev) => {
+          const next = { ...prev };
+          delete next[tmpl.id];
+          return next;
+        });
+        setSelectedTemplateId((prev) => (prev === tmpl.id ? null : prev));
         setDeletingId(null);
       },
     });
@@ -328,6 +395,75 @@ function NewsletterInner() {
 
   const sentCount = campaigns.filter((c) => c.status === "sent").length;
   const draftCount = campaigns.filter((c) => c.status === "draft" || c.status === "scheduled").length;
+
+  const sortedFilteredCampaigns = useMemo(() => {
+    const rows = [...filteredCampaigns];
+    if (campSortCol && campSortPhase !== 0) {
+      const mul = campSortPhase === 1 ? -1 : 1;
+      const rank = (s: string) => (s === "sent" ? 2 : s === "scheduled" ? 1 : 0);
+      rows.sort((a, b) => {
+        if (campSortCol === "name") return mul * a.name.localeCompare(b.name);
+        if (campSortCol === "recipients") {
+          return mul * ((a.recipient_count || 0) - (b.recipient_count || 0));
+        }
+        if (campSortCol === "status") return mul * (rank(a.status) - rank(b.status));
+        return 0;
+      });
+    }
+    return rows;
+  }, [filteredCampaigns, campSortCol, campSortPhase]);
+
+  const sortedFilteredTemplates = useMemo(() => {
+    const rows = [...filteredTemplates];
+    if (tmplSortCol && tmplSortPhase !== 0) {
+      const mul = tmplSortPhase === 1 ? -1 : 1;
+      rows.sort((a, b) => {
+        const ma = templateMetrics[a.id] ?? {
+          recipients: 0,
+          sends: 0,
+          openPct: null,
+          ctrPct: null,
+          lastSent: null,
+        };
+        const mb = templateMetrics[b.id] ?? ma;
+        if (tmplSortCol === "name") return mul * a.name.localeCompare(b.name);
+        if (tmplSortCol === "updated") {
+          return mul * (new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+        }
+        if (tmplSortCol === "recipients") return mul * (ma.recipients - mb.recipients);
+        if (tmplSortCol === "open") {
+          const va = ma.openPct ?? -1;
+          const vb = mb.openPct ?? -1;
+          return mul * (va - vb);
+        }
+        if (tmplSortCol === "ctr") {
+          const va = ma.ctrPct ?? -1;
+          const vb = mb.ctrPct ?? -1;
+          return mul * (va - vb);
+        }
+        if (tmplSortCol === "sends") return mul * (ma.sends - mb.sends);
+        return 0;
+      });
+    }
+    return rows;
+  }, [filteredTemplates, tmplSortCol, tmplSortPhase, templateMetrics]);
+
+  function campSortHeaderPhase(col: string): SortTriPhase {
+    return campSortCol === col ? campSortPhase : 0;
+  }
+  function onCampaignSortHeader(col: string) {
+    const n = cycleSortTriPhase(col, campSortCol, campSortPhase);
+    setCampSortCol(n.key);
+    setCampSortPhase(n.phase);
+  }
+  function tmplSortHeaderPhase(col: string): SortTriPhase {
+    return tmplSortCol === col ? tmplSortPhase : 0;
+  }
+  function onTemplateSortHeader(col: string) {
+    const n = cycleSortTriPhase(col, tmplSortCol, tmplSortPhase);
+    setTmplSortCol(n.key);
+    setTmplSortPhase(n.phase);
+  }
 
   if (loading) {
     return (
@@ -467,29 +603,96 @@ function NewsletterInner() {
     />
   );
 
+  const selectedTemplate = selectedTemplateId
+    ? templates.find((t) => t.id === selectedTemplateId) ?? null
+    : null;
+
+  const templatesAdminActionsPanel = (
+    <AdminActionsPanel
+      attachBelowCreateButton
+      sections={[
+        ...(selectedTemplate
+          ? [
+              {
+                title: "Template",
+                items: [
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    ),
+                    label: "Edit",
+                    href: `/admin/newsletter/template-editor?id=${selectedTemplate.id}`,
+                  },
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    ),
+                    label: duplicatingId === selectedTemplate.id ? "Duplicating…" : "Duplicate",
+                    onClick: () => {
+                      if (duplicatingId === selectedTemplate.id) return;
+                      duplicateTemplate(selectedTemplate);
+                    },
+                  },
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    ),
+                    label: "Use in new campaign",
+                    href: "/admin/newsletter/campaigns/new",
+                  },
+                  {
+                    icon: (
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    ),
+                    label: deletingId === selectedTemplate.id ? "Deleting…" : "Delete",
+                    variant: "danger" as const,
+                    onClick: () => {
+                      if (deletingId === selectedTemplate.id) return;
+                      deleteTemplate(selectedTemplate);
+                    },
+                  },
+                ],
+              },
+            ]
+          : [
+              {
+                title: "Template",
+                customContent: (
+                  <p className="px-1 text-sm text-[var(--admin-text-muted)]">
+                    Select a template in the table to edit, duplicate, use in a campaign, or delete.
+                  </p>
+                ),
+              },
+            ]),
+        {
+          title: "Stats",
+          items: [],
+          customContent: (
+            <div className="space-y-2 px-1">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--admin-text-muted)]">Templates</span>
+                <span className="font-semibold text-[var(--admin-text)]">{templates.length}</span>
+              </div>
+            </div>
+          ),
+        },
+      ]}
+    />
+  );
+
   const actionsPanel =
     tab === "campaigns"
       ? campaignsAdminActionsPanel
       : tab === "templates"
-        ? (
-            <AdminActionsPanel
-              attachBelowCreateButton
-              sections={[
-                {
-                  title: "Stats",
-                  items: [],
-                  customContent: (
-                    <div className="space-y-2 px-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-[var(--admin-text-muted)]">Templates</span>
-                        <span className="font-semibold text-[var(--admin-text)]">{templates.length}</span>
-                      </div>
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          )
+        ? templatesAdminActionsPanel
         : null;
 
   return (
@@ -614,13 +817,28 @@ function NewsletterInner() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-[var(--admin-table-header-bg)] border-b border-[var(--admin-border)]">
-                      <th className="text-left px-5 py-3 text-xs font-medium text-[var(--admin-text)] uppercase tracking-wide">Campaign</th>
-                      <th className="text-left px-5 py-3 text-xs font-medium text-[var(--admin-text)] uppercase tracking-wide">Recipients</th>
-                      <th className="text-left px-5 py-3 text-xs font-medium text-[var(--admin-text)] uppercase tracking-wide">Status</th>
+                      <AdminTableSortTh
+                        label="Campaign"
+                        phase={campSortHeaderPhase("name")}
+                        onClick={() => onCampaignSortHeader("name")}
+                        className="px-5"
+                      />
+                      <AdminTableSortTh
+                        label="Recipients"
+                        phase={campSortHeaderPhase("recipients")}
+                        onClick={() => onCampaignSortHeader("recipients")}
+                        className="px-5"
+                      />
+                      <AdminTableSortTh
+                        label="Status"
+                        phase={campSortHeaderPhase("status")}
+                        onClick={() => onCampaignSortHeader("status")}
+                        className="px-5"
+                      />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--admin-border)]">
-                    {filteredCampaigns.map((c) => {
+                    {sortedFilteredCampaigns.map((c) => {
                       const publishedLine =
                         c.status === "sent" && c.sent_at
                           ? `Published ${new Date(c.sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
@@ -676,12 +894,10 @@ function NewsletterInner() {
         {tab === "templates" && (
           <div>
             <h2 className="text-xl font-semibold text-white mb-4">Templates</h2>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="relative flex-1 min-w-0 max-w-sm">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                <input type="text" placeholder="Search templates…" value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-[var(--admin-border)] rounded-lg bg-[var(--admin-card-bg)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]/30 focus:border-[var(--admin-accent)]" />
-              </div>
+            <div className="relative mb-5 w-full min-w-0">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--admin-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <input type="text" placeholder="Search templates…" value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm border border-[var(--admin-border)] rounded-lg bg-[var(--admin-card-bg)] text-[var(--admin-text)] placeholder:text-[var(--admin-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]/30 focus:border-[var(--admin-accent)]" />
             </div>
 
             {filteredTemplates.length === 0 ? (
@@ -704,82 +920,102 @@ function NewsletterInner() {
               </div>
             ) : (
               <div className="bg-[var(--admin-card-bg)] rounded-lg border border-[var(--admin-border)] overflow-hidden">
-                {filteredTemplates.map((tmpl, i) => {
-                  const usedInCampaigns = campaigns.filter((c) => c.template_id === tmpl.id);
-                  const isExpanded = expandedTemplateId === tmpl.id;
-                  return (
-                    <div key={tmpl.id} className={i > 0 ? "border-t border-[var(--admin-border)]" : ""}>
-                      {/* Main row */}
-                      <div className="flex items-center gap-4 px-5 py-4 hover:bg-[var(--admin-table-row-hover)] transition">
-                        {/* Icon */}
-                        <div className="w-9 h-9 bg-[var(--admin-accent)]/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <svg className="w-4 h-4 text-[var(--admin-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        </div>
-                        {/* Name + meta */}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-[var(--admin-text)] truncate">{tmpl.name}</p>
-                          <p className="text-xs text-[var(--admin-text-muted)] mt-0.5">
-                            {tmpl.blocks.length} block{tmpl.blocks.length !== 1 ? "s" : ""} · Updated {new Date(tmpl.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                          </p>
-                        </div>
-                        {/* Campaign usage toggle */}
-                        <button onClick={() => setExpandedTemplateId(isExpanded ? null : tmpl.id)}
-                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex-shrink-0 ${
-                            usedInCampaigns.length > 0
-                              ? "border-[var(--admin-accent)]/30 text-[var(--admin-accent)] bg-[var(--admin-accent)]/10 hover:bg-[var(--admin-accent)]/20"
-                              : "border-[var(--admin-border)] text-[var(--admin-text-muted)] hover:border-[var(--admin-accent)]/30 hover:text-[var(--admin-text)]"
-                          }`}>
-                          {usedInCampaigns.length > 0
-                            ? <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>{usedInCampaigns.length} campaign{usedInCampaigns.length > 1 ? "s" : ""}</>
-                            : "Not used"}
-                          <svg className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                        </button>
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Link href={`/admin/newsletter/template-editor?id=${tmpl.id}`}
-                            className="px-3 py-1.5 text-xs font-semibold bg-[var(--admin-accent)]/10 border border-[var(--admin-accent)]/30 text-[var(--admin-accent)] hover:bg-[var(--admin-accent)]/20 rounded-lg transition">
-                            Edit
-                          </Link>
-                          <button onClick={() => duplicateTemplate(tmpl)} disabled={duplicatingId === tmpl.id}
-                            className="px-3 py-1.5 text-xs font-semibold border border-[var(--admin-border)] text-[var(--admin-text)] hover:bg-[var(--admin-table-row-hover)] rounded-lg transition disabled:opacity-50">
-                            {duplicatingId === tmpl.id ? "…" : "Duplicate"}
-                          </button>
-                          <Link href="/admin/newsletter/campaigns/new"
-                            className="px-3 py-1.5 text-xs font-semibold bg-[var(--admin-accent)]/10 border border-[var(--admin-accent)]/30 text-[var(--admin-accent)] hover:bg-[var(--admin-accent)]/20 rounded-lg transition">
-                            Use
-                          </Link>
-                          <button onClick={() => deleteTemplate(tmpl)} disabled={deletingId === tmpl.id}
-                            className="px-3 py-1.5 text-xs font-semibold border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg transition disabled:opacity-50">
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                      {/* Expandable campaign list */}
-                      {isExpanded && (
-                        <div className="px-5 pb-4 bg-[var(--admin-table-header-bg)] border-t border-[var(--admin-border)]">
-                          <p className="text-xs font-semibold text-[var(--admin-text-muted)] uppercase tracking-wide pt-3 mb-2">Used in these campaigns</p>
-                          {usedInCampaigns.length === 0 ? (
-                            <p className="text-sm text-[var(--admin-text-muted)] italic">No campaigns use this template yet.</p>
-                          ) : (
-                            <div className="space-y-1.5">
-                              {usedInCampaigns.map((c) => (
-                                <Link key={c.id} href={`/admin/newsletter/campaigns/new?id=${c.id}`}
-                                  className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--admin-card-bg)] border border-[var(--admin-border)] hover:border-[var(--admin-accent)]/30 hover:bg-[var(--admin-table-row-hover)] transition group">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-[var(--admin-text)] truncate group-hover:text-[var(--admin-accent)] transition">{c.name}</p>
-                                    {c.subject && <p className="text-xs text-[var(--admin-text-muted)] truncate">{c.subject}</p>}
-                                  </div>
-                                  <StatusBadge status={c.status} />
-                                  <svg className="w-4 h-4 text-[var(--admin-text-muted)] group-hover:text-[var(--admin-accent)] flex-shrink-0 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                                </Link>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px]">
+                    <thead>
+                      <tr className="bg-[var(--admin-table-header-bg)] border-b border-[var(--admin-border)]">
+                        <AdminTableSortTh
+                          label="Template"
+                          phase={tmplSortHeaderPhase("name")}
+                          onClick={() => onTemplateSortHeader("name")}
+                          className="px-5"
+                        />
+                        <AdminTableSortTh
+                          label="Recipients"
+                          phase={tmplSortHeaderPhase("recipients")}
+                          onClick={() => onTemplateSortHeader("recipients")}
+                          className="px-5"
+                        />
+                        <AdminTableSortTh
+                          label="Open rate"
+                          phase={tmplSortHeaderPhase("open")}
+                          onClick={() => onTemplateSortHeader("open")}
+                          className="px-5"
+                        />
+                        <AdminTableSortTh
+                          label="CTR"
+                          phase={tmplSortHeaderPhase("ctr")}
+                          onClick={() => onTemplateSortHeader("ctr")}
+                          className="px-5"
+                        />
+                        <AdminTableSortTh
+                          label="Sends"
+                          phase={tmplSortHeaderPhase("sends")}
+                          onClick={() => onTemplateSortHeader("sends")}
+                          className="px-5"
+                        />
+                        <AdminTableSortTh
+                          label="Updated"
+                          phase={tmplSortHeaderPhase("updated")}
+                          onClick={() => onTemplateSortHeader("updated")}
+                          className="px-5"
+                        />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--admin-border)]">
+                      {sortedFilteredTemplates.map((tmpl) => {
+                        const m = templateMetrics[tmpl.id];
+                        const usedCount = campaigns.filter((c) => c.template_id === tmpl.id).length;
+                        return (
+                          <tr
+                            key={tmpl.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setSelectedTemplateId(tmpl.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setSelectedTemplateId(tmpl.id);
+                              }
+                            }}
+                            className={`cursor-pointer transition ${
+                              selectedTemplateId === tmpl.id
+                                ? "bg-[var(--admin-accent)]/10"
+                                : "hover:bg-[var(--admin-table-row-hover)]"
+                            }`}
+                          >
+                            <td className="px-5 py-4 align-top">
+                              <p className="font-semibold text-sm text-[var(--admin-text)] truncate max-w-[14rem]">{tmpl.name}</p>
+                              <p className="text-xs text-[var(--admin-text-muted)] mt-0.5">
+                                {tmpl.blocks.length} block{tmpl.blocks.length !== 1 ? "s" : ""}
+                                {usedCount > 0 ? ` · ${usedCount} campaign${usedCount !== 1 ? "s" : ""}` : " · Not used in campaigns"}
+                              </p>
+                            </td>
+                            <td className="px-5 py-4 align-middle text-sm tabular-nums text-[var(--admin-text)]">
+                              {(m?.recipients ?? 0).toLocaleString()}
+                            </td>
+                            <td className="px-5 py-4 align-middle text-sm tabular-nums text-[var(--admin-text)]">
+                              {m?.openPct != null ? `${m.openPct.toFixed(1)}%` : "—"}
+                            </td>
+                            <td className="px-5 py-4 align-middle text-sm tabular-nums text-[var(--admin-text)]">
+                              {m?.ctrPct != null ? `${m.ctrPct.toFixed(1)}%` : "—"}
+                            </td>
+                            <td className="px-5 py-4 align-middle text-sm tabular-nums text-[var(--admin-text)]">
+                              {m?.sends ?? 0}
+                            </td>
+                            <td className="px-5 py-4 align-middle text-xs text-[var(--admin-text-muted)] whitespace-nowrap">
+                              {new Date(tmpl.updated_at).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
