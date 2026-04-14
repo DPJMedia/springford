@@ -20,13 +20,19 @@ interface Template {
   updated_at: string;
 }
 
-type RecipientsType = "newsletter" | "all_users" | "super_admins";
+type RecipientsType = "newsletter" | "tenant_staff" | "all_users" | "super_admins";
 
 const RECIPIENTS_OPTIONS: { value: RecipientsType; label: string; desc: string }[] = [
-  { value: "newsletter",   label: "Newsletter Subscribers", desc: "Only users who have opted in to the newsletter" },
-  { value: "all_users",    label: "All Registered Users",   desc: "Every user with an account on the site" },
-  { value: "super_admins", label: "Super Admins Only",      desc: "Only super admin accounts — useful for internal review before a full send" },
+  { value: "newsletter",    label: "Newsletter Subscribers", desc: "Users who opted in to this site’s newsletter" },
+  { value: "tenant_staff",  label: "This Site’s Staff",      desc: "Admins and editors for this organization (best for a dry run before subscribers)" },
+  { value: "all_users",     label: "All Registered Users",  desc: "Every user with an account on the site" },
+  { value: "super_admins",  label: "Platform Super Admins", desc: "Only platform super-admin accounts" },
 ];
+
+function normalizeRecipientsType(v: string | null | undefined): RecipientsType {
+  const allowed: RecipientsType[] = ["newsletter", "tenant_staff", "all_users", "super_admins"];
+  return allowed.includes(v as RecipientsType) ? (v as RecipientsType) : "newsletter";
+}
 
 // ─── Confirm Modal (replaces browser confirm()) ───────────────────────────────
 
@@ -368,7 +374,7 @@ function CampaignNewInner() {
           setCampaignName(c.name);
           setSubject(c.subject || "");
           setPreviewText(c.preview_text || "");
-          setRecipientsType((c.recipients_type as RecipientsType) || "newsletter");
+          setRecipientsType(normalizeRecipientsType(c.recipients_type));
           setIsSent(c.status === "sent");
           setIsScheduled(c.status === "scheduled");
           setScheduledAt(c.scheduled_at || null);
@@ -477,7 +483,10 @@ function CampaignNewInner() {
   async function goToEditTemplate() {
     if (!selectedTemplate) return;
     const id = await saveNow(campaignName, subject, previewText, recipientsType, selectedTemplate.id, scheduledAt);
-    if (!id) return;
+    if (!id) {
+      setSendResult({ error: "Could not save the campaign. Fix any save errors and try again." });
+      return;
+    }
     const returnTo = encodeURIComponent(`/admin/newsletter/campaigns/new?id=${id}`);
     router.push(`/admin/newsletter/template-editor?id=${selectedTemplate.id}&returnTo=${returnTo}`);
   }
@@ -529,7 +538,11 @@ function CampaignNewInner() {
     if (!selectedTemplate || !scheduledAt) return;
     setSending(true); setSendResult(null);
     const id = await saveNow(campaignName, subject, previewText, recipientsType, selectedTemplate.id, scheduledAt, "scheduled");
-    if (!id) { setSending(false); return; }
+    if (!id) {
+      setSendResult({ error: "Could not save the campaign. Check your connection and that you have access to this site, then try again." });
+      setSending(false);
+      return;
+    }
     await supabase
       .from("newsletter_campaigns")
       .update({ blocks: selectedTemplate.blocks })
@@ -541,10 +554,13 @@ function CampaignNewInner() {
     setTimeout(() => router.push("/admin/newsletter"), 2500);
   }
 
-  async function executeSend(testOnly: boolean) {
+  async function executeSend() {
     if (!selectedTemplate) return;
     const id = await saveNow(campaignName, subject, previewText, recipientsType, selectedTemplate.id, scheduledAt);
-    if (!id) return;
+    if (!id) {
+      setSendResult({ error: "Could not save the campaign. Check your connection and that you have access to this site, then try again." });
+      return;
+    }
     await supabase
       .from("newsletter_campaigns")
       .update({ blocks: selectedTemplate.blocks })
@@ -555,11 +571,15 @@ function CampaignNewInner() {
     try {
       const res = await fetch("/api/newsletter/send-campaign", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaignId: id, testOnly }),
+        body: JSON.stringify({ campaignId: id }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        setSendResult({ error: typeof data.error === "string" ? data.error : "Send failed." });
+        return;
+      }
       setSendResult(data);
-      if (data.success && !testOnly) {
+      if (data.success) {
         setIsSent(true);
         setTimeout(() => router.push("/admin/newsletter"), 2500);
       }
@@ -567,20 +587,10 @@ function CampaignNewInner() {
     finally { setSending(false); }
   }
 
-  function handleSend(testOnly: boolean) {
+  function handleSend() {
     if (!selectedTemplate) { setSendResult({ error: "Please select a template first." }); return; }
     if (!subject.trim()) { setSendResult({ error: "Please enter a subject line before sending." }); return; }
     const recipLabel = RECIPIENTS_OPTIONS.find((o) => o.value === recipientsType)?.label;
-
-    if (testOnly) {
-      setConfirmModal({
-        title: "Send test email?",
-        message: "A preview will be sent to dylancobb2525@gmail.com only. The campaign will not be marked as sent.",
-        confirmLabel: "Send Test",
-        onConfirm: () => { setConfirmModal(null); executeSend(true); },
-      });
-      return;
-    }
 
     // If a future scheduled time is set, confirm the schedule (not an immediate send)
     const isFutureSchedule = scheduledAt && new Date(scheduledAt) > new Date();
@@ -596,7 +606,7 @@ function CampaignNewInner() {
         title: "Send campaign now?",
         message: `This will send to all ${recipLabel} immediately. This cannot be undone.`,
         confirmLabel: "Send Campaign",
-        onConfirm: () => { setConfirmModal(null); executeSend(false); },
+        onConfirm: () => { setConfirmModal(null); executeSend(); },
       });
     }
   }
@@ -681,19 +691,6 @@ function CampaignNewInner() {
               </svg>
               Scheduled
             </span>
-          )}
-          {!isSent && !isScheduled && (
-            <button
-              type="button"
-              onClick={() => handleSend(true)}
-              disabled={sending || !selectedTemplate}
-              className={topBarBtn}
-            >
-              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-              </svg>
-              Send Test
-            </button>
           )}
         </div>
       </div>
@@ -862,6 +859,11 @@ function CampaignNewInner() {
                   <button onClick={clearSchedule} className="text-amber-500 hover:text-amber-300 text-sm flex-shrink-0">✕</button>
                 </div>
               )}
+              {(!selectedTemplate || !subject.trim()) && (
+                <p className="text-[11px] text-amber-400/90 text-center leading-snug">
+                  Choose a template and enter a subject line to enable Schedule Send and Send Campaign.
+                </p>
+              )}
               <button onClick={() => setShowScheduleModal(true)} disabled={!selectedTemplate || !subject.trim()}
                 className="w-full py-2.5 flex items-center justify-center gap-2 text-sm font-semibold text-[var(--admin-text)] border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] hover:bg-[var(--admin-table-row-hover)] rounded-lg transition disabled:opacity-40">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -873,7 +875,7 @@ function CampaignNewInner() {
               </button>
               <button
                 type="button"
-                onClick={() => handleSend(false)}
+                onClick={() => handleSend()}
                 disabled={sending || !selectedTemplate || !subject.trim()}
                 className={sendActionBtnFull}
               >
@@ -898,7 +900,6 @@ function CampaignNewInner() {
                   </>
                 )}
               </button>
-              <p className="text-[10px] text-[var(--admin-text-muted)] text-center">Use &ldquo;Super Admins Only&rdquo; to review before sending to all subscribers.</p>
             </div>
           )}
 

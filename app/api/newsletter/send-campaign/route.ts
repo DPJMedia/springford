@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
 import { buildEmailHtml, newsletterBrandingFromTenant } from '@/lib/newsletter/buildEmailHtml';
 import type { NewsletterBlock, ArticleLayout } from '@/lib/newsletter/buildEmailHtml';
@@ -11,9 +12,6 @@ import { getTenantById, getTenantBySlug } from '@/lib/tenant/getTenant';
 import { getSiteConfig } from '@/lib/seo/site';
 
 const SENDGRID_API_URL = 'https://api.sendgrid.com/v3/mail/send';
-
-// Test recipient used only when the "Send Test" button is clicked (testOnly: true)
-const TEST_RECIPIENT = 'dylancobb2525@gmail.com';
 
 export async function POST(request: Request) {
   try {
@@ -35,7 +33,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const { campaignId, testOnly = false } = await request.json();
+    const { campaignId } = await request.json();
 
     if (!campaignId) {
       return NextResponse.json({ error: 'campaignId is required' }, { status: 400 });
@@ -129,48 +127,64 @@ export async function POST(request: Request) {
     let recipientCount = 0;
     const recipientsType: string = campaign.recipients_type || 'newsletter';
 
-    if (testOnly) {
-      // "Send Test" button — always goes to the test address only, never marks as sent
-      recipients = [{ email: TEST_RECIPIENT }];
-      recipientCount = 1;
-    } else {
-      // Real send — fetch based on recipients_type
-      if (recipientsType === 'newsletter') {
-        const { data: subs } = await supabase
-          .from('tenant_newsletter_subscriptions')
-          .select('user_id')
-          .eq('tenant_id', tenant.id)
-          .eq('subscribed', true);
+    if (recipientsType === 'newsletter') {
+      const { data: subs } = await supabase
+        .from('tenant_newsletter_subscriptions')
+        .select('user_id')
+        .eq('tenant_id', tenant.id)
+        .eq('subscribed', true);
 
-        const userIds = (subs || []).map((s) => s.user_id).filter(Boolean);
-        if (userIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from('user_profiles')
-            .select('email, full_name')
-            .in('id', userIds)
-            .not('email', 'is', null);
+      const userIds = (subs || []).map((s) => s.user_id).filter(Boolean);
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('email, full_name')
+          .in('id', userIds)
+          .not('email', 'is', null);
 
-          if (profiles && profiles.length > 0) {
-            recipients = profiles
-              .filter((s) => s.email)
-              .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
-            recipientCount = recipients.length;
-          }
-        }
-      } else {
-        let query = supabase.from('user_profiles').select('email, full_name').not('email', 'is', null);
-        if (recipientsType === 'super_admins') {
-          query = query.eq('is_super_admin', true);
-        }
-        // 'all_users' sends to every registered user with an email (no extra filter)
-        const { data: subscribers } = await query;
-
-        if (subscribers && subscribers.length > 0) {
-          recipients = subscribers
+        if (profiles && profiles.length > 0) {
+          recipients = profiles
             .filter((s) => s.email)
             .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
           recipientCount = recipients.length;
         }
+      }
+    } else if (recipientsType === 'tenant_staff') {
+      const admin = createAdminClient();
+      const { data: memberships } = await admin
+        .from('tenant_memberships')
+        .select('user_id')
+        .eq('tenant_id', tenant.id)
+        .in('role', ['admin', 'editor']);
+
+      const userIds = (memberships || []).map((m) => m.user_id).filter(Boolean);
+      if (userIds.length > 0) {
+        const { data: profiles } = await admin
+          .from('user_profiles')
+          .select('email, full_name')
+          .in('id', userIds)
+          .not('email', 'is', null);
+
+        if (profiles && profiles.length > 0) {
+          recipients = profiles
+            .filter((s) => s.email)
+            .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
+          recipientCount = recipients.length;
+        }
+      }
+    } else {
+      let query = supabase.from('user_profiles').select('email, full_name').not('email', 'is', null);
+      if (recipientsType === 'super_admins') {
+        query = query.eq('is_super_admin', true);
+      }
+      // 'all_users' sends to every registered user with an email (no extra filter)
+      const { data: subscribers } = await query;
+
+      if (subscribers && subscribers.length > 0) {
+        recipients = subscribers
+          .filter((s) => s.email)
+          .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
+        recipientCount = recipients.length;
       }
     }
 
@@ -216,28 +230,25 @@ export async function POST(request: Request) {
       }
     }
 
-    // Mark campaign as sent only for real sends (not test-only)
-    if (!testOnly) {
-      await supabase
-        .from('newsletter_campaigns')
-        .update({
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-          recipient_count: recipientCount,
-        })
-        .eq('id', campaignId);
-    }
+    await supabase
+      .from('newsletter_campaigns')
+      .update({
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        recipient_count: recipientCount,
+      })
+      .eq('id', campaignId);
 
     const recipientLabel =
       recipientsType === 'all_users' ? 'users' :
       recipientsType === 'super_admins' ? 'super admins' :
+      recipientsType === 'tenant_staff' ? 'staff' :
       'subscribers';
 
     return NextResponse.json({
       success: true,
       recipientCount,
-      testMode: testOnly,
-      sentTo: testOnly ? TEST_RECIPIENT : `${recipientCount} ${recipientLabel}`,
+      sentTo: `${recipientCount} ${recipientLabel}`,
     });
   } catch (error: unknown) {
     console.error('Send campaign error:', error);
