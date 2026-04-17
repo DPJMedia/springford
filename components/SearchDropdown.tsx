@@ -152,7 +152,7 @@ export function SearchDropdown({ isOpen, onClose }: SearchDropdownProps) {
                   <li key={`${item.query}-${i}`} role="option" className="border-b border-gray-50 last:border-b-0">
                     {item.type === "article" && item.slug ? (
                       <Link
-                        href={`/articles/${item.slug}`}
+                        href={`/article/${item.slug}`}
                         onClick={onClose}
                         className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition"
                       >
