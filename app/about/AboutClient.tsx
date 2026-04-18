@@ -21,8 +21,12 @@ export function AboutClient({ siteName }: Props) {
     const hero = heroRef.current;
     if (!canvas || !outer || !hero) return;
 
+    const canvasEl = canvas;
+    const outerEl = outer;
+    const heroEl = hero;
+
     const dpr = window.devicePixelRatio || 1;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    const ctx = canvasEl.getContext("2d", { willReadFrequently: true })!;
     let currentFrameIdx = 0;
     let bgColor = "#ffffff";
 
@@ -33,7 +37,7 @@ export function AboutClient({ siteName }: Props) {
     }
 
     // Canvas: fixed, anchored from the text column's right edge to the browser edge
-    Object.assign(canvas.style, {
+    Object.assign(canvasEl.style, {
       position: "fixed",
       left: "40vw",
       zIndex: "1",
@@ -47,11 +51,11 @@ export function AboutClient({ siteName }: Props) {
       const headerBottom = getHeaderBottom();
       const w = Math.round(window.innerWidth * 0.60);
       const h = window.innerHeight - headerBottom;
-      canvas!.style.top = `${headerBottom}px`;
-      canvas!.style.width = `${w}px`;
-      canvas!.style.height = `${h}px`;
-      canvas!.width = w * dpr;
-      canvas!.height = h * dpr;
+      canvasEl.style.top = `${headerBottom}px`;
+      canvasEl.style.width = `${w}px`;
+      canvasEl.style.height = `${h}px`;
+      canvasEl.width = w * dpr;
+      canvasEl.height = h * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     setCanvasSize();
@@ -85,8 +89,8 @@ export function AboutClient({ siteName }: Props) {
 
     function drawFrame(img: HTMLImageElement) {
       if (!img?.naturalWidth) return;
-      const cw = canvas!.width / dpr;
-      const ch = canvas!.height / dpr;
+      const cw = canvasEl.width / dpr;
+      const ch = canvasEl.height / dpr;
       const scale = Math.max(cw / img.naturalWidth, ch / img.naturalHeight) * 0.92;
       const dw = img.naturalWidth * scale;
       const dh = img.naturalHeight * scale;
@@ -102,7 +106,7 @@ export function AboutClient({ siteName }: Props) {
         frames[i] = img;
         if (i === 0) {
           bgColor = sampleBgColor(img);
-          canvas.style.background = bgColor;
+          canvasEl.style.background = bgColor;
           // Apply matched bg to body so the whole page looks seamless
           document.body.style.backgroundColor = bgColor;
           drawFrame(img);
@@ -144,7 +148,7 @@ export function AboutClient({ siteName }: Props) {
 
       // Frame scrub — tied to the ENTIRE outer container, tighter scrub = more responsive
       ScrollTrigger.create({
-        trigger: outer,
+        trigger: outerEl,
         start: "top top",
         end: "bottom bottom",
         scrub: 0.15,
@@ -164,23 +168,23 @@ export function AboutClient({ siteName }: Props) {
       });
 
       // Canvas stays visible the entire time — footer sits on top via z-index in page.tsx
-      canvas.style.visibility = "visible";
+      canvasEl.style.visibility = "visible";
 
       // Hero fade — fades out over the first 15% of scroll
       ScrollTrigger.create({
-        trigger: outer,
+        trigger: outerEl,
         start: "top top",
         end: "bottom bottom",
         scrub: true,
         onUpdate(self) {
-          hero.style.opacity = String(Math.max(0, 1 - self.progress * 20));
+          heroEl.style.opacity = String(Math.max(0, 1 - self.progress * 20));
         },
       });
 
       // Hero entrance animations
-      const heroLabel = hero.querySelector<HTMLElement>(".hero-label");
-      const heroHeading = hero.querySelector<HTMLElement>(".hero-heading");
-      const heroTagline = hero.querySelector<HTMLElement>(".hero-tagline");
+      const heroLabel = heroEl.querySelector<HTMLElement>(".hero-label");
+      const heroHeading = heroEl.querySelector<HTMLElement>(".hero-heading");
+      const heroTagline = heroEl.querySelector<HTMLElement>(".hero-tagline");
       const heroEls = [heroLabel, heroHeading, heroTagline].filter(Boolean);
 
       gsap.fromTo(
