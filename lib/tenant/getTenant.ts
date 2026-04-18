@@ -25,7 +25,8 @@ export function normalizeDomainForLookup(domain: string): string {
   return d;
 }
 
-async function fetchTenantByDomain(domain: string): Promise<TenantRow | null> {
+/** Direct DB lookup; safe for Edge middleware. Cached variant: {@link getTenant}. */
+export async function fetchTenantByDomain(domain: string): Promise<TenantRow | null> {
   const normalized = normalizeDomainForLookup(domain);
   const supabase = createAdminClient();
   const { data, error } = await supabase
@@ -44,7 +45,8 @@ async function fetchTenantByDomain(domain: string): Promise<TenantRow | null> {
  */
 export const getTenant = cache(fetchTenantByDomain);
 
-async function fetchTenantBySlug(slug: string): Promise<TenantRow | null> {
+/** Direct DB lookup; safe for Edge middleware. Cached variant: {@link getTenantBySlug}. */
+export async function fetchTenantBySlug(slug: string): Promise<TenantRow | null> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("tenants")

@@ -329,6 +329,20 @@ export default function Home() {
   }, [tenantId]);
 
   async function fetchArticles() {
+    if (!tenantId) {
+      setLoading(false);
+      return;
+    }
+
+    let fetchTimeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      fetchTimeout = setTimeout(
+        () => reject(new Error("Homepage article queries timed out")),
+        45_000,
+      );
+    });
+
+    try {
     const now = new Date().toISOString();
     
     // Fetch all main queries in parallel for faster loading
@@ -348,7 +362,8 @@ export default function Home() {
       businessResult,
       eventsResult,
       opinionResult
-    ] = await Promise.all([
+    ] = await Promise.race([
+      Promise.all([
       // Hero article
       supabase
         .from("articles")
@@ -503,7 +518,10 @@ export default function Home() {
         .lte("published_at", now)
         .order("published_at", { ascending: false })
         .limit(15)
+    ]),
+      timeoutPromise,
     ]);
+    if (fetchTimeout) clearTimeout(fetchTimeout);
 
     // Process results
     if (heroResult.data && heroResult.data.length > 0) {
@@ -576,8 +594,12 @@ export default function Home() {
     if (businessResult.data) setBusinessArticles(businessResult.data as any);
     if (eventsResult.data) setEventsArticles(eventsResult.data as any);
     if (opinionResult.data) setOpinionArticles(opinionResult.data as any);
-
-    setLoading(false);
+    } catch (err) {
+      console.error("[Home] fetchArticles failed:", err);
+    } finally {
+      if (fetchTimeout) clearTimeout(fetchTimeout);
+      setLoading(false);
+    }
   }
 
   return (

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { isWebpackChunkLoadError } from "@/lib/errors/isWebpackChunkLoadError";
 
 export default function GlobalError({
   error,
@@ -9,9 +10,19 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const staleChunk = useMemo(() => isWebpackChunkLoadError(error), [error]);
+
   useEffect(() => {
     console.error("[global-error]", error);
   }, [error]);
+
+  const handleRetry = () => {
+    if (staleChunk) {
+      window.location.reload();
+      return;
+    }
+    reset();
+  };
 
   return (
     <html lang="en">
@@ -19,14 +30,16 @@ export default function GlobalError({
         <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-4 px-6 py-16 text-center">
           <h1 className="text-2xl font-bold">Something went wrong</h1>
           <p className="text-[color:var(--color-medium)]">
-            Please try again or return to the home page.
+            {staleChunk
+              ? "A script failed to load—often after the dev server rebuilt. Reload the page to fetch a fresh copy."
+              : "Please try again or return to the home page."}
           </p>
           <button
             type="button"
-            onClick={() => reset()}
+            onClick={handleRetry}
             className="rounded-lg bg-[color:var(--color-riviera-blue)] px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
           >
-            Try again
+            {staleChunk ? "Reload page" : "Try again"}
           </button>
         </div>
       </body>

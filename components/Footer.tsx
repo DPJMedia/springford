@@ -84,7 +84,7 @@ export function Footer() {
             </h3>
             <ul className="space-y-2 text-xs">
               <li>
-                <a href="#" className="hover:text-[color:var(--color-dark)] transition">About Us</a>
+                <a href="/about" className="hover:text-[color:var(--color-dark)] transition">About Us</a>
               </li>
               <li>
                 <a href="/contact" className="hover:text-[color:var(--color-dark)] transition">Contact</a>

@@ -345,3 +345,8 @@ a {
 .admin-layout .transactional-email-preview .hover\:bg-gray-200:hover {
   background-color: unset !important;
 }
+
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}

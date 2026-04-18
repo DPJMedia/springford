@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Newsreader, Playfair_Display, Red_Hat_Display, Space_Grotesk } from "next/font/google";
+import { Dancing_Script, Newsreader, Playfair_Display, Red_Hat_Display, Space_Grotesk } from "next/font/google";
 import { headers } from "next/headers";
 import { OrganizationJsonLd } from "@/components/seo/OrganizationJsonLd";
 import { getSiteConfig, SITE_KEYWORDS } from "@/lib/seo/site";
@@ -38,6 +38,13 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   variable: "--font-space-grotesk",
   weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+});
+
+const dancingScript = Dancing_Script({
+  subsets: ["latin"],
+  variable: "--font-cursive",
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -99,7 +106,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${redHatDisplay.variable} ${newsreader.variable} ${playfair.variable} ${spaceGrotesk.variable} antialiased bg-[color:var(--color-surface)] text-[color:var(--color-text)]`}
+        className={`${redHatDisplay.variable} ${newsreader.variable} ${playfair.variable} ${spaceGrotesk.variable} ${dancingScript.variable} antialiased bg-[color:var(--color-surface)] text-[color:var(--color-text)]`}
       >
         <TenantProvider value={tenantContext}>
           <OrganizationJsonLd tenant={tenantRow} />

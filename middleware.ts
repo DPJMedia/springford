@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateSession } from "./lib/supabase/middleware";
 import {
-  getTenant,
-  getTenantBySlug,
+  fetchTenantByDomain,
+  fetchTenantBySlug,
   normalizeDomainForLookup,
 } from "./lib/tenant/getTenant";
 
@@ -27,12 +27,12 @@ export async function middleware(request: NextRequest) {
   const hostHeader = request.headers.get("host") ?? "";
   const normalizedHost = normalizeDomainForLookup(hostHeader);
 
-  let tenant = null as Awaited<ReturnType<typeof getTenant>>;
+  let tenant = null as Awaited<ReturnType<typeof fetchTenantBySlug>>;
 
   if (shouldUseSpringFordFallback(normalizedHost)) {
-    tenant = await getTenantBySlug("spring-ford");
+    tenant = await fetchTenantBySlug("spring-ford");
   } else {
-    tenant = await getTenant(normalizedHost);
+    tenant = await fetchTenantByDomain(normalizedHost);
   }
 
   if (!tenant) {
@@ -55,6 +55,11 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    /*
+     * Exclude the entire /_next/* tree (not only static + image). Webpack/Turbopack
+     * dev uses /_next/webpack-hmr, manifests, and other paths; running tenant +
+     * Supabase middleware on those requests breaks chunk loading and HMR.
+     */
+    "/((?!_next/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
