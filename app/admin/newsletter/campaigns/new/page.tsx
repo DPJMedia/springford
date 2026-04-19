@@ -332,6 +332,7 @@ function CampaignNewInner() {
   const [saveStatus, setSaveStatus] = useState<"" | "saved" | "error">("");
   const [sendResult, setSendResult] = useState<{ success?: boolean; error?: string; sentTo?: string } | null>(null);
   const [isSent, setIsSent] = useState(false);
+  const [isCanceled, setIsCanceled] = useState(false);
   const [isScheduled, setIsScheduled] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [templatePickModal, setTemplatePickModal] = useState<Template | null>(null);
@@ -376,6 +377,7 @@ function CampaignNewInner() {
           setPreviewText(c.preview_text || "");
           setRecipientsType(normalizeRecipientsType(c.recipients_type));
           setIsSent(c.status === "sent");
+          setIsCanceled(c.status === "canceled");
           setIsScheduled(c.status === "scheduled");
           setScheduledAt(c.scheduled_at || null);
           if (c.template_id) {
@@ -412,7 +414,10 @@ function CampaignNewInner() {
     tmplId: string | null, schedAt: string | null, newStatus?: "draft" | "scheduled",
   ): Promise<string | null> {
     setSaving(true); setSaveStatus("");
-    const status = newStatus ?? (schedAt ? "scheduled" : "draft");
+    // Never infer "scheduled" over "sent" / "canceled": stale editor state can otherwise overwrite server status.
+    const status =
+      newStatus ??
+      (isSent ? "sent" : isCanceled ? "canceled" : schedAt ? "scheduled" : "draft");
     try {
       if (currentCampaignId.current) {
         const { error } = await supabase.from("newsletter_campaigns").update({

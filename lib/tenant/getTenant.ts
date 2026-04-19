@@ -62,6 +62,24 @@ export async function fetchTenantBySlug(slug: string): Promise<TenantRow | null>
 /** e.g. Spring-Ford fallback for localhost / *.vercel.app */
 export const getTenantBySlug = cache(fetchTenantBySlug);
 
+/**
+ * First active tenant (stable order) — used for localhost when the default slug
+ * is missing so local dev works against any Supabase project that has tenants.
+ */
+export async function fetchFirstActiveTenant(): Promise<TenantRow | null> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("tenants")
+    .select("*")
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as TenantRow;
+}
+
 async function fetchTenantById(id: string): Promise<TenantRow | null> {
   const supabase = createAdminClient();
   const { data, error } = await supabase

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateSession } from "./lib/supabase/middleware";
 import {
+  fetchFirstActiveTenant,
   fetchTenantByDomain,
   fetchTenantBySlug,
   normalizeDomainForLookup,
@@ -30,7 +31,13 @@ export async function middleware(request: NextRequest) {
   let tenant = null as Awaited<ReturnType<typeof fetchTenantBySlug>>;
 
   if (shouldUseSpringFordFallback(normalizedHost)) {
-    tenant = await fetchTenantBySlug("spring-ford");
+    const slugOverride =
+      process.env.NEXT_PUBLIC_LOCAL_TENANT_SLUG?.trim() || "spring-ford";
+    tenant = await fetchTenantBySlug(slugOverride);
+    // localhost only: if this DB has no row for that slug, use the first active tenant so `npm run dev` works.
+    if (!tenant && isLocalhostOrLoopback(normalizedHost) && process.env.NODE_ENV === "development") {
+      tenant = await fetchFirstActiveTenant();
+    }
   } else {
     tenant = await fetchTenantByDomain(normalizedHost);
   }

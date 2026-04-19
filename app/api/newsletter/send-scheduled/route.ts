@@ -12,10 +12,12 @@ import { getSiteConfig } from "@/lib/seo/site";
 
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 
-export const runtime = "edge";
+/** Node runtime: more reliable for long Supabase + SendGrid work than Edge for this route. */
 
 const isProduction =
   process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+
+const STALE_SENDING_MS = 30 * 60 * 1000;
 
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
@@ -44,6 +46,17 @@ export async function GET(request: Request) {
   );
 
   const now = new Date().toISOString();
+  const staleBefore = new Date(Date.now() - STALE_SENDING_MS).toISOString();
+
+  // Recover abandoned "sending" rows (e.g. crash mid-request) so they can retry.
+  const { error: staleErr } = await supabase
+    .from("newsletter_campaigns")
+    .update({ status: "scheduled", updated_at: now })
+    .eq("status", "sending")
+    .lt("updated_at", staleBefore);
+  if (staleErr) {
+    console.error("[send-scheduled] stale reset error:", staleErr);
+  }
 
   // Find all scheduled campaigns whose scheduled_at has passed
   const { data: campaigns, error } = await supabase
@@ -172,17 +185,43 @@ export async function GET(request: Request) {
       }
 
       if (recipients.length === 0) {
-        await supabase
+        const { error: draftErr } = await supabase
           .from("newsletter_campaigns")
-          .update({ status: "draft", updated_at: now })
-          .eq("id", campaign.id);
+          .update({ status: "draft", scheduled_at: null, updated_at: now })
+          .eq("id", campaign.id)
+          .eq("status", "scheduled");
+        if (draftErr) {
+          console.error("[send-scheduled] draft fallback error:", draftErr);
+        }
         results.push({ id: campaign.id, name: campaign.name, success: false, error: "No recipients found" });
+        continue;
+      }
+
+      // Claim this row so concurrent cron invocations cannot double-send.
+      const { data: claimedRows, error: claimError } = await supabase
+        .from("newsletter_campaigns")
+        .update({ status: "sending", updated_at: now })
+        .eq("id", campaign.id)
+        .eq("status", "scheduled")
+        .select("id");
+
+      if (claimError) {
+        console.error("[send-scheduled] claim error:", claimError);
+        results.push({ id: campaign.id, name: campaign.name, success: false, error: claimError.message });
+        continue;
+      }
+      if (!claimedRows?.length) {
+        results.push({
+          id: campaign.id,
+          name: campaign.name,
+          success: false,
+          error: "Skipped (already claimed or no longer scheduled)",
+        });
         continue;
       }
 
       const categoryTag = sendGridCategoryForCampaign(campaign.id);
       const globalCategory = sendGridNewsletterGlobalCategory(tenant);
-      // Send in batches of 1000 (SendGrid limit per request)
       const BATCH_SIZE = 1000;
       let sendError: string | null = null;
       for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
@@ -216,20 +255,53 @@ export async function GET(request: Request) {
       }
 
       if (sendError) {
+        const { error: revertErr } = await supabase
+          .from("newsletter_campaigns")
+          .update({ status: "scheduled", updated_at: now })
+          .eq("id", campaign.id)
+          .eq("status", "sending");
+        if (revertErr) {
+          console.error("[send-scheduled] revert after SendGrid failure:", revertErr);
+        }
         results.push({ id: campaign.id, name: campaign.name, success: false, error: sendError });
         continue;
       }
 
-      // Mark sent
-      await supabase
+      const { error: sentErr } = await supabase
         .from("newsletter_campaigns")
-        .update({ status: "sent", sent_at: now, recipient_count: recipients.length, updated_at: now })
-        .eq("id", campaign.id);
+        .update({
+          status: "sent",
+          sent_at: now,
+          scheduled_at: null,
+          recipient_count: recipients.length,
+          updated_at: now,
+        })
+        .eq("id", campaign.id)
+        .eq("status", "sending");
+
+      if (sentErr) {
+        console.error("[send-scheduled] final sent update error:", sentErr);
+        const { error: revertErr } = await supabase
+          .from("newsletter_campaigns")
+          .update({ status: "scheduled", updated_at: now })
+          .eq("id", campaign.id)
+          .eq("status", "sending");
+        if (revertErr) {
+          console.error("[send-scheduled] revert after sent update failure:", revertErr);
+        }
+        results.push({ id: campaign.id, name: campaign.name, success: false, error: sentErr.message });
+        continue;
+      }
 
       results.push({ id: campaign.id, name: campaign.name, success: true, recipientCount: recipients.length });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[send-scheduled] Error processing campaign ${campaign.id}:`, msg);
+      await supabase
+        .from("newsletter_campaigns")
+        .update({ status: "scheduled", updated_at: now })
+        .eq("id", campaign.id)
+        .eq("status", "sending");
       results.push({ id: campaign.id, name: campaign.name, success: false, error: msg });
     }
   }

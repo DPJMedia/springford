@@ -25,7 +25,7 @@ interface Campaign {
   id: string;
   name: string;
   subject: string;
-  status: "draft" | "sent" | "scheduled";
+  status: "draft" | "sent" | "scheduled" | "sending" | "canceled";
   recipients_type: string;
   template_id: string | null;
   preview_text: string;
@@ -125,13 +125,28 @@ function InputModal({ title, message, defaultValue, confirmLabel, onConfirm, onC
 
 function StatusBadge({ status }: { status: string }) {
   const label =
-    status === "sent" ? "Sent" : status === "scheduled" ? "Scheduled" : status === "draft" ? "Draft" : status;
-  const isSent = status === "sent";
+    status === "sent"
+      ? "Sent"
+      : status === "scheduled"
+        ? "Scheduled"
+        : status === "sending"
+          ? "Sending…"
+          : status === "canceled"
+            ? "Canceled"
+            : status === "draft"
+              ? "Draft"
+              : status;
+  const tone =
+    status === "sent"
+      ? "text-emerald-400"
+      : status === "canceled"
+        ? "text-rose-400"
+        : status === "sending"
+          ? "text-amber-400"
+          : "text-[var(--admin-text)]";
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] ${
-        isSent ? "text-emerald-400" : "text-[var(--admin-text)]"
-      }`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] ${tone}`}
     >
       {label}
     </span>
@@ -168,6 +183,7 @@ function NewsletterInner() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [templateMetrics, setTemplateMetrics] = useState<Record<string, TemplateMetricsRow>>({});
@@ -306,6 +322,49 @@ function NewsletterInner() {
     });
   }
 
+  function cancelScheduledSend(c: Campaign) {
+    setConfirmModal({
+      title: "Cancel scheduled send?",
+      message: `“${c.name}” will stay in your campaigns as canceled and will not be emailed.`,
+      confirmLabel: "Cancel send",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setCancelingId(c.id);
+        try {
+          const res = await fetch("/api/newsletter/cancel-scheduled", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ campaignId: c.id }),
+          });
+          const j = (await res.json()) as { error?: string };
+          if (!res.ok) throw new Error(j.error || "Request failed");
+          setCampaigns((prev) =>
+            prev.map((row) =>
+              row.id === c.id
+                ? {
+                    ...row,
+                    status: "canceled",
+                    scheduled_at: null,
+                    updated_at: new Date().toISOString(),
+                  }
+                : row
+            )
+          );
+        } catch {
+          setConfirmModal({
+            title: "Could not cancel",
+            message: "Try again or refresh the page.",
+            confirmLabel: "OK",
+            onConfirm: () => setConfirmModal(null),
+          });
+        } finally {
+          setCancelingId(null);
+        }
+      },
+    });
+  }
+
   function deleteTemplate(tmpl: Template) {
     setConfirmModal({
       title: `Delete "${tmpl.name}"?`,
@@ -388,7 +447,10 @@ function NewsletterInner() {
       campaignFilter === "all"
         ? true
         : campaignFilter === "draft"
-          ? c.status === "draft" || c.status === "scheduled"
+          ? c.status === "draft" ||
+            c.status === "scheduled" ||
+            c.status === "sending" ||
+            c.status === "canceled"
           : c.status === "sent";
     return matchesSearch && matchesFilter;
   });
@@ -404,13 +466,26 @@ function NewsletterInner() {
   // ── Stats ─────────────────────────────────────────────────────────────────────
 
   const sentCount = campaigns.filter((c) => c.status === "sent").length;
-  const draftCount = campaigns.filter((c) => c.status === "draft" || c.status === "scheduled").length;
+  const draftCount = campaigns.filter(
+    (c) =>
+      c.status === "draft" ||
+      c.status === "scheduled" ||
+      c.status === "sending" ||
+      c.status === "canceled"
+  ).length;
 
   const sortedFilteredCampaigns = useMemo(() => {
     const rows = [...filteredCampaigns];
     if (campSortCol && campSortPhase !== 0) {
       const mul = campSortPhase === 1 ? -1 : 1;
-      const rank = (s: string) => (s === "sent" ? 2 : s === "scheduled" ? 1 : 0);
+      const rank = (s: string) =>
+        s === "sent"
+          ? 4
+          : s === "scheduled" || s === "sending"
+            ? 3
+            : s === "canceled"
+              ? 1
+              : 0;
       rows.sort((a, b) => {
         if (campSortCol === "name") return mul * a.name.localeCompare(b.name);
         if (campSortCol === "recipients") {
@@ -548,6 +623,29 @@ function NewsletterInner() {
                     label: selectedCampaign.status === "sent" ? "View" : "Edit",
                     href: `/admin/newsletter/campaigns/new?id=${selectedCampaign.id}`,
                   },
+                  ...(selectedCampaign.status === "scheduled"
+                    ? [
+                        {
+                          icon: (
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          ),
+                          label:
+                            cancelingId === selectedCampaign.id ? "Canceling…" : "Cancel scheduled send",
+                          variant: "danger" as const,
+                          onClick: () => {
+                            if (cancelingId === selectedCampaign.id) return;
+                            cancelScheduledSend(selectedCampaign);
+                          },
+                        },
+                      ]
+                    : []),
                   {
                     icon: (
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -856,7 +954,9 @@ function NewsletterInner() {
                       const publishedLine =
                         c.status === "sent" && c.sent_at
                           ? `Published ${new Date(c.sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-                          : "Not published yet";
+                          : c.status === "canceled"
+                            ? "Send canceled — not published"
+                            : "Not published yet";
                       return (
                       <tr
                         key={c.id}

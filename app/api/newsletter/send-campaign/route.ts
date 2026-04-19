@@ -235,6 +235,7 @@ export async function POST(request: Request) {
       .update({
         status: 'sent',
         sent_at: new Date().toISOString(),
+        scheduled_at: null,
         recipient_count: recipientCount,
       })
       .eq('id', campaignId);
