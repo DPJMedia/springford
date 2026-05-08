@@ -1,6 +1,17 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const AUTH_TIMEOUT_MS = 4000
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Supabase auth timeout after ${timeoutMs}ms`)), timeoutMs)
+    ),
+  ])
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -31,11 +42,18 @@ export async function updateSession(request: NextRequest) {
   // supabase.auth.getUser(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
 
+  const needsAdminAuth = request.nextUrl.pathname.startsWith('/admin')
+
+  // Local dev stability: avoid an auth round-trip on every public route request.
+  if (process.env.NODE_ENV === 'development' && !needsAdminAuth) {
+    return supabaseResponse
+  }
+
   let user = null
   try {
     const {
       data: { user: authUser },
-    } = await supabase.auth.getUser()
+    } = await withTimeout(supabase.auth.getUser(), AUTH_TIMEOUT_MS)
     user = authUser
   } catch (error) {
     // If Supabase is unreachable, log the error but don't break the site

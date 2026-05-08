@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next.nosync/
 /out/
 
 # production
@@ -39,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local AI tooling (Cursor / Claude skills, not for production)
+/.claude/

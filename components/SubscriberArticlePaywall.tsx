@@ -148,29 +148,21 @@ export function SubscriberArticlePaywall({ content, contentBlocks }: Props) {
             The full story is behind this panel—subscribe to read it clearly.
           </p>
 
-          <p className="mb-2 mt-10 text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--color-riviera-blue)]">
-            Limited time
+          <p className="mb-2 mt-10 text-[11px] font-bold uppercase tracking-[0.22em] text-[color:var(--color-riviera-blue)]">
+            Free · Always
           </p>
-          <h3 className="text-xl font-semibold tracking-tight text-[color:var(--color-dark)] sm:text-2xl">
-            {siteName}
-            <br />
-            <span className="text-[color:var(--color-riviera-blue)]">Grand Opening Offer</span>
+          <h3 className="masthead text-xl font-semibold tracking-tight text-[color:var(--color-dark)] sm:text-2xl">
+            Subscribe to read the full story
           </h3>
-          <div className="mt-4 flex justify-center">
-            <span className="inline-flex items-center rounded-full border border-emerald-200/90 bg-gradient-to-b from-emerald-50 to-emerald-100/80 px-4 py-2 text-xs font-bold uppercase tracking-wide text-emerald-900 shadow-sm">
-              First 500 subscribers — free for a year
-            </span>
-          </div>
-          <p className="mt-3 text-sm text-[color:var(--color-medium)]">No payment method required</p>
-          <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-[color:var(--color-medium)]">
-            Our way of giving back to the community and keeping our earliest subscribers well informed.
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[color:var(--color-medium)]">
+            Independent, hyper-local journalism from {siteName} — delivered to your inbox. No payment, no card, unsubscribe anytime.
           </p>
 
           <Link
             href="/subscribe"
-            className="mt-8 inline-flex min-w-[200px] items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)] px-8 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-110 hover:shadow-lg"
+            className="mt-7 inline-flex min-w-[200px] items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)] px-8 py-3.5 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:brightness-110 hover:shadow-lg"
           >
-            Subscribe now
+            Subscribe — it's free
           </Link>
           <p className="mt-4 text-xs text-[color:var(--color-medium)]">
             Already have an account?{" "}

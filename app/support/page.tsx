@@ -18,6 +18,8 @@ const PRESET_AMOUNTS = [
 const MIN_CUSTOM = 5;
 const MAX_CUSTOM = 1000;
 
+const POST_DONATION_FORMSPREE_URL = "https://formspree.io/f/xeenlrnw";
+
 type RecurringPlan = "one_time" | "monthly_ongoing" | "monthly_limited" | "annual";
 
 function SupportPageContent() {
@@ -28,7 +30,11 @@ function SupportPageContent() {
   const canceled = searchParams.get("canceled") === "true";
   const welcome = searchParams.get("welcome") === "1";
 
-  const [user, setUser] = useState<{ email?: string } | null>(null);
+  type SupportUser = {
+    email?: string;
+    user_metadata?: { full_name?: string | null } | null;
+  };
+  const [user, setUser] = useState<SupportUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [selectedAmount, setSelectedAmount] = useState<number>(2500);
   const [customDollars, setCustomDollars] = useState<string>("");
@@ -41,20 +47,84 @@ function SupportPageContent() {
   );
   const [durationMonths, setDurationMonths] = useState(3);
 
+  // Post-donation "send a letter" form state.
+  const [letterName, setLetterName] = useState("");
+  const [letterEmail, setLetterEmail] = useState("");
+  const [letterMessage, setLetterMessage] = useState("");
+  const [letterSending, setLetterSending] = useState(false);
+  const [letterSent, setLetterSent] = useState(false);
+  const [letterError, setLetterError] = useState<string | null>(null);
+
   const supabase = createClient();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: u } }) => {
-      setUser(u ?? null);
+      setUser((u ?? null) as SupportUser | null);
       setAuthLoading(false);
     });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
-      supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u ?? null));
+      supabase.auth.getUser().then(({ data: { user: u } }) =>
+        setUser((u ?? null) as SupportUser | null),
+      );
     });
     return () => subscription.unsubscribe();
   }, [supabase]);
+
+  // Prefill the post-donation letter form from the signed-in user once we have it.
+  useEffect(() => {
+    if (!user) return;
+    const fullName = user.user_metadata?.full_name?.trim();
+    if (fullName && !letterName) setLetterName(fullName);
+    if (user.email && !letterEmail) setLetterEmail(user.email);
+  }, [user, letterName, letterEmail]);
+
+  async function handleLetterSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLetterError(null);
+    const trimmedName = letterName.trim();
+    const trimmedEmail = letterEmail.trim();
+    const trimmedMessage = letterMessage.trim();
+    if (!trimmedName || !trimmedEmail || !trimmedMessage) {
+      setLetterError("Please fill out your name, email, and message.");
+      return;
+    }
+    setLetterSending(true);
+    try {
+      const res = await fetch(POST_DONATION_FORMSPREE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          email: trimmedEmail,
+          message: trimmedMessage,
+          _subject: `Letter from ${trimmedName} after supporting ${siteName}`,
+          source: "support-page-thank-you",
+          site: siteName,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          data?.errors?.[0]?.message ||
+            data?.error ||
+            "Could not send your letter. Please try again.",
+        );
+      }
+      setLetterSent(true);
+      setLetterMessage("");
+    } catch (err) {
+      setLetterError(
+        err instanceof Error ? err.message : "Could not send your letter.",
+      );
+    } finally {
+      setLetterSending(false);
+    }
+  }
 
   const useCustom = customDollars !== "";
   const customNum = parseFloat(customDollars) || 0;
@@ -123,19 +193,135 @@ function SupportPageContent() {
           </p>
 
           {success && (
-            <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-6 text-center">
-              <p className="font-semibold text-green-800">Thank you for your support.</p>
-              <p className="mt-1 text-sm text-green-700">
-                {recurringSuccess
-                  ? "Your recurring contribution is set up. You’ll receive a confirmation email with receipt details."
-                  : "Your payment was successful."}
-              </p>
-              {recurringSuccess && (
-                <p className="mt-2 text-xs text-green-800">
-                  Manage or cancel anytime from your profile → Support.
+            <>
+              <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-6 text-center">
+                <p className="font-semibold text-green-800">Thank you for your support.</p>
+                <p className="mt-1 text-sm text-green-700">
+                  {recurringSuccess
+                    ? "Your recurring contribution is set up. You'll receive a confirmation email with receipt details."
+                    : "Your payment was successful."}
                 </p>
-              )}
-            </div>
+                {recurringSuccess && (
+                  <p className="mt-2 text-xs text-green-800">
+                    Manage or cancel anytime from your profile → Support.
+                  </p>
+                )}
+              </div>
+
+              {/* Optional: send the team a note after donating. */}
+              <section className="mt-6 rounded-xl border border-[color:var(--color-border)] bg-white p-6 shadow-soft sm:p-8">
+                {letterSent ? (
+                  <div className="text-center">
+                    <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)]/12 text-[color:var(--color-riviera-blue)]">
+                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                        <path
+                          fillRule="evenodd"
+                          d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.41 0l-3.5-3.5a1 1 0 011.41-1.42L8.5 12.09l6.79-6.8a1 1 0 011.41 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                    <p className="masthead text-xl font-semibold tracking-tight text-[color:var(--color-dark)]">
+                      Your letter is on its way.
+                    </p>
+                    <p className="mt-2 text-sm text-[color:var(--color-medium)]">
+                      Thanks for writing — the {siteName} team will read every word.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLetterSent(false);
+                        setLetterMessage("");
+                      }}
+                      className="mt-4 text-xs font-semibold text-[color:var(--color-riviera-blue)] hover:underline"
+                    >
+                      Send another note
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleLetterSubmit} className="space-y-4">
+                    <div className="text-center sm:text-left">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[color:var(--color-riviera-blue)]">
+                        Optional
+                      </p>
+                      <h2 className="masthead mt-1 text-2xl font-semibold leading-tight tracking-tight text-[color:var(--color-dark)]">
+                        Want to send us a letter?
+                      </h2>
+                      <p className="mt-2 text-sm text-[color:var(--color-medium)]">
+                        Story tip, kind word, or feedback — write directly to the editors of {siteName}.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label
+                          htmlFor="letter-name"
+                          className="block text-xs font-semibold text-[color:var(--color-dark)] mb-1.5"
+                        >
+                          Your name
+                        </label>
+                        <input
+                          id="letter-name"
+                          type="text"
+                          required
+                          value={letterName}
+                          onChange={(e) => setLetterName(e.target.value)}
+                          autoComplete="name"
+                          className="w-full rounded-lg border border-[color:var(--color-border)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="letter-email"
+                          className="block text-xs font-semibold text-[color:var(--color-dark)] mb-1.5"
+                        >
+                          Email
+                        </label>
+                        <input
+                          id="letter-email"
+                          type="email"
+                          required
+                          value={letterEmail}
+                          onChange={(e) => setLetterEmail(e.target.value)}
+                          autoComplete="email"
+                          className="w-full rounded-lg border border-[color:var(--color-border)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="letter-message"
+                        className="block text-xs font-semibold text-[color:var(--color-dark)] mb-1.5"
+                      >
+                        Your message
+                      </label>
+                      <textarea
+                        id="letter-message"
+                        required
+                        rows={5}
+                        value={letterMessage}
+                        onChange={(e) => setLetterMessage(e.target.value)}
+                        placeholder="Share a story tip, ask a question, or just say hi…"
+                        className="w-full resize-y rounded-lg border border-[color:var(--color-border)] bg-white px-4 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[color:var(--color-riviera-blue)]"
+                      />
+                    </div>
+
+                    {letterError && (
+                      <p className="text-sm text-red-600">{letterError}</p>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={letterSending}
+                      className="inline-flex w-full items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)] px-8 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:brightness-110 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto"
+                    >
+                      {letterSending ? "Sending…" : "Send letter"}
+                    </button>
+                  </form>
+                )}
+              </section>
+            </>
           )}
 
           {canceled && (

@@ -2,6 +2,8 @@ import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TenantRow } from "@/lib/types/database";
 
+const TENANT_QUERY_TIMEOUT_MS = 4000;
+
 /** Strip port from Host-style string (localhost:3000 → localhost; keeps IPv6 in brackets). */
 export function stripPortFromHost(host: string): string {
   const h = host.trim();
@@ -32,6 +34,7 @@ export async function fetchTenantByDomain(domain: string): Promise<TenantRow | n
   const { data, error } = await supabase
     .from("tenants")
     .select("*")
+    .abortSignal(AbortSignal.timeout(TENANT_QUERY_TIMEOUT_MS))
     .eq("domain", normalized)
     .eq("is_active", true)
     .maybeSingle();
@@ -51,6 +54,7 @@ export async function fetchTenantBySlug(slug: string): Promise<TenantRow | null>
   const { data, error } = await supabase
     .from("tenants")
     .select("*")
+    .abortSignal(AbortSignal.timeout(TENANT_QUERY_TIMEOUT_MS))
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
@@ -71,6 +75,7 @@ export async function fetchFirstActiveTenant(): Promise<TenantRow | null> {
   const { data, error } = await supabase
     .from("tenants")
     .select("*")
+    .abortSignal(AbortSignal.timeout(TENANT_QUERY_TIMEOUT_MS))
     .eq("is_active", true)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -85,6 +90,7 @@ async function fetchTenantById(id: string): Promise<TenantRow | null> {
   const { data, error } = await supabase
     .from("tenants")
     .select("*")
+    .abortSignal(AbortSignal.timeout(TENANT_QUERY_TIMEOUT_MS))
     .eq("id", id)
     .eq("is_active", true)
     .maybeSingle();

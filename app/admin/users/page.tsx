@@ -19,6 +19,7 @@ import { AdminPageLayout } from "@/components/admin/AdminPageLayout";
 import { AdminActionsPanel } from "@/components/admin/AdminActionsPanel";
 import { AdminTableSortTh } from "@/components/admin/AdminTableSortTh";
 import { cycleSortTriPhase, type SortTriPhase } from "@/lib/admin/tableSort";
+import { useTenant } from "@/lib/tenant/TenantProvider";
 
 function roleLabel(u: UserProfile): string {
   if (u.is_super_admin) return "SUPER ADMIN";
@@ -74,6 +75,7 @@ export default function UsersAdminPage() {
   const filterDropdownMobileRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const supabase = createClient();
+  const { id: currentTenantId } = useTenant();
 
   function newsletterSortKey(u: AdminUserRow): string {
     const names = u.newsletter_tenant_names ?? u.newsletter_subscriptions?.map((s) => s.tenant_name) ?? [];
@@ -277,23 +279,90 @@ export default function UsersAdminPage() {
     }
   }
 
-  async function toggleNewsletterStatus(userId: string, currentStatus: boolean) {
-    const action = currentStatus ? "revoke" : "grant";
+  async function toggleNewsletterStatus(userId: string, currentlySubscribed: boolean) {
+    const action = currentlySubscribed ? "revoke" : "grant";
     if (!confirm(`Are you sure you want to ${action} newsletter subscription for this user?`)) {
       return;
     }
 
-    const { error } = await supabase
+    const now = new Date().toISOString();
+
+    // Update legacy account-wide flag (kept in sync for backward compat).
+    const { error: profileErr } = await supabase
       .from("user_profiles")
-      .update({ newsletter_subscribed: !currentStatus })
+      .update({
+        newsletter_subscribed: !currentlySubscribed,
+        newsletter_subscribed_at: !currentlySubscribed ? now : null,
+      })
       .eq("id", userId);
 
-    if (!error) {
-      loadUsers();
-      alert(`Newsletter subscription ${action === "grant" ? "granted" : "revoked"}!`);
-    } else {
-      alert("Error updating user: " + error.message);
+    if (profileErr) {
+      alert("Error updating user: " + profileErr.message);
+      return;
     }
+
+    // Update the per-tenant subscription rows that the UI actually reads from.
+    // Revoke: unsubscribe from every tenant the user is subscribed to.
+    // Grant: upsert a subscription row for the admin's current tenant context.
+    if (currentlySubscribed) {
+      const { error: revokeErr } = await supabase
+        .from("tenant_newsletter_subscriptions")
+        .update({ subscribed: false, unsubscribed_at: now })
+        .eq("user_id", userId)
+        .eq("subscribed", true);
+      if (revokeErr) {
+        alert(
+          "Profile flag was updated, but per-tenant subscriptions failed: " +
+            revokeErr.message,
+        );
+        loadUsers();
+        return;
+      }
+    } else if (currentTenantId) {
+      const { error: grantErr } = await supabase
+        .from("tenant_newsletter_subscriptions")
+        .upsert(
+          {
+            user_id: userId,
+            tenant_id: currentTenantId,
+            subscribed: true,
+            subscribed_at: now,
+            unsubscribed_at: null,
+          },
+          { onConflict: "user_id,tenant_id" },
+        );
+      if (grantErr) {
+        alert(
+          "Profile flag was updated, but per-tenant subscription failed: " +
+            grantErr.message,
+        );
+        loadUsers();
+        return;
+      }
+    }
+
+    // Optimistically update local state so the table reflects the change
+    // immediately without waiting for the network round-trip.
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id !== userId) return u;
+        const next: AdminUserRow = {
+          ...u,
+          newsletter_subscribed: !currentlySubscribed,
+          newsletter_subscribed_at: !currentlySubscribed ? now : null,
+        };
+        if (currentlySubscribed) {
+          next.newsletter_subscriptions = [];
+          next.newsletter_tenant_names = [];
+        }
+        return next;
+      }),
+    );
+
+    // Re-sync from the server to pick up tenant names for grants and any
+    // other server-side side effects.
+    loadUsers();
+    alert(`Newsletter subscription ${action === "grant" ? "granted" : "revoked"}!`);
   }
 
   async function removeUser(userId: string, userName: string) {
@@ -552,15 +621,20 @@ export default function UsersAdminPage() {
               label: "Edit profile",
               onClick: () => setEditingUser(selectedUser),
             },
-            {
-              icon: (
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              ),
-              label: selectedUser.newsletter_subscribed ? "Revoke newsletter" : "Grant newsletter",
-              onClick: () => toggleNewsletterStatus(selectedUser.id, selectedUser.newsletter_subscribed || false),
-            },
+            (() => {
+              const isSubscribed =
+                (selectedUser.newsletter_subscriptions?.length ?? 0) > 0 ||
+                !!selectedUser.newsletter_subscribed;
+              return {
+                icon: (
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                ),
+                label: isSubscribed ? "Revoke newsletter" : "Grant newsletter",
+                onClick: () => toggleNewsletterStatus(selectedUser.id, isSubscribed),
+              };
+            })(),
             ...(selectedUser.id !== currentUser.id && !selectedUser.is_super_admin
               ? [
                   {

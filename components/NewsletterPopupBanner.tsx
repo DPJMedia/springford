@@ -7,11 +7,8 @@ import { useSearchParams } from "next/navigation";
 import { useTenant } from "@/lib/tenant/TenantProvider";
 
 const COOKIE_DISMISSED = "newsletter_popup_dismissed";
-const COOKIE_VIEWS = "newsletter_popup_views";
 const COOKIE_MAX_AGE_24H = 86400; // 24 hours
-const COOKIE_MAX_AGE_2WEEKS = 1209600; // 14 days
-const MAX_VIEWS_BEFORE_COOLDOWN = 3;
-const SHOW_DELAY_MS = 10000; // 10 seconds
+const SHOW_DELAY_MS = 10000; // 10 seconds before the popup appears
 
 function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
@@ -25,13 +22,16 @@ function setCookie(name: string, value: string, maxAge: number) {
 }
 
 function setDismissCookie() {
-  if (typeof document === "undefined") return;
-  const viewsRaw = getCookie(COOKIE_VIEWS) || "0";
-  const views = Math.min(parseInt(viewsRaw, 10) + 1, MAX_VIEWS_BEFORE_COOLDOWN);
-  setCookie(COOKIE_VIEWS, String(views), 365 * 24 * 60 * 60); // persist 1 year
-  const cooldown = views >= MAX_VIEWS_BEFORE_COOLDOWN ? COOKIE_MAX_AGE_2WEEKS : COOKIE_MAX_AGE_24H;
-  setCookie(COOKIE_DISMISSED, "1", cooldown);
+  // Flat 24-hour cooldown for every unsubscribed / anonymous visitor.
+  setCookie(COOKIE_DISMISSED, "1", COOKIE_MAX_AGE_24H);
 }
+
+const BENEFITS = [
+  "Breaking local news alerts the moment stories publish",
+  "Exclusive subscriber-only investigations and deep-dives",
+  "Weekly briefing — council agendas, meetings, must-knows",
+  "Hyper-local coverage you won't find anywhere else",
+];
 
 export function NewsletterPopupBanner() {
   const { name: siteName } = useTenant();
@@ -97,27 +97,32 @@ export function NewsletterPopupBanner() {
 
   if (!show || checking) return null;
 
+  const ctaHref = hasAccount ? "/subscribe" : "/signup?returnTo=/subscribe";
+  const ctaLabel = hasAccount ? "Subscribe — it's free" : "Sign up — it's free";
+
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 bg-[#0f172a]/30 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 bg-[#0f172a]/45 backdrop-blur-[3px]"
       style={{
         opacity: visible ? 1 : 0,
         transition: "opacity 400ms ease-out",
       }}
     >
       <div
-        className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-[0_25px_50px_-12px_rgba(15,23,42,0.35)] ring-1 ring-black/[0.06]"
+        className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-[0_30px_60px_-15px_rgba(15,23,42,0.45)] ring-1 ring-black/[0.06]"
         style={{
           opacity: visible ? 1 : 0,
-          transform: visible ? "scale(1)" : "scale(0.97) translateY(8px)",
+          transform: visible ? "scale(1)" : "scale(0.96) translateY(10px)",
           transition: "opacity 400ms ease-out, transform 400ms cubic-bezier(0.34, 1.2, 0.64, 1)",
         }}
       >
+        {/* Top gradient accent + soft serif backdrop */}
         <div className="h-1.5 w-full bg-gradient-to-r from-[color:var(--color-riviera-blue)] via-[#3d8ba8] to-[color:var(--color-riviera-blue)]" />
-        <div className="relative px-6 pb-8 pt-7 sm:px-10 sm:pb-10 sm:pt-8">
+
+        <div className="relative px-6 pb-7 pt-7 sm:px-8 sm:pb-8 sm:pt-8">
           <button
             onClick={handleDismiss}
-            className="absolute top-4 right-4 p-2 rounded-full text-[color:var(--color-medium)] hover:text-[color:var(--color-dark)] hover:bg-gray-100/90 transition"
+            className="absolute top-3 right-3 p-2 rounded-full text-[color:var(--color-medium)] hover:text-[color:var(--color-dark)] hover:bg-gray-100/90 transition"
             aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,53 +130,66 @@ export function NewsletterPopupBanner() {
             </svg>
           </button>
 
-          <div className="text-center">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--color-riviera-blue)]">
-              Limited time
-            </p>
-            <h2 className="masthead mt-3 text-[1.65rem] font-semibold leading-tight tracking-tight text-[color:var(--color-dark)] sm:text-3xl">
-              {siteName}
-              <br />
-              <span className="text-[color:var(--color-riviera-blue)]">Grand Opening Offer</span>
-            </h2>
+          {/* Eyebrow */}
+          <p className="text-center text-[10.5px] font-bold uppercase tracking-[0.22em] text-[color:var(--color-riviera-blue)]">
+            Free · Always
+          </p>
 
-            <div className="mt-5 flex justify-center">
-              <span className="inline-flex items-center rounded-full border border-emerald-200/90 bg-gradient-to-b from-emerald-50 to-emerald-100/80 px-4 py-2 text-xs font-bold uppercase tracking-wide text-emerald-900 shadow-sm sm:text-sm">
-                First 500 subscribers — free for a year
-              </span>
-            </div>
+          {/* Masthead-style headline */}
+          <h2 className="masthead mt-3 text-center text-[1.7rem] font-semibold leading-[1.1] tracking-tight text-[color:var(--color-dark)] sm:text-[2rem]">
+            Don't miss a story
+            <br />
+            <span className="text-[color:var(--color-riviera-blue)]">in your neighborhood</span>
+          </h2>
 
-            <div className="mt-6 flex flex-col items-center gap-0.5 text-center">
-              <p className="text-xl font-bold text-[color:var(--color-dark)] sm:text-2xl">
-                One full year free
-              </p>
-              <p className="text-[10px] font-normal leading-snug tracking-wide text-[color:var(--color-medium)] sm:text-[11px]">
-                No payment method required
-              </p>
-            </div>
+          <p className="mx-auto mt-3 max-w-xs text-center text-sm leading-relaxed text-[color:var(--color-medium)]">
+            Join the {siteName} community for free, independent local journalism — straight to your inbox.
+          </p>
 
-            <p className="mt-4 text-sm leading-relaxed text-[color:var(--color-medium)] max-w-sm mx-auto">
-              Our way of giving back to the community and keeping our earliest subscribers well informed.
-            </p>
-
-            <div className="mt-8 flex justify-center">
-              {hasAccount ? (
-                <Link
-                  href="/subscribe"
-                  className="inline-flex min-w-[200px] items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)] px-8 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-110 hover:shadow-lg"
+          {/* Benefits */}
+          <ul className="mt-5 space-y-2.5">
+            {BENEFITS.map((benefit) => (
+              <li key={benefit} className="flex items-start gap-2.5">
+                <span
+                  aria-hidden
+                  className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)]/12 text-[color:var(--color-riviera-blue)]"
                 >
-                  Subscribe now
-                </Link>
-              ) : (
-                <Link
-                  href="/signup?returnTo=/subscribe"
-                  className="inline-flex min-w-[200px] items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)] px-8 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-110 hover:shadow-lg"
-                >
-                  Create free account
-                </Link>
-              )}
-            </div>
+                  <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path
+                      fillRule="evenodd"
+                      d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.41 0l-3.5-3.5a1 1 0 011.41-1.42L8.5 12.09l6.79-6.8a1 1 0 011.41 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </span>
+                <span className="text-[13.5px] leading-snug text-[color:var(--color-dark)]">
+                  {benefit}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {/* CTA */}
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <Link
+              href={ctaHref}
+              className="inline-flex w-full items-center justify-center rounded-full bg-[color:var(--color-riviera-blue)] px-8 py-3.5 text-sm font-bold uppercase tracking-wide text-white shadow-md transition hover:brightness-110 hover:shadow-lg"
+            >
+              {ctaLabel}
+            </Link>
+            <p className="text-[11px] text-[color:var(--color-medium)]">
+              No payment. No card. Unsubscribe anytime.
+            </p>
           </div>
+
+          {!hasAccount && (
+            <p className="mt-4 text-center text-[12.5px] text-[color:var(--color-medium)]">
+              Already have an account?{" "}
+              <Link href="/login?returnTo=/subscribe" className="font-semibold text-[color:var(--color-riviera-blue)] hover:underline">
+                Log in
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </div>
