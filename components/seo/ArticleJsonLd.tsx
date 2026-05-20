@@ -1,5 +1,6 @@
 import type { Article, TenantRow } from "@/lib/types/database";
 import { getSiteConfig } from "@/lib/seo/site";
+import { getOptimizedOgImageUrl } from "@/lib/seo/ogImage";
 
 type Props = {
   article: Article;
@@ -16,9 +17,17 @@ export function ArticleJsonLd({ article, tenant }: Props) {
 
   function absoluteImageUrl(url: string | null): string {
     if (!url) return logoUrl;
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    if (url.startsWith("/")) return `${siteUrl}${url}`;
-    return `${siteUrl}/${url}`;
+    let absolute: string;
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      absolute = url;
+    } else if (url.startsWith("/")) {
+      absolute = `${siteUrl}${url}`;
+    } else {
+      absolute = `${siteUrl}/${url}`;
+    }
+    // Match the optimized OG image so JSON-LD and link previews agree on a
+    // single canonical, small, properly-sized variant.
+    return getOptimizedOgImageUrl(absolute) ?? absolute;
   }
 
   const pageUrl = `${siteUrl}/article/${article.slug}`;

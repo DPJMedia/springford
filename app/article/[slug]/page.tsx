@@ -8,6 +8,11 @@ import {
   normalizeVisibility,
 } from "@/lib/articles/visibilityAccess";
 import { getSiteConfig } from "@/lib/seo/site";
+import {
+  getOptimizedOgImageUrl,
+  OG_IMAGE_WIDTH,
+  OG_IMAGE_HEIGHT,
+} from "@/lib/seo/ogImage";
 import { loadTenantForPage } from "@/lib/tenant/loadTenantForPage";
 
 export async function generateMetadata({
@@ -44,13 +49,18 @@ export async function generateMetadata({
 
   let imageUrl: string;
   if (article.image_url) {
+    let absoluteImageUrl: string;
     if (article.image_url.startsWith("http://") || article.image_url.startsWith("https://")) {
-      imageUrl = article.image_url;
+      absoluteImageUrl = article.image_url;
     } else if (article.image_url.startsWith("/")) {
-      imageUrl = `${origin}${article.image_url}`;
+      absoluteImageUrl = `${origin}${article.image_url}`;
     } else {
-      imageUrl = `${origin}/${article.image_url}`;
+      absoluteImageUrl = `${origin}/${article.image_url}`;
     }
+    // Route through Supabase's image render endpoint so Facebook gets a 1200×630
+    // ~200 KB JPEG instead of a 2-5 MB camera photo (which FB's scraper often
+    // refuses, leaving the share with no preview image).
+    imageUrl = getOptimizedOgImageUrl(absoluteImageUrl) ?? absoluteImageUrl;
   } else {
     imageUrl = `${origin}/springford-press-logo.svg`;
   }
@@ -74,8 +84,8 @@ export async function generateMetadata({
       images: [
         {
           url: imageUrl,
-          width: 1200,
-          height: 630,
+          width: OG_IMAGE_WIDTH,
+          height: OG_IMAGE_HEIGHT,
           alt: title,
         },
       ],

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useRef, Fragment, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { NewsletterPopupBanner } from "@/components/NewsletterPopupBanner";
 import { ShareButton } from "@/components/ShareButton";
 import { Avatar } from "@/components/Avatar";
 import { AdDisplay } from "@/components/AdDisplay";
@@ -340,6 +341,10 @@ export function ArticleContent({
   return (
     <>
       <Header />
+      {/* Mobile-only compact newsletter popup for article visitors */}
+      <Suspense fallback={null}>
+        <NewsletterPopupBanner variant="compact" />
+      </Suspense>
       <main className="bg-[color:var(--color-surface)] min-h-screen">
         <div className="mx-auto max-w-7xl px-4 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
