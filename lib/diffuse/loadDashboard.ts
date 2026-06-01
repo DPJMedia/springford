@@ -2,6 +2,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DiffuseOutput, DiffuseProject } from "./client";
 import { formatUnknownError } from "@/lib/formatUnknownError";
 
+/**
+ * PostgREST's "table not found" / "relation does not exist" errors. Any other
+ * error from a Diffuse table query (RLS denial, JWT expiry, network blip, …)
+ * should bubble up unchanged so we don't mask the real cause by attempting a
+ * fallback against a table that doesn't exist.
+ */
+function isMissingTableError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { code?: string; message?: string };
+  if (e.code === "PGRST205" || e.code === "42P01") return true;
+  const msg = (e.message || "").toLowerCase();
+  return msg.includes("schema cache") || msg.includes("does not exist");
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -102,11 +116,19 @@ async function fetchAllOutputsForProjects(
       .in("project_id", ids)
       .is("deleted_at", null);
     if (error) {
+      // Only retry against the legacy/alt table name if the first error was
+      // literally "this table doesn't exist". Anything else (RLS denial,
+      // auth issue, …) should surface so we can actually debug it.
+      if (!isMissingTableError(error)) {
+        throw new Error(formatUnknownError(error));
+      }
       const alt = outputsTable.includes("diffuse") ? "project_outputs" : "diffuse_project_outputs";
       const r2 = await client.from(alt).select("*").in("project_id", ids).is("deleted_at", null);
       const fallbackErr = (r2 as { error?: unknown }).error;
       if (fallbackErr) {
-        throw new Error(formatUnknownError(fallbackErr));
+        // Re-throw the *original* error — it's more informative than
+        // "alt table also missing".
+        throw new Error(formatUnknownError(error));
       }
       all.push(...((r2 as { data?: DiffuseOutput[] | null }).data ?? []));
     } else {
@@ -132,7 +154,7 @@ async function fetchCoverInputsForProjects(
       .eq("type", "cover_photo")
       .is("deleted_at", null);
 
-    if (error) {
+    if (error && isMissingTableError(error)) {
       const alt = inputsTable.includes("diffuse") ? "project_inputs" : "diffuse_project_inputs";
       const r2 = await client
         .from(alt)

@@ -12,7 +12,7 @@ import { SectionSelector } from "@/components/SectionSelector";
 import { CategorySelector } from "@/components/CategorySelector";
 import { Tooltip } from "@/components/Tooltip";
 import { DateTimePicker } from "@/components/DateTimePicker";
-import { AuthorSelector } from "@/components/AuthorSelector";
+import { AuthorPicker } from "@/components/AuthorPicker";
 import { TagSelector } from "@/components/TagSelector";
 import { ArticlePreviewModal } from "@/components/admin/ArticlePreviewModal";
 import { useTenant } from "@/lib/tenant/TenantProvider";
@@ -57,8 +57,10 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [authorName, setAuthorName] = useState("");
+  const [primaryAuthorId, setPrimaryAuthorId] = useState<string | null>(null);
   const [poweredByDiffuse, setPoweredByDiffuse] = useState(false);
   const [coAuthorName, setCoAuthorName] = useState("");
+  const [coAuthorId, setCoAuthorId] = useState<string | null>(null);
   const [showCoAuthor, setShowCoAuthor] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -147,6 +149,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
       setMetaDescription(data.meta_description || "");
       const authorName = data.author_name || "";
       setAuthorName(authorName);
+      setPrimaryAuthorId(data.primary_author_id ?? null);
+      setCoAuthorId(data.co_author_id ?? null);
       
       // Check if this article was imported from DiffuseAI
       const fromDiffuse = searchParams.get('fromDiffuse') === 'true';
@@ -344,6 +348,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           author_name: poweredByDiffuse 
             ? (showCoAuthor && coAuthorName ? `Powered by diffuse.ai & ${coAuthorName}` : "Powered by diffuse.ai")
             : (showCoAuthor && coAuthorName ? `${authorName} & ${coAuthorName}` : (authorName || null)),
+          primary_author_id: poweredByDiffuse ? null : primaryAuthorId,
+          co_author_id: showCoAuthor ? coAuthorId : null,
           updated_by: user.id,
         })
         .eq("id", id)
@@ -409,7 +415,17 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
             
             <div className="space-y-4">
               {/* Author Selection */}
-              <AuthorSelector value={authorName} onChange={setAuthorName} />
+              <AuthorPicker
+                authorId={primaryAuthorId}
+                authorName={authorName}
+                onChange={({ authorId, authorName: name }) => {
+                  setPrimaryAuthorId(authorId);
+                  setAuthorName(name);
+                  if (poweredByDiffuse && name !== "Powered by diffuse.ai") {
+                    setPoweredByDiffuse(false);
+                  }
+                }}
+              />
 
               {/* Powered by diffuse.ai Checkbox */}
               <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-[#ff9628]/5 to-[#c086fa]/5 border border-[#ff9628]/20 rounded-lg">
@@ -421,6 +437,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                     setPoweredByDiffuse(e.target.checked);
                     if (e.target.checked) {
                       setAuthorName("Powered by diffuse.ai");
+                      setPrimaryAuthorId(null);
                     }
                   }}
                   className="w-5 h-5 accent-[#ff9628] border-[var(--admin-border)] rounded focus:ring-[#ff9628] focus:ring-2 cursor-pointer"
@@ -463,7 +480,15 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                       Remove
                     </button>
                   </div>
-                  <AuthorSelector value={coAuthorName} onChange={setCoAuthorName} />
+                  <AuthorPicker
+                    authorId={coAuthorId}
+                    authorName={coAuthorName}
+                    onChange={({ authorId, authorName: name }) => {
+                      setCoAuthorId(authorId);
+                      setCoAuthorName(name);
+                    }}
+                    label="Co-Author"
+                  />
                   <p className="text-xs text-[var(--admin-text-muted)]">
                     Both authors will be displayed with their profile pictures and an &ldquo;&amp;&rdquo; between their names.
                   </p>

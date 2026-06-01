@@ -11,7 +11,7 @@ type AvatarProps = {
   src?: string | null;
   name?: string | null;
   email?: string | null;
-  size?: "xs" | "sm" | "md" | "lg" | "xl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
   className?: string;
   /** Initials-only fallback background: site blue (default) or admin accent orange */
   fallbackTone?: "brand" | "accent";
@@ -25,6 +25,7 @@ export function Avatar({ src, name, email, size = "md", className = "", fallback
     md: "w-10 h-10 text-base",
     lg: "w-16 h-16 text-2xl",
     xl: "w-32 h-32 text-4xl",
+    "2xl": "w-44 h-44 text-5xl",
   };
 
   const safeSrc = normalizeAvatarUrl(src);

@@ -45,6 +45,28 @@ export interface UserProfile {
   updated_at: string;
 }
 
+export interface AuthorRow {
+  id: string;
+  name: string;
+  slug: string;
+  title: string | null;
+  bio: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  cover_image_url: string | null;
+  twitter_handle: string | null;
+  linkedin_url: string | null;
+  website_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Author + tenant ids list (used by admin list/edit). */
+export interface AuthorWithTenants extends AuthorRow {
+  tenant_ids: string[];
+}
+
 export interface Article {
   id: string;
   created_at: string;
@@ -69,6 +91,10 @@ export interface Article {
   tags: string[] | null;
   author_id: string | null;
   author_name: string | null;
+  /** New: FK to authors.id for the primary byline. */
+  primary_author_id?: string | null;
+  /** New: FK to authors.id for the co-byline. */
+  co_author_id?: string | null;
   meta_title: string | null;
   meta_description: string | null;
   view_count: number;

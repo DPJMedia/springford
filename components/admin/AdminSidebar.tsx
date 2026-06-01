@@ -33,6 +33,7 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
   const navItems: NavItem[] = [
     { icon: "dashboard", label: "Dashboard", href: "/admin/diffuse", highlight: true },
     { icon: "article", label: "Articles", href: "/admin/articles" },
+    { icon: "pencil", label: "Authors", href: "/admin/authors" },
     { icon: "users", label: "Users", href: "/admin/users", superAdminOnly: true },
     { icon: "newsletter", label: "Newsletter", href: "/admin/newsletter" },
     { icon: "megaphone", label: "Ad Manager", href: "/admin/ads", superAdminOnly: true },
@@ -108,6 +109,11 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
       user: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+      pencil: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
       ),
     };

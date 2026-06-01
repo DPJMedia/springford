@@ -173,6 +173,45 @@ export function ArticleContent({
 
     // Fetch author profile(s) if author_name exists
     async function fetchAuthorProfile() {
+      // FIRST: prefer the new `authors` table when the article has FKs.
+      // Anything edited in /admin/authors flows through here, so an avatar
+      // change on the author profile immediately updates every byline.
+      const fkIds = [article.primary_author_id, article.co_author_id].filter(
+        (x): x is string => !!x,
+      );
+      if (fkIds.length > 0) {
+        const { data: managedAuthors } = await supabase
+          .from("authors")
+          .select("id, name, slug, avatar_url")
+          .in("id", fkIds);
+        const byId = new Map<string, { name: string; slug: string; avatar_url: string | null }>();
+        for (const a of managedAuthors ?? []) {
+          byId.set(a.id, { name: a.name, slug: a.slug, avatar_url: a.avatar_url });
+        }
+        const primary = article.primary_author_id ? byId.get(article.primary_author_id) : null;
+        const co = article.co_author_id ? byId.get(article.co_author_id) : null;
+        if (primary) {
+          setAuthorAvatar(primary.avatar_url);
+          setAuthorName(primary.name);
+          setAuthorUsername(primary.slug);
+        }
+        if (co) {
+          setCoAuthorAvatar(co.avatar_url);
+          setCoAuthorName(co.name);
+          setCoAuthorUsername(co.slug);
+        }
+        // If we resolved BOTH bylines via FKs we're done — skip the legacy
+        // free-text fallback below. If only the primary is FK-managed and
+        // the co-byline is a free-text name, continue and let the legacy
+        // path resolve the second slot via author_name parsing.
+        const needsLegacyPass =
+          (!primary && article.primary_author_id == null) ||
+          (article.author_name?.includes(" & ") && !co);
+        if (!needsLegacyPass && primary) {
+          return;
+        }
+      }
+
       if (article.author_name) {
         // Check if there are two authors separated by " & "
         const authorNames = article.author_name.includes(' & ') 
@@ -290,7 +329,16 @@ export function ArticleContent({
           setRelatedArticles(data as Article[]);
         }
       });
-  }, [article.id, article.section, article.sections, article.author_name, supabase, tenantId]);
+  }, [
+    article.id,
+    article.section,
+    article.sections,
+    article.author_name,
+    article.primary_author_id,
+    article.co_author_id,
+    supabase,
+    tenantId,
+  ]);
 
   // Format dates with time in EST (e.g. "Jan 22, 2026 at 9:31 AM EST")
   const publishedDate = article.published_at

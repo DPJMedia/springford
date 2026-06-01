@@ -34,6 +34,7 @@ export function AdminBottomNav({ profile }: AdminBottomNavProps) {
   const orderedNavItems: NavItem[] = [
     { icon: "dashboard", label: "Dashboard", href: "/admin/diffuse" },
     { icon: "article", label: "Articles", href: "/admin/articles" },
+    { icon: "pencil", label: "Authors", href: "/admin/authors" },
     { icon: "users", label: "Users", href: "/admin/users", superAdminOnly: true },
     { icon: "newsletter", label: "Newsletter", href: "/admin/newsletter" },
     { icon: "megaphone", label: "Ad Manager", href: "/admin/ads", superAdminOnly: true },
@@ -124,6 +125,11 @@ export function AdminBottomNav({ profile }: AdminBottomNavProps) {
       more: (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      ),
+      pencil: (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
       ),
     };

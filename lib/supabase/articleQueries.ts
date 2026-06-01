@@ -4,4 +4,4 @@
  * Supabase data transfer (including cached egress) without changing what users see.
  */
 export const ARTICLE_LIST_COLUMNS =
-  "id, title, slug, subtitle, excerpt, image_url, published_at, author_name, sections, section, category, tags, is_advertisement, is_breaking, visibility, is_featured, breaking_news_set_at, breaking_news_duration, share_count, view_count, created_at, updated_at";
+  "id, title, slug, subtitle, excerpt, image_url, published_at, author_name, primary_author_id, co_author_id, sections, section, category, tags, is_advertisement, is_breaking, visibility, is_featured, breaking_news_set_at, breaking_news_duration, share_count, view_count, created_at, updated_at";
