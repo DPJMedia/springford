@@ -36,10 +36,11 @@ export function Header() {
       .map((entry) => {
         const slug = String((entry as { slug?: string }).slug || "").trim();
         const label = String((entry as { label?: string }).label || slug).trim();
+        const normalizedSlug = slug.toLowerCase();
         return {
           label: label || slug,
-          slug: slug.toLowerCase(),
-          href: slug ? `/#${encodeURIComponent(slug)}` : "/",
+          slug: normalizedSlug,
+          href: normalizedSlug ? `/section/${encodeURIComponent(normalizedSlug)}` : "/",
         };
       });
   }, [sectionConfig]);
@@ -335,14 +336,14 @@ export function Header() {
         <div className="flex items-center justify-center px-4 py-3">
           <nav className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
             {nav.map((item) => (
-              <a
+              <Link
                 key={item.label}
                 href={item.href}
                 onClick={() => trackSectionClick({ tenantId, sectionName: item.slug, clickedFromPage: window.location.pathname, userId: user?.id })}
                 className="rounded-md px-3 py-1.5 text-sm font-semibold transition hover:bg-black/10 text-[color:var(--color-dark)] whitespace-nowrap flex-shrink-0"
               >
                 {item.label}
-              </a>
+              </Link>
             ))}
           </nav>
         </div>
@@ -364,14 +365,14 @@ export function Header() {
           )}
           <nav className="px-4 py-3 space-y-1 border-b border-black/10">
             {nav.map((item) => (
-              <a
+              <Link
                 key={item.label}
                 href={item.href}
                 onClick={() => { setShowMobileNav(false); trackSectionClick({ tenantId, sectionName: item.slug, clickedFromPage: window.location.pathname, userId: user?.id }); }}
                 className="block px-4 py-2 text-sm font-semibold text-[color:var(--color-dark)] hover:bg-black/10 rounded-md transition"
               >
                 {item.label}
-              </a>
+              </Link>
             ))}
           </nav>
           {/* Bottom row: Advertise, Support, Subscribe, and (when logged in) user pfp that opens Dashboard / My Profile / Log out */}

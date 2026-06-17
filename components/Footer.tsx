@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useTenant } from "@/lib/tenant/TenantProvider";
 
 const LEGACY_SPRINGFORD_FACEBOOK =
@@ -17,11 +18,11 @@ export function Footer() {
     return sectionConfig
       .filter((entry) => String((entry as { slug?: string }).slug || "").toLowerCase().trim() !== "hero")
       .map((entry) => {
-        const slug = String((entry as { slug?: string }).slug || "").trim();
+        const slug = String((entry as { slug?: string }).slug || "").trim().toLowerCase();
         const label = String((entry as { label?: string }).label || slug).trim();
         return {
           label: label || slug,
-          href: slug ? `/#${encodeURIComponent(slug)}` : "/",
+          href: slug ? `/section/${encodeURIComponent(slug)}` : "/",
         };
       });
   }, [sectionConfig]);
@@ -68,9 +69,9 @@ export function Footer() {
               <ul className="space-y-2 text-xs">
                 {sectionLinks.map((item) => (
                   <li key={item.href + item.label}>
-                    <a href={item.href} className="hover:text-[color:var(--color-dark)] transition">
+                    <Link href={item.href} className="hover:text-[color:var(--color-dark)] transition">
                       {item.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
