@@ -59,14 +59,37 @@ export default function AuthorPage({
       setManagedAuthor(null);
       setLegacyAuthor(null);
 
-      // 1. PREFERRED PATH — look up in the new `authors` table by slug.
+      // 1. PREFERRED PATH — look up in the new `authors` table.
       //    Anything created/edited in /admin/authors is the canonical
       //    source of truth and renders the rich profile below.
-      const { data: managed } = await supabase
+      //
+      //    First try an exact slug match. If that misses, fall back to a
+      //    name-based match (so URLs that were generated from a legacy
+      //    user_profiles.username — e.g. /author/jmcguire — still resolve
+      //    to the rich managed profile when a managed author has the same
+      //    display name).
+      let { data: managed } = await supabase
         .from("authors")
         .select("*")
         .eq("slug", username)
         .maybeSingle();
+
+      if (!managed) {
+        // Normalize the URL piece: "john-mcguire" or "john_mcguire" → "john mcguire"
+        const guessedName = username.replace(/[-_]+/g, " ").trim();
+        if (guessedName.length > 0) {
+          const { data: candidates } = await supabase
+            .from("authors")
+            .select("*")
+            .ilike("name", guessedName);
+          if (candidates && candidates.length > 0) {
+            managed =
+              candidates.find(
+                (c) => c.name.trim().toLowerCase() === guessedName.toLowerCase(),
+              ) ?? candidates[0];
+          }
+        }
+      }
 
       if (managed) {
         setManagedAuthor(managed as AuthorRow);
@@ -156,6 +179,44 @@ export default function AuthorPage({
       }
 
       if (authorData) {
+        // One final check: if a managed author exists with the same display
+        // name as this legacy user_profile, prefer the managed profile so
+        // the rich hero (PFP/cover/bio/social) renders instead of the old
+        // bare-bones layout. This is the safety net for legacy username
+        // URLs that didn't match a managed author's slug above.
+        if (authorData.full_name) {
+          const { data: matchByName } = await supabase
+            .from("authors")
+            .select("*")
+            .ilike("name", authorData.full_name)
+            .limit(1);
+          const managedTwin = (matchByName ?? []).find(
+            (a) =>
+              a.name.trim().toLowerCase() ===
+              authorData!.full_name!.trim().toLowerCase(),
+          );
+          if (managedTwin) {
+            setManagedAuthor(managedTwin as AuthorRow);
+            setSource("managed");
+            const orFilter = [
+              `primary_author_id.eq.${managedTwin.id}`,
+              `co_author_id.eq.${managedTwin.id}`,
+              `author_name.ilike.%${managedTwin.name}%`,
+            ].join(",");
+            const { data: rows } = await supabase
+              .from("articles")
+              .select(ARTICLE_LIST_COLUMNS)
+              .eq("status", "published")
+              .eq("tenant_id", tenantId)
+              .lte("published_at", new Date().toISOString())
+              .or(orFilter)
+              .order("published_at", { ascending: false });
+            setArticles((rows ?? []) as Article[]);
+            setLoading(false);
+            return;
+          }
+        }
+
         setLegacyAuthor(authorData);
         setSource("user_profile");
         const { data: rows } = await supabase

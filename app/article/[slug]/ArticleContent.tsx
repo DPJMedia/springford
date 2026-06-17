@@ -222,7 +222,7 @@ export function ArticleContent({
         const fetchSingleAuthor = async (authorName: string) => {
           // Clean the author_name (remove any extra text like "(Admin)")
           const cleanAuthorName = authorName.split('(')[0].trim();
-          
+
           // Special case for DiffuseAI
           if (cleanAuthorName.toLowerCase() === 'powered by diffuse.ai' || cleanAuthorName.toLowerCase() === 'diffuse.ai') {
             return {
@@ -231,7 +231,26 @@ export function ArticleContent({
               username: 'diffuse.ai'
             };
           }
-          
+
+          // PREFER the new `authors` table even when the article's FK is not
+          // set: match by name (case-insensitive). This way every legacy
+          // article whose byline matches a managed author still links to
+          // the rich new author page and avatar.
+          const { data: managedMatches } = await supabase
+            .from("authors")
+            .select("name, slug, avatar_url")
+            .ilike("name", cleanAuthorName);
+          const managedHit = (managedMatches ?? []).find(
+            (a) => a.name.trim().toLowerCase() === cleanAuthorName.toLowerCase(),
+          ) ?? (managedMatches ?? [])[0];
+          if (managedHit) {
+            return {
+              avatar_url: managedHit.avatar_url,
+              full_name: managedHit.name,
+              username: managedHit.slug,
+            };
+          }
+
           // Try multiple ways to find the author profile
           let { data: authorProfile } = await supabase
             .from("user_profiles")
