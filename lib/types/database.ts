@@ -105,6 +105,10 @@ export interface Article {
   breaking_news_set_at: string | null; // When marked as breaking news
   allow_comments: boolean;
   is_advertisement: boolean;
+  /** When the article is also is_advertisement, the byline name links to this external URL (new tab) instead of the internal author page. */
+  sponsor_url?: string | null;
+  /** Renders a tiny italic disclaimer under the byline crediting AI assistance reviewed/edited by the author. */
+  ai_assisted?: boolean;
   updated_by: string | null;
   /** public: everyone; newsletter_subscribers: logged-in + newsletter_subscribed; admin_only: admin/super_admin */
   visibility: ArticleVisibility;

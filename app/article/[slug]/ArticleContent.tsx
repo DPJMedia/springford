@@ -473,8 +473,24 @@ export function ArticleContent({
                 <div className="flex flex-col gap-2 text-sm text-[color:var(--color-medium)] pt-4 border-t border-gray-200">
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
-                      {/* First Author */}
-                      {authorUsername ? (
+                      {/* First Author — sponsor URL wins for sponsored articles */}
+                      {article.is_advertisement && article.sponsor_url ? (
+                        <a
+                          href={article.sponsor_url}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                          className="flex items-center gap-2 hover:opacity-80 transition"
+                          onClick={() => trackAuthorClick({
+                            tenantId,
+                            authorName: authorName || article.author_name || 'Unknown',
+                            clickedFromPage: 'article',
+                            articleId: article.id,
+                          })}
+                        >
+                          <Avatar src={authorAvatar} name={authorName || article.author_name} size="sm" />
+                          <span className="font-semibold text-[color:var(--color-riviera-blue)] hover:underline">{authorName || article.author_name}</span>
+                        </a>
+                      ) : authorUsername ? (
                         <Link 
                           href={`/author/${authorUsername}`} 
                           className="flex items-center gap-2 hover:opacity-80 transition"
@@ -537,24 +553,45 @@ export function ArticleContent({
                     Published {publishedDate}
                     {hasUpdate && <> (Updated {updatedDate})</>}
                   </p>
+                  {article.ai_assisted && (
+                    <p className="text-[11px] italic text-[color:var(--color-medium)]/70 leading-snug">
+                      This article was generated with AI assistance. All content was reviewed, edited, and fact-checked by{" "}
+                      {authorUsername ? (
+                        <Link
+                          href={`/author/${authorUsername}`}
+                          className="underline decoration-dotted underline-offset-2 hover:text-[color:var(--color-riviera-blue)]"
+                        >
+                          {authorName || article.author_name}
+                        </Link>
+                      ) : (
+                        <span>{authorName || article.author_name}</span>
+                      )}
+                      .
+                    </p>
+                  )}
                 </div>
               </header>
 
               {/* Featured Image */}
               {article.image_url && (
-                <figure className="mb-8">
-                  <img
-                    src={article.image_url}
-                    alt={article.title}
-                    className="w-full h-auto rounded-lg shadow-lg"
-                  />
-                  {(article.image_caption || article.image_credit) && (
-                    <figcaption className="mt-2 text-sm text-[color:var(--color-medium)] italic">
-                      {article.image_caption}
-                      {article.image_credit && ` Photo: ${article.image_credit}`}
-                    </figcaption>
-                  )}
-                </figure>
+                <>
+                  <figure className="mb-8">
+                    <img
+                      src={article.image_url}
+                      alt={article.title}
+                      className="w-full h-auto rounded-lg shadow-lg"
+                    />
+                    {(article.image_caption || article.image_credit) && (
+                      <figcaption className="mt-2 text-sm text-[color:var(--color-medium)] italic">
+                        {article.image_caption}
+                        {article.image_credit && ` Photo: ${article.image_credit}`}
+                      </figcaption>
+                    )}
+                  </figure>
+                  {/* Opt-in ad slot directly under the lead image — only renders when an ad is actually assigned. */}
+                  <AdDisplay adSlot="article-after-image" className="hidden lg:block w-full mb-8" hidePlaceholder />
+                  <AdDisplay adSlot="article-mobile-after-image" className="lg:hidden w-full mb-8" hidePlaceholder />
+                </>
               )}
 
               {/* Article Content — first ad between block 1 and 2, second ad at bottom */}
@@ -566,9 +603,14 @@ export function ArticleContent({
               ) : article.content_blocks && Array.isArray(article.content_blocks) && article.content_blocks.length > 0 ? (
                 <>
                   <div className="prose prose-lg max-w-none">
-                    {article.content_blocks
-                      .sort((a: any, b: any) => a.order - b.order)
-                      .map((block: any, index: number) => (
+                    {(() => {
+                      const sortedBlocks = [...article.content_blocks].sort((a: any, b: any) => a.order - b.order);
+                      // When there's no featured image, the new "after-lead-image" ad slot
+                      // renders after the first image block in the body instead.
+                      const firstBodyImageIdx = article.image_url
+                        ? -1
+                        : sortedBlocks.findIndex((b: any) => b.type === "image");
+                      return sortedBlocks.map((block: any, index: number) => (
                         <Fragment key={block.id}>
                           {block.type === "text" ? (
                             <div className="text-lg leading-relaxed text-[color:var(--color-dark)] mb-6 article-text-block markdown-content">
@@ -621,6 +663,13 @@ export function ArticleContent({
                               )}
                             </figure>
                           ) : null}
+                          {/* Opt-in "after lead image" slot — only used when there's no featured image, so the slot still appears below the article's first image. Hidden when no ad assigned. */}
+                          {firstBodyImageIdx !== -1 && index === firstBodyImageIdx && (
+                            <Fragment>
+                              <AdDisplay adSlot="article-after-image" className="hidden lg:block w-full my-8 not-prose" hidePlaceholder />
+                              <AdDisplay adSlot="article-mobile-after-image" className="lg:hidden w-full my-8 not-prose" hidePlaceholder />
+                            </Fragment>
+                          )}
                           {/* First ad after first content block */}
                           {index === 0 && (
                             <div className="my-8 not-prose">
@@ -633,7 +682,8 @@ export function ArticleContent({
                             </div>
                           )}
                         </Fragment>
-                      ))}
+                      ));
+                    })()}
                   </div>
                   {/* Second ad only when there are 2+ blocks; single-block articles show only the first ad */}
                   {article.content_blocks.length > 1 && (

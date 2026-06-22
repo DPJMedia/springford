@@ -15,11 +15,17 @@ type AdDisplayProps = {
   adSlot: string;
   className?: string;
   fallbackComponent?: React.ReactNode;
+  /**
+   * When true, render nothing (not even the loading skeleton) unless an actual ad is
+   * assigned to this slot. Use for opt-in slots that should leave zero whitespace when
+   * no creative is configured. Per-slot fallback settings are still respected.
+   */
+  hidePlaceholder?: boolean;
 };
 
 type AdWithFillSetting = Ad & { fill_section_for_slot?: boolean };
 
-export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDisplayProps) {
+export function AdDisplay({ adSlot, className = "", fallbackComponent, hidePlaceholder = false }: AdDisplayProps) {
   const { id: tenantId } = useTenant();
   const [ad, setAd] = useState<AdWithFillSetting | null>(null);
   const [adSetting, setAdSetting] = useState<AdSetting | null>(null);
@@ -216,6 +222,7 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent }: AdDispl
   };
 
   if (loading) {
+    if (hidePlaceholder) return null;
     return (
       <div className={`bg-gray-100 rounded-lg animate-pulse ${className}`}>
         <div className="h-32 w-full"></div>

@@ -543,7 +543,30 @@ function ArticlePreview({
         <div className="lg:col-span-8 space-y-6">
           <div>
             <h2 className="text-2xl font-bold mb-2">Article Title</h2>
-            <p className="text-gray-600 mb-4">Article content goes here...</p>
+            <p className="text-xs text-gray-500 mb-3">By Author Name • Today</p>
+            <div className="h-40 bg-gray-200 rounded mb-3 flex items-center justify-center text-xs text-gray-400">
+              Lead Image
+            </div>
+          </div>
+
+          {/* NEW: After Lead Image Ad Slot — opt-in, renders nothing on the live site when no ad is assigned */}
+          <div
+            onClick={() => onSlotClick("article-after-image")}
+            className={`p-4 border-2 rounded-lg transition cursor-pointer ${
+              isSlotSelected("article-after-image")
+                ? "border-[color:var(--admin-accent)] bg-black"
+                : "border-dashed border-gray-300 hover:border-gray-400"
+            }`}
+          >
+            <div className="mb-2 text-xs font-bold text-[color:var(--admin-accent)]">
+              {getAdSlotTableLabel("article-after-image")}
+              <span className="font-normal"> (2912×360 px) — directly under the lead image, only appears when an ad is assigned</span>
+            </div>
+            {renderSlotContent("article-after-image", "h-32")}
+          </div>
+
+          <div>
+            <p className="text-gray-600 mb-2">Article content goes here...</p>
             <p className="text-gray-500 text-sm">More article content...</p>
           </div>
 
@@ -718,11 +741,19 @@ function ArticleMobilePreview({
 
       <div className="mb-6">
         <h2 className="text-xl font-bold mb-2">Article Title</h2>
-        <div className="space-y-2 text-sm text-gray-600">
-          <div className="h-3 bg-gray-200 rounded w-full" />
-          <div className="h-3 bg-gray-200 rounded w-11/12" />
-          <div className="h-3 bg-gray-200 rounded w-10/12" />
+        <p className="text-[10px] text-gray-500 mb-2">By Author Name • Today</p>
+        <div className="h-40 bg-gray-200 rounded mb-3 flex items-center justify-center text-xs text-gray-400">
+          Lead Image
         </div>
+      </div>
+
+      {/* NEW: After Lead Image (mobile) — opt-in, doesn't render on live site without an ad */}
+      {renderMobileSlot("article-mobile-after-image")}
+
+      <div className="mb-6 space-y-2">
+        <div className="h-3 bg-gray-200 rounded w-full" />
+        <div className="h-3 bg-gray-200 rounded w-11/12" />
+        <div className="h-3 bg-gray-200 rounded w-10/12" />
       </div>
 
       {renderMobileSlot("article-mobile-inline")}

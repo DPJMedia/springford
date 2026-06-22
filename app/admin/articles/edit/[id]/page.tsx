@@ -48,6 +48,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   const [breakingNewsDuration, setBreakingNewsDuration] = useState(24);
   const [allowComments, setAllowComments] = useState(true);
   const [isAdvertisement, setIsAdvertisement] = useState(false);
+  const [sponsorUrl, setSponsorUrl] = useState("");
+  const [aiAssisted, setAiAssisted] = useState(false);
   const [visibility, setVisibility] = useState<ArticleVisibility>("public");
   const [scheduledFor, setScheduledFor] = useState("");
   
@@ -174,6 +176,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
       setIsFeatured(data.is_featured);
       setIsBreaking(data.is_breaking);
       setIsAdvertisement(data.is_advertisement ?? false);
+      setSponsorUrl(data.sponsor_url ?? "");
+      setAiAssisted(data.ai_assisted ?? false);
       const vis = data.visibility;
       setVisibility(
         vis === "newsletter_subscribers" || vis === "admin_only" ? vis : "public"
@@ -342,6 +346,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           breaking_news_set_at: isBreaking && !article?.is_breaking ? new Date().toISOString() : (isBreaking ? article?.breaking_news_set_at : null),
           allow_comments: allowComments,
           is_advertisement: isAdvertisement,
+          sponsor_url: isAdvertisement && sponsorUrl.trim() ? sponsorUrl.trim() : null,
+          ai_assisted: aiAssisted,
           visibility,
           meta_title: metaTitle || null,
           meta_description: metaDescription || null,
@@ -508,6 +514,39 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                   Is the article an advertisement?
                 </label>
                 <Tooltip text="When checked, a subtle 'Advertisement' label will appear on this article in the feed and on the article page so readers know it's sponsored content." />
+              </div>
+
+              {/* Sponsor URL — only shown for advertisements; routes byline name to an external link in a new tab */}
+              {isAdvertisement && (
+                <div>
+                  <label htmlFor="sponsor-url" className="text-sm font-semibold text-[var(--admin-text)] mb-2 flex items-center">
+                    Sponsor URL
+                    <Tooltip text="Optional external link for sponsored content. When set, the byline (author/sponsor name) on this article will open this URL in a new tab instead of the internal author page." />
+                  </label>
+                  <input
+                    id="sponsor-url"
+                    type="url"
+                    value={sponsorUrl}
+                    onChange={(e) => setSponsorUrl(e.target.value)}
+                    className="w-full border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-md px-4 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--admin-accent)] focus:border-[var(--admin-accent)]"
+                    placeholder="https://example.com/sponsor"
+                  />
+                </div>
+              )}
+
+              {/* AI-assisted disclaimer */}
+              <div className="flex items-center gap-3 p-4 bg-[var(--admin-table-header-bg)] border border-[var(--admin-border)] rounded-lg">
+                <input
+                  type="checkbox"
+                  id="ai-assisted"
+                  checked={aiAssisted}
+                  onChange={(e) => setAiAssisted(e.target.checked)}
+                  className="w-5 h-5 accent-[var(--admin-accent)] border-[var(--admin-border)] rounded focus:ring-[var(--admin-accent)] focus:ring-2 cursor-pointer"
+                />
+                <label htmlFor="ai-assisted" className="text-sm font-medium text-[var(--admin-text)] cursor-pointer">
+                  AI-assisted disclaimer
+                </label>
+                <Tooltip text='Adds a tiny italic notice below the byline: "This article was generated with AI assistance. All content was reviewed, edited, and fact-checked by [author]."' />
               </div>
 
               <div>
