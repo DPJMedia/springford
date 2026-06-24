@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ContentBlock } from "@/components/BlockEditor";
 import { normalizeArticleBodyTextForMarkdown } from "@/lib/article/normalizeArticleBodyText";
+import { ArticleVideoBlock } from "@/components/ArticleVideoBlock";
 
 /** Same markdown component map as `app/article/[slug]/ArticleContent.tsx` (reader view). */
 const markdownComponents = {
@@ -159,6 +160,13 @@ export function ArticlePreviewModal({
                           </figcaption>
                         )}
                       </figure>
+                    ) : block.type === "video" && block.url ? (
+                      <ArticleVideoBlock
+                        url={block.url}
+                        provider={block.provider}
+                        caption={block.caption}
+                        credit={block.credit}
+                      />
                     ) : null}
                   </Fragment>
                 ))

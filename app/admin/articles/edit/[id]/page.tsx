@@ -313,6 +313,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
         .map((block) => {
           if (block.type === "text") {
             return block.content || "";
+          } else if (block.type === "video") {
+            return `[Video: ${block.caption || "Article video"}]`;
           } else {
             return `[Image: ${block.caption || "Article image"}]`;
           }

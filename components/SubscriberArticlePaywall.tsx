@@ -8,6 +8,7 @@ import { Fragment } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import type { ContentBlock } from "@/lib/types/database";
 import { useTenant } from "@/lib/tenant/TenantProvider";
+import { ArticleVideoBlock } from "@/components/ArticleVideoBlock";
 
 /** Match main article markdown so background layout ≈ the real article */
 const blurMarkdownComponents = {
@@ -101,6 +102,13 @@ function BlurredArticleBody({
                     </figcaption>
                   )}
                 </figure>
+              ) : block.type === "video" && block.url ? (
+                <ArticleVideoBlock
+                  url={block.url}
+                  provider={block.provider}
+                  caption={block.caption}
+                  credit={block.credit}
+                />
               ) : (
                 /* future block types: keep layout in one flow */
                 null

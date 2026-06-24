@@ -30,6 +30,7 @@ import {
   DIFFUSE_AI_BYLINE_DISPLAY,
 } from "@/lib/branding/diffuse";
 import { normalizeArticleBodyTextForMarkdown } from "@/lib/article/normalizeArticleBodyText";
+import { ArticleVideoBlock } from "@/components/ArticleVideoBlock";
 
 type ArticleContentProps = {
   initialArticle: Article;
@@ -285,20 +286,11 @@ export function ArticleContent({
             }
           }
 
-          if (!authorProfile) {
-            const { data: profiles } = await supabase
-              .from("user_profiles")
-              .select("avatar_url, full_name, email, username")
-              .limit(100);
-
-            if (profiles) {
-              authorProfile = profiles.find(
-                (p) => 
-                  (p.full_name && cleanAuthorName.toLowerCase().includes(p.full_name.toLowerCase())) ||
-                  (p.full_name && p.full_name.toLowerCase().includes(cleanAuthorName.toLowerCase()))
-              ) || null;
-            }
-          }
+          // NOTE: intentionally NO fuzzy/substring matching here. A loose match
+          // (e.g. the byline "Lesley Aronson" CONTAINS a sloppily-saved reader
+          // profile named "Lesley a") would hijack the byline — truncating the
+          // displayed name and linking to the wrong person. Only the exact
+          // full_name / email matches above are trusted.
 
           // Generate a fallback username if none exists
           if (authorProfile && !authorProfile.username) {
@@ -309,8 +301,16 @@ export function ArticleContent({
               authorProfile.username = authorProfile.full_name.toLowerCase().replace(/[^a-z0-9]/g, '');
             }
           }
-          
-          return authorProfile || { full_name: cleanAuthorName, avatar_url: null, username: null };
+
+          // Always display the byline exactly as written on the article. The
+          // matched profile only supplies the avatar + link target (username) —
+          // never the displayed name — so a profile whose full_name was saved
+          // sloppily can never truncate or alter the byline shown to readers.
+          return {
+            full_name: cleanAuthorName,
+            avatar_url: authorProfile?.avatar_url ?? null,
+            username: authorProfile?.username ?? null,
+          };
         };
 
         // Fetch first author
@@ -662,6 +662,13 @@ export function ArticleContent({
                                 </figcaption>
                               )}
                             </figure>
+                          ) : block.type === "video" ? (
+                            <ArticleVideoBlock
+                              url={block.url}
+                              provider={block.provider}
+                              caption={block.caption}
+                              credit={block.credit}
+                            />
                           ) : null}
                           {/* Opt-in "after lead image" slot — only used when there's no featured image, so the slot still appears below the article's first image. Hidden when no ad assigned. */}
                           {firstBodyImageIdx !== -1 && index === firstBodyImageIdx && (

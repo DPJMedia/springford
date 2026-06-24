@@ -7,9 +7,11 @@ export type ArticleSection = 'hero' | 'world' | 'local' | 'sports' | 'business' 
 
 export interface ContentBlock {
   id: string;
-  type: "text" | "image";
+  type: "text" | "image" | "video";
   content?: string;
-  url?: string;
+  url?: string; // image src, uploaded video src, or YouTube URL/id
+  /** For video blocks: "file" (uploaded) or "youtube". */
+  provider?: "file" | "youtube";
   caption?: string;
   credit?: string;
   order: number;
