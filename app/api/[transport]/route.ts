@@ -178,4 +178,21 @@ async function handle(req: NextRequest) {
   return handler(req);
 }
 
-export { handle as GET, handle as POST };
+export async function GET(req: NextRequest) {
+  const accept = req.headers.get("accept") || "";
+  // A human opening this URL in a browser does a plain GET with Accept: text/html.
+  // Real MCP clients use POST (or an SSE stream with Accept: text/event-stream).
+  // For the browser case, show a friendly explainer instead of a raw JSON-RPC error.
+  if (accept.includes("text/html") && !accept.includes("text/event-stream")) {
+    const tenant = await resolveTenantFromHeaders();
+    const siteName = tenant ? getSiteConfig(tenant).siteName : "This site";
+    const siteUrl = tenant ? getSiteConfig(tenant).siteUrl : "";
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${siteName} — MCP endpoint</title></head><body style="font-family:system-ui,-apple-system,sans-serif;max-width:640px;margin:48px auto;padding:0 20px;line-height:1.55;color:#1a1a1a"><h1 style="font-size:22px">${siteName} — AI (MCP) endpoint</h1><p>This is a machine endpoint for AI assistants (Model Context Protocol), <strong>not a web page</strong>. It speaks JSON-RPC over HTTP POST, so opening it in a browser won't show anything useful — that's expected.</p><p>Looking for something? Try:</p><ul><li><a href="${siteUrl}/llms.txt">/llms.txt</a> — what this endpoint offers</li><li><a href="${siteUrl}">${siteUrl}</a> — the website</li></ul><p style="color:#555;font-size:14px">For AI tools: connect to <code>${siteUrl}/api/mcp</code> (Streamable HTTP, read-only, no auth). Tools: search_articles, get_latest_articles, get_article, list_coverage_by_municipality.</p></body></html>`;
+    return new Response(html, {
+      headers: { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=3600" },
+    });
+  }
+  return handle(req);
+}
+
+export const POST = handle;
