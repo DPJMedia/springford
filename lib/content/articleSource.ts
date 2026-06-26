@@ -4,6 +4,10 @@
  * (app/llms.txt/route.ts), and the article JSON-LD. Keeping the query logic here
  * means what AI agents are told can never drift from what the public site shows.
  *
+ * Fully TENANT-AGNOSTIC: coverage areas / sections come from each tenant's own
+ * section_config, so a brand-new tenant automatically gets a correct MCP server
+ * (its own domain, its own sections, its own articles) with zero code changes.
+ *
  * Rules enforced everywhere in this module:
  *  - tenant-scoped (every query filters tenant_id)
  *  - status = 'published' AND published_at <= now() (no drafts / scheduled / future)
@@ -13,17 +17,18 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSiteConfig } from "@/lib/seo/site";
 import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
+import { parseTenantSectionConfig } from "@/lib/tenant/sectionConfigStorage";
 import type { TenantRow, ContentBlock } from "@/lib/types/database";
 
-/** The municipalities Spring-Ford Press covers, encoded as `sections` slugs. */
-export const MUNICIPALITIES: { slug: string; label: string }[] = [
-  { slug: "royersford", label: "Royersford" },
-  { slug: "spring-city", label: "Spring City" },
-  { slug: "limerick", label: "Limerick" },
-  { slug: "upper-providence", label: "Upper Providence" },
-];
+/** Internal section slugs that aren't real coverage areas. */
+const NON_AREA_SLUGS = new Set(["hero", "latest"]);
 
-const MUNICIPALITY_SLUGS = new Set(MUNICIPALITIES.map((m) => m.slug));
+export type Section = { slug: string; label: string };
+
+/** The tenant's public coverage areas / sections (from section_config). */
+export function getTenantSections(tenant: TenantRow): Section[] {
+  return parseTenantSectionConfig(tenant).filter((s) => !NON_AREA_SLUGS.has(s.slug));
+}
 
 export interface ArticleSummary {
   slug: string;
@@ -33,7 +38,6 @@ export interface ArticleSummary {
   url: string;
   imageUrl: string | null;
   sections: string[];
-  municipalities: string[];
   category: string | null;
   tags: string[];
   author: string | null;
@@ -47,7 +51,7 @@ export interface ArticleFull extends ArticleSummary {
 }
 
 type ListOptions = {
-  municipality?: string;
+  section?: string;
   query?: string;
   from?: string;
   to?: string;
@@ -63,26 +67,24 @@ function clampLimit(n: number | undefined): number {
   return Math.max(1, Math.min(MAX_LIMIT, Math.floor(n)));
 }
 
-function municipalitiesOf(sections: string[] | null | undefined): string[] {
-  return (sections ?? []).filter((s) => MUNICIPALITY_SLUGS.has(s));
+function cleanSections(sections: string[] | null | undefined): string[] {
+  return (sections ?? []).filter((s) => !NON_AREA_SLUGS.has(s));
 }
 
-/** Resolve a municipality argument (slug OR human label) to a canonical slug. */
-export function resolveMunicipalitySlug(input: string | undefined): string | null {
+/** Resolve a section argument (slug OR human label) against THIS tenant's sections. */
+export function resolveSectionSlug(tenant: TenantRow, input: string | undefined): string | null {
   if (!input) return null;
   const norm = input.trim().toLowerCase();
-  const bySlug = MUNICIPALITIES.find((m) => m.slug === norm);
-  if (bySlug) return bySlug.slug;
-  const byLabel = MUNICIPALITIES.find((m) => m.label.toLowerCase() === norm);
-  if (byLabel) return byLabel.slug;
-  // tolerate "spring city" / "upper-providence" variants
   const collapsed = norm.replace(/\s+/g, "-");
-  const byCollapsed = MUNICIPALITIES.find((m) => m.slug === collapsed);
-  return byCollapsed ? byCollapsed.slug : null;
+  const sections = getTenantSections(tenant);
+  const hit =
+    sections.find((s) => s.slug === norm) ||
+    sections.find((s) => s.label.toLowerCase() === norm) ||
+    sections.find((s) => s.slug === collapsed);
+  return hit ? hit.slug : null;
 }
 
 function toSummary(row: Record<string, unknown>, siteUrl: string): ArticleSummary {
-  const sections = (row.sections as string[] | null) ?? [];
   return {
     slug: row.slug as string,
     title: row.title as string,
@@ -90,8 +92,7 @@ function toSummary(row: Record<string, unknown>, siteUrl: string): ArticleSummar
     excerpt: (row.excerpt as string | null) ?? null,
     url: `${siteUrl}/article/${row.slug as string}`,
     imageUrl: (row.image_url as string | null) ?? null,
-    sections,
-    municipalities: municipalitiesOf(sections),
+    sections: cleanSections(row.sections as string[] | null),
     category: (row.category as string | null) ?? null,
     tags: (row.tags as string[] | null) ?? [],
     author: (row.author_name as string | null) ?? null,
@@ -132,7 +133,7 @@ function basePublishedQuery(tenant: TenantRow, columns: string) {
     .lte("published_at", new Date().toISOString());
 }
 
-/** Latest published articles, optionally filtered by municipality and/or since-date. */
+/** Latest published articles, optionally filtered by section and/or since-date. */
 export async function getLatestArticles(
   tenant: TenantRow,
   opts: ListOptions = {},
@@ -142,8 +143,8 @@ export async function getLatestArticles(
     ascending: false,
   });
 
-  const muni = resolveMunicipalitySlug(opts.municipality);
-  if (muni) q = q.contains("sections", [muni]);
+  const section = resolveSectionSlug(tenant, opts.section);
+  if (section) q = q.contains("sections", [section]);
   if (opts.since) q = q.gte("published_at", opts.since);
   if (opts.from) q = q.gte("published_at", opts.from);
   if (opts.to) q = q.lte("published_at", opts.to);
@@ -153,7 +154,7 @@ export async function getLatestArticles(
   return (data ?? []).map((r) => toSummary(r as unknown as Record<string, unknown>, siteUrl));
 }
 
-/** Keyword search over title / subtitle / excerpt / tags / category. */
+/** Keyword search over title / subtitle / excerpt / category (+ a tags pass). */
 export async function searchArticles(
   tenant: TenantRow,
   opts: ListOptions = {},
@@ -180,8 +181,8 @@ export async function searchArticles(
     }
   }
 
-  const muni = resolveMunicipalitySlug(opts.municipality);
-  if (muni) q = q.contains("sections", [muni]);
+  const section = resolveSectionSlug(tenant, opts.section);
+  if (section) q = q.contains("sections", [section]);
   if (opts.from) q = q.gte("published_at", opts.from);
   if (opts.to) q = q.lte("published_at", opts.to);
 
@@ -232,20 +233,20 @@ export async function getArticleBySlug(
   };
 }
 
-export interface MunicipalityCoverage {
+export interface SectionCoverage {
   slug: string;
   label: string;
   articleCount: number;
   latest: ArticleSummary[];
 }
 
-/** Coverage summary per municipality (count + a few latest headlines each). */
-export async function listCoverageByMunicipality(
+/** Coverage summary per section (count + a few latest headlines each). */
+export async function listCoverageBySection(
   tenant: TenantRow,
   latestPer = 3,
-): Promise<MunicipalityCoverage[]> {
-  const out: MunicipalityCoverage[] = [];
-  for (const m of MUNICIPALITIES) {
+): Promise<SectionCoverage[]> {
+  const out: SectionCoverage[] = [];
+  for (const s of getTenantSections(tenant)) {
     const supabase = createAdminClient();
     const { count } = await supabase
       .from("articles")
@@ -255,19 +256,12 @@ export async function listCoverageByMunicipality(
       .eq("visibility", "public")
       .not("published_at", "is", null)
       .lte("published_at", new Date().toISOString())
-      .contains("sections", [m.slug]);
+      .contains("sections", [s.slug]);
 
-    const latest = await getLatestArticles(tenant, {
-      municipality: m.slug,
-      limit: latestPer,
-    });
+    const latest = await getLatestArticles(tenant, { section: s.slug, limit: latestPer });
 
-    out.push({
-      slug: m.slug,
-      label: m.label,
-      articleCount: count ?? 0,
-      latest,
-    });
+    out.push({ slug: s.slug, label: s.label, articleCount: count ?? 0, latest });
   }
-  return out;
+  // Most-covered first; drop empty sections so the overview stays useful.
+  return out.filter((c) => c.articleCount > 0).sort((a, b) => b.articleCount - a.articleCount);
 }

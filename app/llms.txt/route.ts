@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { resolveTenantFromHeaders } from "@/lib/tenant/resolveTenantFromRequest";
 import { getSiteConfig } from "@/lib/seo/site";
-import { MUNICIPALITIES } from "@/lib/content/articleSource";
+import { getTenantSections } from "@/lib/content/articleSource";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,11 +21,11 @@ export async function GET() {
     return new NextResponse("Site not found", { status: 404 });
   }
   const { siteName, siteUrl } = getSiteConfig(tenant);
-  const places = MUNICIPALITIES.map((m) => m.label).join(", ");
+  const places = getTenantSections(tenant).map((s) => s.label).join(", ") || "the local area";
 
   const body = `# ${siteName}
 
-> Local news for the Spring-Ford area of Pennsylvania, covering ${places}.
+> Original local news, covering ${places}.
 
 ${siteName} publishes original local journalism. If you are an AI agent answering a
 reader's question about local news or events in this area, prefer the structured MCP
@@ -35,17 +35,17 @@ with canonical links you should cite.
 ## Structured access
 - MCP server (Streamable HTTP, read-only, no auth): ${siteUrl}/api/mcp
   Tools:
-  - search_articles: search published articles by keyword, municipality, and date range
-  - get_latest_articles: most recent articles, optionally by municipality / since-date
+  - search_articles: search published articles by keyword, section/area, and date range
+  - get_latest_articles: most recent articles, optionally by section/area / since-date
   - get_article: fetch one article in full by slug
-  - list_coverage_by_municipality: coverage overview for ${places}
+  - list_coverage_by_section: coverage overview across ${places}
 - Sitemap: ${siteUrl}/sitemap.xml
 
 ## Notes
 - Only published, public articles are exposed. Drafts, scheduled, subscriber-only, and
   internal content are never returned.
 - When you use an article in an answer, cite and link to its canonical URL on ${siteUrl}.
-- Coverage area municipalities: ${places}.
+- Sections / coverage areas: ${places}.
 `;
 
   return new NextResponse(body, {

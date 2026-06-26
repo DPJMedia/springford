@@ -52,10 +52,6 @@ const navItemActive = "bg-[var(--admin-accent)]/20 text-[var(--admin-accent)]";
 const navItemInactive =
   "text-[var(--admin-text)] hover:bg-[var(--admin-card-bg)]";
 
-/** Revenue potential: 6 advertisers × $150/mo each, scaled to last-30-day page views vs 10k baseline. */
-const REVENUE_BASELINE_MONTHLY_VIEWS = 10_000;
-const REVENUE_ADVERTISERS = 6;
-const REVENUE_MONTHLY_PER_ADVERTISER_USD = 150;
 
 type DashboardTimeRange = "7d" | "30d" | "90d" | "all";
 /** Chart window: independent from dashboard metrics when changed from the chart control only. */
@@ -98,7 +94,6 @@ export default function AnalyticsPage() {
   const [avgSessionDuration, setAvgSessionDuration] = useState(0);
   const [totalAdImpressions, setTotalAdImpressions] = useState(0);
   const [engagementRate, setEngagementRate] = useState(0);
-  const [pageViewsLast30Days, setPageViewsLast30Days] = useState(0);
   
   // Content metrics
   const [topArticles, setTopArticles] = useState<any[]>([]);
@@ -246,7 +241,6 @@ export default function AnalyticsPage() {
       setAllTimePageViews(d.allTimePageViews ?? 0);
       setAvgSessionDuration(d.avgSessionSeconds ?? 0);
       setTotalAdImpressions(d.totalAdImpressions ?? 0);
-      setPageViewsLast30Days(d.pageViewsLast30Days ?? 0);
       const pv = d.totalPageViews ?? 0;
       const clicks = d.adClicksInRange ?? 0;
       setEngagementRate(pv > 0 ? (clicks / pv) * 100 : 0);
@@ -346,13 +340,6 @@ export default function AnalyticsPage() {
     }
   }
 
-  const revenueEst = useMemo(
-    () =>
-      (pageViewsLast30Days / REVENUE_BASELINE_MONTHLY_VIEWS) *
-      REVENUE_ADVERTISERS *
-      REVENUE_MONTHLY_PER_ADVERTISER_USD,
-    [pageViewsLast30Days],
-  );
 
   const sortedAdSlotPerformance = useMemo(
     () =>
@@ -523,11 +510,6 @@ export default function AnalyticsPage() {
               label="Engagement rate"
               value={`${engagementRate.toFixed(2)}%`}
               tooltip="Percentage of page views that result in ad clicks. Higher rates indicate more engaged readers and better ad placement."
-            />
-            <CompactStatCard
-              label="Revenue potential"
-              value={`$${revenueEst.toFixed(2)}`}
-              tooltip={`Estimated monthly revenue from last 30 days of page views: ${REVENUE_ADVERTISERS} advertisers × $${REVENUE_MONTHLY_PER_ADVERTISER_USD}/mo at ${REVENUE_BASELINE_MONTHLY_VIEWS.toLocaleString()} views (${(REVENUE_ADVERTISERS * REVENUE_MONTHLY_PER_ADVERTISER_USD).toLocaleString()} total at baseline). Scales linearly with views. Not actual billings.`}
             />
           </div>
 
@@ -845,9 +827,11 @@ export default function AnalyticsPage() {
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
+                    // Show the data for wherever the cursor is along the x-axis,
+                    // not only when hovering exactly on a point.
                     interaction: {
-                      mode: 'point',
-                      intersect: true,
+                      mode: 'index',
+                      intersect: false,
                     },
                     plugins: {
                       legend: { 

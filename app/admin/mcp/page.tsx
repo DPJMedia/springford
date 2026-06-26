@@ -17,8 +17,8 @@ const TOOLS = [
     desc: "Fetch one published article in full (headline, byline, date, municipalities, full body) by slug.",
   },
   {
-    name: "list_coverage_by_municipality",
-    desc: "Coverage overview per municipality (article counts + recent headlines).",
+    name: "list_coverage_by_section",
+    desc: "Coverage overview per section/area (article counts + recent headlines), from this site's own section config.",
   },
 ];
 
