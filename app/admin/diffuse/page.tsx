@@ -198,6 +198,13 @@ export default function DiffuseIntegrationPage() {
   }
 
   async function checkConnection(userId: string) {
+    // INTENTIONALLY global per user — NOT scoped by tenant_id. One Diffuse login
+    // works across every Press tenant (current and future): the connection links
+    // a person to their Diffuse account once, and they can then pull their Diffuse
+    // articles into whichever site (tenant) they're administering. Do not add an
+    // `.eq("tenant_id", ...)` filter here or connecting on one site would not carry
+    // to the others. Which tenant an imported article lands on is decided at import
+    // time (articleData.tenant_id + diffuse_imported_articles.tenant_id).
     const { data, error } = await supabase
       .from("diffuse_connections")
       .select("*")
@@ -854,6 +861,22 @@ export default function DiffuseIntegrationPage() {
       console.log("  - image_credit:", photoCredit);
       console.log("  - title:", title);
       
+      // Cross-posting: if this Diffuse output was already imported on another
+      // tenant, point this copy's canonical at that original (one original +
+      // pointers, so the network doesn't compete with itself in search).
+      let canonicalUrl: string | null = null;
+      try {
+        const originRes = await fetch(
+          `/api/admin/diffuse/origin?outputId=${encodeURIComponent(output.id)}`,
+        );
+        if (originRes.ok) {
+          const j = await originRes.json();
+          canonicalUrl = j.canonicalUrl ?? null;
+        }
+      } catch {
+        /* non-fatal: fall back to self-canonical */
+      }
+
       const articleData = {
         tenant_id: tenantId,
         title: title,
@@ -884,6 +907,7 @@ export default function DiffuseIntegrationPage() {
         is_advertisement: false,
         visibility: "public" as const,
         allow_comments: true,
+        canonical_url: canonicalUrl,
         view_count: 0,
         share_count: 0,
         image_url: imageUrl,

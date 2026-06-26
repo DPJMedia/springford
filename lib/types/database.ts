@@ -99,6 +99,8 @@ export interface Article {
   co_author_id?: string | null;
   meta_title: string | null;
   meta_description: string | null;
+  /** Set on syndicated/cross-posted copies; points to the canonical original. NULL = self-canonical. */
+  canonical_url?: string | null;
   view_count: number;
   share_count: number;
   is_featured: boolean;

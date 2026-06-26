@@ -39,6 +39,7 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
     { icon: "megaphone", label: "Ad Manager", href: "/admin/ads", superAdminOnly: true },
     { icon: "dollar", label: "Ad Quoter", href: "/admin/ad-quoter" },
     { icon: "analytics", label: "Analytics", href: "/admin/analytics" },
+    { icon: "robot", label: "AI Discovery", href: "/admin/mcp" },
     { icon: "building", label: "Tenants", href: "/admin/tenants", superAdminOnly: true },
   ];
 
@@ -114,6 +115,11 @@ export function AdminSidebar({ profile }: AdminSidebarProps) {
       pencil: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      ),
+      robot: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3h6m-3 0v3m-5 0h10a2 2 0 012 2v3a5 5 0 01-5 5H10a5 5 0 01-5-5V8a2 2 0 012-2zm2 6h.01M15 12h.01M8 21h8" />
         </svg>
       ),
     };

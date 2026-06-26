@@ -28,7 +28,7 @@ export async function generateMetadata({
   const { data: article } = await supabase
     .from("articles")
     .select(
-      "title, meta_title, meta_description, excerpt, image_url, slug, published_at, updated_at"
+      "title, meta_title, meta_description, excerpt, image_url, slug, published_at, updated_at, canonical_url"
     )
     .eq("slug", slug)
     .eq("tenant_id", tenant.id)
@@ -66,6 +66,8 @@ export async function generateMetadata({
   }
 
   const articleUrl = `${siteUrl}/article/${article.slug}`;
+  // Syndicated copies point at the original; originals are self-canonical.
+  const canonicalUrl = article.canonical_url || articleUrl;
   const publishedTime = article.published_at
     ? new Date(article.published_at).toISOString()
     : undefined;
@@ -76,10 +78,13 @@ export async function generateMetadata({
   return {
     title: `${title} | ${siteName}`,
     description,
+    alternates: {
+      canonical: canonicalUrl,
+    },
     openGraph: {
       title,
       description,
-      url: articleUrl,
+      url: canonicalUrl,
       siteName,
       images: [
         {

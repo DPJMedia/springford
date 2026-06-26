@@ -369,6 +369,23 @@ function renderArticleCard(block: NewsletterBlock, b: NewsletterEmailBranding): 
 }
 
 /** Render a group of article blocks according to layout */
+/**
+ * Email-safe "show only our best" control: a run of article blocks renders the
+ * top N inline and links the rest to the site. We use a link rather than an
+ * interactive <details> expander because Gmail/Outlook don't support toggles;
+ * a link works in every client and still "leads with our best, hides the rest."
+ */
+const NEWSLETTER_MAX_VISIBLE_ARTICLES = 5;
+
+function renderMoreStoriesLink(remaining: number, b: NewsletterEmailBranding): string {
+  if (remaining <= 0) return '';
+  const label = `Read ${remaining} more ${remaining === 1 ? 'story' : 'stories'} on ${esc(b.siteName)} →`;
+  return `
+  <tr><td style="padding: 4px 40px 24px; background-color: ${WHITE}; text-align: center;">
+    <a href="${esc(b.siteUrl)}" style="display: inline-block; font-family: 'Red Hat Display', Arial, sans-serif; font-size: 14px; font-weight: 700; color: ${BLUE}; text-decoration: none; border: 1px solid ${BORDER}; border-radius: 6px; padding: 10px 18px;">${label}</a>
+  </td></tr>`;
+}
+
 function renderArticleGroup(
   articles: NewsletterBlock[],
   layout: ArticleLayout,
@@ -376,9 +393,17 @@ function renderArticleGroup(
 ): string {
   if (articles.length === 0) return '';
 
+  // Collapse long runs: show the top 5, link the rest to the site.
+  let moreLink = '';
+  if (articles.length > NEWSLETTER_MAX_VISIBLE_ARTICLES) {
+    const remaining = articles.length - NEWSLETTER_MAX_VISIBLE_ARTICLES;
+    articles = articles.slice(0, NEWSLETTER_MAX_VISIBLE_ARTICLES);
+    moreLink = renderMoreStoriesLink(remaining, b);
+  }
+
   // Stack: render each as full-width
   if (layout === 'stack' || articles.length === 1) {
-    return `<tr><td style="background-color: ${WHITE};">${articles.map((blk) => renderArticleFull(blk, b)).join('')}</td></tr>`;
+    return `<tr><td style="background-color: ${WHITE};">${articles.map((blk) => renderArticleFull(blk, b)).join('')}</td></tr>${moreLink}`;
   }
 
   // Determine columns
@@ -414,7 +439,7 @@ function renderArticleGroup(
   <tr><td style="padding: 20px 40px 0; background-color: ${WHITE};">
     <div style="height: 1px; background-color: ${BORDER};"></div>
   </td></tr>
-  <tr><td style="height: 8px; background-color: ${WHITE};">&nbsp;</td></tr>`;
+  <tr><td style="height: 8px; background-color: ${WHITE};">&nbsp;</td></tr>${moreLink}`;
 }
 
 // ─── Main renderer ────────────────────────────────────────────────────────────

@@ -31,6 +31,8 @@ export function ArticleJsonLd({ article, tenant }: Props) {
   }
 
   const pageUrl = `${siteUrl}/article/${article.slug}`;
+  // Syndicated copies declare the original as canonical so AI/search treat one origin.
+  const canonicalUrl = article.canonical_url || pageUrl;
   const isoPublished = article.published_at
     ? new Date(article.published_at).toISOString()
     : undefined;
@@ -61,7 +63,7 @@ export function ArticleJsonLd({ article, tenant }: Props) {
     },
     mainEntityOfPage: {
       "@type": "WebPage",
-      "@id": pageUrl,
+      "@id": canonicalUrl,
     },
     isAccessibleForFree: true,
   };

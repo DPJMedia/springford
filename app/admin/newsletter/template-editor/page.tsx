@@ -15,7 +15,7 @@ import { tenantPublicOrigin } from "@/lib/tenant/publicSiteUrl";
 interface Article {
   id: string; title: string; slug: string; excerpt: string | null;
   image_url: string | null; section: string; sections: string[]; published_at: string | null;
-  is_advertisement?: boolean | null;
+  is_advertisement?: boolean | null; view_count?: number | null;
 }
 
 function newBlock(type: BlockType, defaultButtonLink: string): NewsletterBlock {
@@ -215,15 +215,29 @@ function ArticlePickerModal({ onSelect, onClose }: { onSelect: (a: Article) => v
   const [articles, setArticles] = useState<Article[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  // Data-driven selection: rank by measured performance so editors lead with the
+  // best, and collapse to the top 5 by default so the list isn't a dump.
+  const [sort, setSort] = useState<"top" | "latest">("top");
+  const [showAll, setShowAll] = useState(false);
   const supabase = createClient();
   const { id: tenantId } = useTenant();
   useEffect(() => {
-    supabase.from("articles").select("id,title,slug,excerpt,image_url,section,sections,published_at,is_advertisement")
+    supabase.from("articles").select("id,title,slug,excerpt,image_url,section,sections,published_at,is_advertisement,view_count")
       .eq("tenant_id", tenantId)
       .eq("status", "published").order("published_at", { ascending: false }).limit(60)
       .then(({ data }) => { setArticles(data || []); setLoading(false); });
   }, [supabase, tenantId]);
-  const filtered = articles.filter((a) => a.title.toLowerCase().includes(query.toLowerCase()));
+  const matched = articles.filter((a) => a.title.toLowerCase().includes(query.toLowerCase()));
+  const sorted = [...matched].sort((a, b) =>
+    sort === "top"
+      ? (b.view_count ?? 0) - (a.view_count ?? 0)
+      : new Date(b.published_at ?? 0).getTime() - new Date(a.published_at ?? 0).getTime(),
+  );
+  // Top 5 by default; "show more" reveals the rest (skipped while searching).
+  const TOP_N = 5;
+  const collapsing = !query && !showAll && sorted.length > TOP_N;
+  const filtered = collapsing ? sorted.slice(0, TOP_N) : sorted;
+  const hiddenCount = sorted.length - filtered.length;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-[var(--admin-card-bg)] rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden border border-[var(--admin-border)]">
@@ -231,9 +245,18 @@ function ArticlePickerModal({ onSelect, onClose }: { onSelect: (a: Article) => v
           <h2 className="text-lg font-semibold text-white">Pick an Article</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-[var(--admin-table-header-bg)] flex items-center justify-center text-[var(--admin-text-muted)] transition">✕</button>
         </div>
-        <div className="px-6 py-3 border-b border-[var(--admin-border)]">
+        <div className="px-6 py-3 border-b border-[var(--admin-border)] space-y-2">
           <input type="text" placeholder="Search articles…" value={query} onChange={(e) => setQuery(e.target.value)}
             className="w-full px-3 py-2 text-sm border border-[var(--admin-border)] bg-[var(--admin-table-header-bg)] text-[var(--admin-text)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--admin-accent)]" autoFocus />
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-[var(--admin-text-muted)]">Sort by:</span>
+            {(["top", "latest"] as const).map((s) => (
+              <button key={s} type="button" onClick={() => { setSort(s); setShowAll(false); }}
+                className={`rounded-full px-3 py-1 font-semibold transition ${sort === s ? "bg-[var(--admin-accent)] text-white" : "bg-[var(--admin-table-header-bg)] text-[var(--admin-text-muted)] hover:text-[var(--admin-text)]"}`}>
+                {s === "top" ? "Top performing" : "Latest"}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="overflow-y-auto flex-1 p-3">
           {loading ? <div className="flex items-center justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--admin-accent)] border-r-transparent" /></div>
@@ -249,10 +272,19 @@ function ArticlePickerModal({ onSelect, onClose }: { onSelect: (a: Article) => v
                   {(article.sections?.filter((s) => s !== "hero")[0] || article.section || "").replace(/-/g, " ")}
                 </p>
                 <p className="text-sm font-semibold text-[var(--admin-text)] line-clamp-2 group-hover:text-[var(--admin-accent)] transition">{article.title}</p>
-                {article.published_at && <p className="text-xs text-[var(--admin-text-muted)] mt-0.5">{new Date(article.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>}
+                <p className="text-xs text-[var(--admin-text-muted)] mt-0.5 flex items-center gap-2">
+                  {article.published_at && <span>{new Date(article.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
+                  <span className="inline-flex items-center gap-1 font-medium">👁 {(article.view_count ?? 0).toLocaleString()} views</span>
+                </p>
               </div>
             </button>
           ))}
+          {collapsing && (
+            <button type="button" onClick={() => setShowAll(true)}
+              className="w-full mt-1 py-2 text-sm font-semibold text-[var(--admin-accent)] hover:bg-[var(--admin-accent)]/10 rounded-lg transition">
+              Show {hiddenCount} more {hiddenCount === 1 ? "article" : "articles"}
+            </button>
+          )}
         </div>
       </div>
     </div>

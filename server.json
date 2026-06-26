@@ -1,0 +1,12 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "press.springford/springford-press",
+  "description": "Read-only MCP server exposing published local-news articles from Spring-Ford Press, covering Royersford, Spring City, Limerick, and Upper Providence, PA. Tools: search_articles, get_latest_articles, get_article, list_coverage_by_municipality.",
+  "version": "1.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://www.springford.press/api/mcp"
+    }
+  ]
+}
