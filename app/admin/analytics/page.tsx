@@ -301,42 +301,48 @@ export default function AnalyticsPage() {
       setChartSeriesRaw(series);
       setServerChartGranularity(d.chartGranularity === "hour" ? "hour" : "day");
 
-      try {
-        const ns = await fetch(
-          `/api/admin/newsletter/sendgrid-summary?timeRange=${encodeURIComponent(timeRange)}`,
-          { credentials: "include" },
-        );
-        if (ns.ok) {
-          const j = await ns.json();
-          const t = j.totals;
-          setNewsletterSendgrid({
-            totals: t && typeof t === "object"
-              ? {
-                  delivered: Number(t.delivered) || 0,
-                  unique_opens: Number(t.unique_opens) || 0,
-                  unique_clicks: Number(t.unique_clicks) || 0,
-                  bounces: Number(t.bounces) || 0,
-                  blocks: Number(t.blocks) || 0,
-                  bounce_drops: Number(t.bounce_drops) || 0,
-                  spam_reports: Number(t.spam_reports) || 0,
-                  unsubscribes: Number(t.unsubscribes) || 0,
-                }
-              : null,
-            sendGridError: typeof j.sendGridError === "string" ? j.sendGridError : null,
-            statsInfo: typeof j.statsInfo === "string" ? j.statsInfo : null,
-            campaignsInRange: typeof j.campaignsInRange === "number" ? j.campaignsInRange : 0,
-            note: typeof j.note === "string" ? j.note : null,
-          });
-        } else {
-          setNewsletterSendgrid(null);
-        }
-      } catch {
-        setNewsletterSendgrid(null);
-      }
+      // Newsletter (SendGrid) stats hit an external API and are the slowest part.
+      // Load them in the background so they never gate the page's loading state.
+      void loadNewsletterStats(timeRange);
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
       if (showFullPageLoading) setLoading(false);
+    }
+  }
+
+  async function loadNewsletterStats(range: DashboardTimeRange) {
+    try {
+      const ns = await fetch(
+        `/api/admin/newsletter/sendgrid-summary?timeRange=${encodeURIComponent(range)}`,
+        { credentials: "include" },
+      );
+      if (ns.ok) {
+        const j = await ns.json();
+        const t = j.totals;
+        setNewsletterSendgrid({
+          totals: t && typeof t === "object"
+            ? {
+                delivered: Number(t.delivered) || 0,
+                unique_opens: Number(t.unique_opens) || 0,
+                unique_clicks: Number(t.unique_clicks) || 0,
+                bounces: Number(t.bounces) || 0,
+                blocks: Number(t.blocks) || 0,
+                bounce_drops: Number(t.bounce_drops) || 0,
+                spam_reports: Number(t.spam_reports) || 0,
+                unsubscribes: Number(t.unsubscribes) || 0,
+              }
+            : null,
+          sendGridError: typeof j.sendGridError === "string" ? j.sendGridError : null,
+          statsInfo: typeof j.statsInfo === "string" ? j.statsInfo : null,
+          campaignsInRange: typeof j.campaignsInRange === "number" ? j.campaignsInRange : 0,
+          note: typeof j.note === "string" ? j.note : null,
+        });
+      } else {
+        setNewsletterSendgrid(null);
+      }
+    } catch {
+      setNewsletterSendgrid(null);
     }
   }
 

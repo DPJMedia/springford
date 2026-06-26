@@ -151,18 +151,12 @@ type SectionPerformanceItem = {
   avgTimeSpent: number;
 };
 
-async function loadSectionPerformance(
-  supabase: SupabaseClient,
+/** Pure merge of the RPC's section clicks with article view totals (no I/O, so the
+ *  article-sections query can run in parallel with everything else). */
+function buildSectionPerformance(
   rpcData: Record<string, unknown> | null,
-  tenantId: string,
-): Promise<SectionPerformanceItem[]> {
-  const { data: articleSections } = await supabase
-    .from("articles")
-    .select("section, view_count")
-    .eq("tenant_id", tenantId)
-    .eq("status", "published")
-    .not("section", "is", null);
-
+  articleSections: { section: unknown; view_count: unknown }[] | null,
+): SectionPerformanceItem[] {
   const viewsBySection = new Map<string, { name: string; views: number }>();
   for (const row of articleSections || []) {
     const section = typeof row.section === "string" ? row.section.trim() : "";
@@ -239,50 +233,44 @@ export async function GET(request: NextRequest) {
     const tenant = await getTenantForApiRoute();
 
     const admin = createAdminClient();
-    const { data: rpcData, error: rpcError } = await admin.rpc("get_admin_analytics_dashboard", {
-      p_range_start: rangeStartIso,
-      p_range_end: rangeEndIso,
-      p_chart_start: chartStartIso,
-      p_chart_end: chartEndIso,
-      p_chart_granularity: granularity,
-      p_chart_bucket_count: bucketCount,
-      p_tenant_id: tenant.id,
-    });
 
-    if (rpcError) {
-      console.error("[analytics-dashboard] RPC error:", rpcError);
-      return NextResponse.json({ error: rpcError.message }, { status: 500 });
+    // Run the independent queries concurrently instead of one-after-another.
+    // (Previously sequential: RPC -> ads -> sections -> counts, which stacked
+    // their latencies. These don't depend on each other.)
+    const [rpcRes, currentAdsStats, allTimeCountRes, articleSectionsRes] = await Promise.all([
+      admin.rpc("get_admin_analytics_dashboard", {
+        p_range_start: rangeStartIso,
+        p_range_end: rangeEndIso,
+        p_chart_start: chartStartIso,
+        p_chart_end: chartEndIso,
+        p_chart_granularity: granularity,
+        p_chart_bucket_count: bucketCount,
+        p_tenant_id: tenant.id,
+      }),
+      loadCurrentAdsStats(admin, rangeEndIso, tenant.id),
+      admin.from("page_views").select("*", { count: "exact", head: true }).eq("tenant_id", tenant.id),
+      admin
+        .from("articles")
+        .select("section, view_count")
+        .eq("tenant_id", tenant.id)
+        .eq("status", "published")
+        .not("section", "is", null),
+    ]);
+
+    if (rpcRes.error) {
+      console.error("[analytics-dashboard] RPC error:", rpcRes.error);
+      return NextResponse.json({ error: rpcRes.error.message }, { status: 500 });
     }
 
-    const currentAdsStats = await loadCurrentAdsStats(admin, rangeEndIso, tenant.id);
-    const sectionPerformance = await loadSectionPerformance(
-      admin,
-      rpcData as Record<string, unknown> | null,
-      tenant.id,
-    );
-
-    const { count: allTimePageViews } = await admin
-      .from("page_views")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id);
-
-    const now = new Date();
-    const thirtyDaysStart = new Date(now);
-    thirtyDaysStart.setDate(thirtyDaysStart.getDate() - 30);
-    const { count: pageViewsLast30Days } = await admin
-      .from("page_views")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenant.id)
-      .gte("viewed_at", thirtyDaysStart.toISOString())
-      .lte("viewed_at", now.toISOString());
+    const rpcData = rpcRes.data as Record<string, unknown> | null;
+    const sectionPerformance = buildSectionPerformance(rpcData, articleSectionsRes.data ?? null);
 
     return NextResponse.json({
       ...rpcData,
       sectionPerformance,
       chartGranularity: granularity,
       currentAdsStats,
-      allTimePageViews: allTimePageViews ?? 0,
-      pageViewsLast30Days: pageViewsLast30Days ?? 0,
+      allTimePageViews: allTimeCountRes.count ?? 0,
     });
   } catch (e) {
     console.error("[analytics-dashboard]", e);
