@@ -845,6 +845,10 @@ export default function AnalyticsPage() {
                       },
                       tooltip: {
                         enabled: true,
+                        // Anchor the tooltip to the nearest data point (with its caret
+                        // pointing at it) instead of floating at the average position.
+                        position: 'nearest',
+                        caretSize: 6,
                         backgroundColor: 'rgba(0, 0, 0, 0.8)',
                         titleFont: { family: CHART_FONT_FAMILY, size: 14, weight: 'bold' },
                         bodyFont: { family: CHART_FONT_FAMILY, size: 13 },
