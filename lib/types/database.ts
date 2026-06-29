@@ -101,6 +101,8 @@ export interface Article {
   meta_description: string | null;
   /** Set on syndicated/cross-posted copies; points to the canonical original. NULL = self-canonical. */
   canonical_url?: string | null;
+  /** Managed author who fact-checked an AI-assisted article (shown in the AI disclaimer). */
+  ai_fact_checker_id?: string | null;
   view_count: number;
   share_count: number;
   is_featured: boolean;

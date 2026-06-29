@@ -53,6 +53,9 @@ export function ArticleContent({
   const [coAuthorAvatar, setCoAuthorAvatar] = useState<string | null>(null);
   const [coAuthorName, setCoAuthorName] = useState<string | null>(null);
   const [coAuthorUsername, setCoAuthorUsername] = useState<string | null>(null);
+  // AI-disclaimer fact-checker (a real managed author, never the Diffuse byline).
+  const [factCheckerName, setFactCheckerName] = useState<string | null>(null);
+  const [factCheckerUsername, setFactCheckerUsername] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
   const { id: tenantId } = useTenant();
@@ -177,9 +180,11 @@ export function ArticleContent({
       // FIRST: prefer the new `authors` table when the article has FKs.
       // Anything edited in /admin/authors flows through here, so an avatar
       // change on the author profile immediately updates every byline.
-      const fkIds = [article.primary_author_id, article.co_author_id].filter(
-        (x): x is string => !!x,
-      );
+      const fkIds = [
+        article.primary_author_id,
+        article.co_author_id,
+        article.ai_fact_checker_id,
+      ].filter((x): x is string => !!x);
       if (fkIds.length > 0) {
         const { data: managedAuthors } = await supabase
           .from("authors")
@@ -200,6 +205,13 @@ export function ArticleContent({
           setCoAuthorAvatar(co.avatar_url);
           setCoAuthorName(co.name);
           setCoAuthorUsername(co.slug);
+        }
+        // AI-disclaimer fact-checker — a real author, independent of the byline
+        // (the byline may be "Powered by diffuse.ai" while a person verified it).
+        const factChecker = article.ai_fact_checker_id ? byId.get(article.ai_fact_checker_id) : null;
+        if (factChecker) {
+          setFactCheckerName(factChecker.name);
+          setFactCheckerUsername(factChecker.slug);
         }
         // If we resolved BOTH bylines via FKs we're done — skip the legacy
         // free-text fallback below. If only the primary is FK-managed and
@@ -355,6 +367,7 @@ export function ArticleContent({
     article.author_name,
     article.primary_author_id,
     article.co_author_id,
+    article.ai_fact_checker_id,
     supabase,
     tenantId,
   ]);
@@ -553,22 +566,30 @@ export function ArticleContent({
                     Published {publishedDate}
                     {hasUpdate && <> (Updated {updatedDate})</>}
                   </p>
-                  {article.ai_assisted && (
-                    <p className="text-[11px] italic text-[color:var(--color-medium)]/70 leading-snug">
-                      This article was generated with AI assistance. All content was reviewed, edited, and fact-checked by{" "}
-                      {authorUsername ? (
-                        <Link
-                          href={`/author/${authorUsername}`}
-                          className="underline decoration-dotted underline-offset-2 hover:text-[color:var(--color-riviera-blue)]"
-                        >
-                          {authorName || article.author_name}
-                        </Link>
-                      ) : (
-                        <span>{authorName || article.author_name}</span>
-                      )}
-                      .
-                    </p>
-                  )}
+                  {article.ai_assisted && (() => {
+                    // Credit the real fact-checker (a managed author), independent of
+                    // the byline. Falls back to the byline only for legacy AI articles
+                    // saved before the fact-checker field existed.
+                    const checkerName = factCheckerName || authorName || article.author_name;
+                    const checkerUsername = factCheckerName ? factCheckerUsername : authorUsername;
+                    if (!checkerName) return null;
+                    return (
+                      <p className="text-[11px] italic text-[color:var(--color-medium)]/70 leading-snug">
+                        This article was generated with AI assistance. All content was reviewed, edited, and fact-checked by{" "}
+                        {checkerUsername ? (
+                          <Link
+                            href={`/author/${checkerUsername}`}
+                            className="underline decoration-dotted underline-offset-2 hover:text-[color:var(--color-riviera-blue)]"
+                          >
+                            {checkerName}
+                          </Link>
+                        ) : (
+                          <span>{checkerName}</span>
+                        )}
+                        .
+                      </p>
+                    );
+                  })()}
                 </div>
               </header>
 

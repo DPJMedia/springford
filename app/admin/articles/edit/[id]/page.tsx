@@ -64,6 +64,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   const [coAuthorName, setCoAuthorName] = useState("");
   const [coAuthorId, setCoAuthorId] = useState<string | null>(null);
   const [showCoAuthor, setShowCoAuthor] = useState(false);
+  const [aiFactCheckerId, setAiFactCheckerId] = useState<string | null>(null);
+  const [aiFactCheckerName, setAiFactCheckerName] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -178,6 +180,15 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
       setIsAdvertisement(data.is_advertisement ?? false);
       setSponsorUrl(data.sponsor_url ?? "");
       setAiAssisted(data.ai_assisted ?? false);
+      setAiFactCheckerId(data.ai_fact_checker_id ?? null);
+      if (data.ai_fact_checker_id) {
+        const { data: fc } = await supabase
+          .from("authors")
+          .select("name")
+          .eq("id", data.ai_fact_checker_id)
+          .maybeSingle();
+        if (fc?.name) setAiFactCheckerName(fc.name);
+      }
       const vis = data.visibility;
       setVisibility(
         vis === "newsletter_subscribers" || vis === "admin_only" ? vis : "public"
@@ -245,6 +256,13 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
 
     if (action === "schedule" && !scheduledFor) {
       setError("Please select a date and time for scheduling");
+      return;
+    }
+
+    if (aiAssisted && !aiFactCheckerId) {
+      setError(
+        'Select the author who fact-checked this AI-assisted article. It must be a real author, not "Powered by diffuse.ai".',
+      );
       return;
     }
 
@@ -350,6 +368,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
           is_advertisement: isAdvertisement,
           sponsor_url: isAdvertisement && sponsorUrl.trim() ? sponsorUrl.trim() : null,
           ai_assisted: aiAssisted,
+          ai_fact_checker_id: aiAssisted ? aiFactCheckerId : null,
           visibility,
           meta_title: metaTitle || null,
           meta_description: metaDescription || null,
@@ -550,6 +569,27 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                 </label>
                 <Tooltip text='Adds a tiny italic notice below the byline: "This article was generated with AI assistance. All content was reviewed, edited, and fact-checked by [author]."' />
               </div>
+
+              {/* When the AI disclaimer is on, a REAL author who fact-checked the
+                  article is required — never "Powered by diffuse.ai". */}
+              {aiAssisted && (
+                <div className="space-y-2 rounded-lg border border-[var(--admin-accent)]/30 bg-[var(--admin-table-header-bg)] p-4">
+                  <AuthorPicker
+                    authorId={aiFactCheckerId}
+                    authorName={aiFactCheckerName}
+                    onChange={({ authorId, authorName: name }) => {
+                      setAiFactCheckerId(authorId);
+                      setAiFactCheckerName(name);
+                    }}
+                    label="Fact-checked by *"
+                  />
+                  <p className="text-xs text-[var(--admin-text-muted)]">
+                    Required for the AI disclaimer. Choose the real author who reviewed and
+                    fact-checked this article (pick a managed author — it can&rsquo;t be
+                    &ldquo;Powered by diffuse.ai&rdquo;).
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2">
