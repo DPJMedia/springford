@@ -13,6 +13,7 @@ import { CategorySelector } from "@/components/CategorySelector";
 import { Tooltip } from "@/components/Tooltip";
 import { DateTimePicker } from "@/components/DateTimePicker";
 import { AuthorPicker } from "@/components/AuthorPicker";
+import { CrossPostSelector } from "@/components/CrossPostSelector";
 import { TagSelector } from "@/components/TagSelector";
 import { ArticlePreviewModal } from "@/components/admin/ArticlePreviewModal";
 import { useTenant } from "@/lib/tenant/TenantProvider";
@@ -66,6 +67,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
   const [showCoAuthor, setShowCoAuthor] = useState(false);
   const [aiFactCheckerId, setAiFactCheckerId] = useState<string | null>(null);
   const [aiFactCheckerName, setAiFactCheckerName] = useState("");
+  const [crossPostTenantIds, setCrossPostTenantIds] = useState<string[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -384,6 +386,20 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
 
       if (updateError) throw updateError;
 
+      // Cross-post the same article to any other selected tenant sites.
+      if (crossPostTenantIds.length > 0) {
+        try {
+          await fetch("/api/admin/articles/cross-post", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ sourceArticleId: id, targetTenantIds: crossPostTenantIds }),
+          });
+        } catch (e) {
+          console.error("Cross-post failed (this article was still saved):", e);
+        }
+      }
+
       router.push("/admin/articles");
     } catch (err: any) {
       setError(err.message);
@@ -590,6 +606,9 @@ export default function EditArticlePage({ params }: { params: Promise<{ id: stri
                   </p>
                 </div>
               )}
+
+              {/* Cross-post: also publish this article to other tenant sites. */}
+              <CrossPostSelector value={crossPostTenantIds} onChange={setCrossPostTenantIds} />
 
               <div>
                 <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2">

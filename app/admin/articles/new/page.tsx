@@ -12,6 +12,7 @@ import { CategorySelector } from "@/components/CategorySelector";
 import { Tooltip } from "@/components/Tooltip";
 import { DateTimePicker } from "@/components/DateTimePicker";
 import { AuthorPicker } from "@/components/AuthorPicker";
+import { CrossPostSelector } from "@/components/CrossPostSelector";
 import { TagSelector } from "@/components/TagSelector";
 import type { ArticleVisibility } from "@/lib/types/database";
 import { ArticleVisibilitySelector } from "@/components/ArticleVisibilitySelector";
@@ -61,6 +62,7 @@ export default function NewArticlePage() {
   const [showCoAuthor, setShowCoAuthor] = useState(false);
   const [aiFactCheckerId, setAiFactCheckerId] = useState<string | null>(null);
   const [aiFactCheckerName, setAiFactCheckerName] = useState("");
+  const [crossPostTenantIds, setCrossPostTenantIds] = useState<string[]>([]);
   const router = useRouter();
   const supabase = createClient();
   const { id: tenantId } = useTenant();
@@ -244,6 +246,20 @@ export default function NewArticlePage() {
         .single();
 
       if (insertError) throw insertError;
+
+      // Cross-post the same article to any other selected tenant sites.
+      if (data?.id && crossPostTenantIds.length > 0) {
+        try {
+          await fetch("/api/admin/articles/cross-post", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ sourceArticleId: data.id, targetTenantIds: crossPostTenantIds }),
+          });
+        } catch (e) {
+          console.error("Cross-post failed (original article was still saved):", e);
+        }
+      }
 
       router.push("/admin/articles");
     } catch (err: any) {
@@ -452,6 +468,9 @@ export default function NewArticlePage() {
                   </p>
                 </div>
               )}
+
+              {/* Cross-post: also publish this article to other tenant sites. */}
+              <CrossPostSelector value={crossPostTenantIds} onChange={setCrossPostTenantIds} />
 
               <div>
                 <label className="block text-sm font-semibold text-[var(--admin-text)] mb-2 flex items-center">
