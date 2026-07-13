@@ -9,6 +9,22 @@
 /** Stored on `ads.ad_slot` when the creative has no slot assignments yet (draft / inventory). */
 export const UNASSIGNED_AD_SLOT = "unassigned";
 
+/**
+ * Desktop-homepage sidebar "fill" slots (opt-in inventory). `SidebarAdFill` renders
+ * as many of these as fit in the leftover whitespace below the sidebar on tall
+ * homepages — desktop only, never past the final homepage section. Unsold fill
+ * slots render nothing (no gray boxes). Count here is the hard cap.
+ */
+export const HOMEPAGE_SIDEBAR_FILL_SLOT_IDS: string[] = Array.from(
+  { length: 8 },
+  (_, i) => `homepage-sidebar-fill-${i + 1}`,
+);
+
+/** True for any homepage sidebar fill slot id (used by AdDisplay sizing). */
+export function isHomepageSidebarFillSlot(slotId: string): boolean {
+  return slotId.startsWith("homepage-sidebar-fill-");
+}
+
 export const AD_SLOT_LABELS: Record<string, string> = {
   // Desktop — Home (main column first, then sidebars, then bottom full-width)
   "homepage-banner-top": "Desktop Home 1",
@@ -19,6 +35,10 @@ export const AD_SLOT_LABELS: Record<string, string> = {
   "homepage-sidebar-middle": "Desktop Home 6",
   "homepage-sidebar-bottom": "Desktop Home 7",
   "homepage-banner-bottom": "Desktop Home 8",
+  // Desktop — Home sidebar fill (dynamic, opt-in)
+  ...Object.fromEntries(
+    HOMEPAGE_SIDEBAR_FILL_SLOT_IDS.map((id, i) => [id, `Desktop Home Fill ${i + 1}`]),
+  ),
   // Mobile — Home (top to bottom)
   "homepage-banner-top-mobile": "Mobile Home 1",
   "homepage-mobile-above-most-read": "Mobile Home 2",
@@ -35,6 +55,12 @@ export const AD_SLOT_LABELS: Record<string, string> = {
   "article-mobile-inline": "Mobile Article 2",
   "article-mobile-end": "Mobile Article 3",
   "article-mobile-below-tags": "Mobile Article 4",
+  // Community calendar page — 2 squares each side + bottom banner (desktop only)
+  "calendar-left-1": "Calendar Left 1",
+  "calendar-left-2": "Calendar Left 2",
+  "calendar-right-1": "Calendar Right 1",
+  "calendar-right-2": "Calendar Right 2",
+  "calendar-bottom-banner": "Calendar Bottom Banner",
 };
 
 /** Order used in admin dropdowns and slot pickers (grouped by surface). */
@@ -51,6 +77,7 @@ export const AD_SLOT_IDS_IN_ORDER: string[] = [
   "homepage-sidebar-middle",
   "homepage-sidebar-bottom",
   "homepage-banner-bottom",
+  ...HOMEPAGE_SIDEBAR_FILL_SLOT_IDS,
   "article-after-image",
   "article-inline-1",
   "article-inline-2",
@@ -60,6 +87,11 @@ export const AD_SLOT_IDS_IN_ORDER: string[] = [
   "article-mobile-inline",
   "article-mobile-end",
   "article-mobile-below-tags",
+  "calendar-left-1",
+  "calendar-left-2",
+  "calendar-right-1",
+  "calendar-right-2",
+  "calendar-bottom-banner",
 ];
 
 export function getAdSlotLabel(slotId: string): string {
@@ -80,6 +112,9 @@ export const AD_SLOT_TABLE_LABELS: Record<string, string> = {
   "homepage-sidebar-middle": "Desktop Home Tier 6",
   "homepage-sidebar-bottom": "Desktop Home Tier 7",
   "homepage-banner-bottom": "Desktop Home Tier 8",
+  ...Object.fromEntries(
+    HOMEPAGE_SIDEBAR_FILL_SLOT_IDS.map((id, i) => [id, `Desktop Home Fill ${i + 1}`]),
+  ),
   "homepage-banner-top-mobile": "Mobile Home Tier 1",
   "homepage-mobile-above-most-read": "Mobile Home Tier 2",
   "homepage-mobile-above-editors-picks": "Mobile Home Tier 3",
@@ -93,6 +128,11 @@ export const AD_SLOT_TABLE_LABELS: Record<string, string> = {
   "article-mobile-inline": "Mobile Article Tier 2",
   "article-mobile-end": "Mobile Article Tier 3",
   "article-mobile-below-tags": "Mobile Article Tier 4",
+  "calendar-left-1": "Calendar Left 1",
+  "calendar-left-2": "Calendar Left 2",
+  "calendar-right-1": "Calendar Right 1",
+  "calendar-right-2": "Calendar Right 2",
+  "calendar-bottom-banner": "Calendar Bottom Banner",
 };
 
 export function getAdSlotTableLabel(slotId: string): string {

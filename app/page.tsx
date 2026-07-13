@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { NewsletterForm } from "@/components/NewsletterForm";
 import { NewsletterPopupBanner } from "@/components/NewsletterPopupBanner";
 import { AdDisplay } from "@/components/AdDisplay";
+import { SidebarAdFill } from "@/components/SidebarAdFill";
 import type { Article } from "@/lib/types/database";
 import Link from "next/link";
 import { ArticleAudienceBookmark } from "@/components/ArticleAudienceBookmark";
@@ -297,6 +298,8 @@ export default function Home() {
   const [trendingArticles, setTrendingArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  // Ref to the tall main content column — SidebarAdFill measures against its bottom.
+  const mainColRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
   // After articles load, scroll to the hash section if one is in the URL
@@ -718,7 +721,7 @@ export default function Home() {
               {/* Main Content Grid: Content + Sidebar */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* MAIN CONTENT AREA */}
-                <div className="lg:col-span-8 space-y-8">
+                <div ref={mainColRef} className="lg:col-span-8 space-y-8">
                   {/* Top Stories - same heading/line style as other sections */}
                   <section id="top-stories" className="scroll-mt-[35vh]">
                     <div className="flex items-center justify-between mb-4">
@@ -1008,11 +1011,14 @@ export default function Home() {
 
                   {/* AD SECTION 4 - SIDEBAR BOTTOM (desktop only on homepage) */}
                   <div className="mt-8 hidden lg:block">
-                    <AdSlot 
-                      slot="homepage-sidebar-bottom" 
+                    <AdSlot
+                      slot="homepage-sidebar-bottom"
                       className="w-full"
                     />
                   </div>
+
+                  {/* Dynamic fill: consume leftover sidebar whitespace with ads (desktop only) */}
+                  <SidebarAdFill mainColRef={mainColRef} />
                 </aside>
               </div>
 

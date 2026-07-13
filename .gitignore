@@ -46,3 +46,8 @@ next-env.d.ts
 
 # local AI tooling (Cursor / Claude skills, not for production)
 /.claude/
+
+# outreach lead pipeline: intermediate data + generated lead lists contain
+# business PII — never commit. Only source code under /outreach/ is tracked.
+/outreach/data/
+/outreach/output/

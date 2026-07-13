@@ -179,20 +179,69 @@ async function fetchCoverInputsForProjects(
   return map;
 }
 
+const MAX_LOAD_ATTEMPTS = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * A failure worth retrying: a transient network / availability blip against the
+ * external Diffuse Supabase (the common cause of the "Fetch Error" admins saw
+ * after switching tenants). RLS/permission errors are NOT transient, so we don't
+ * waste retries on them.
+ */
+function isTransientLoadFailure(message: string): boolean {
+  const m = (message || "").toLowerCase();
+  return (
+    m.includes("failed to fetch") ||
+    m.includes("network") ||
+    m.includes("fetch failed") ||
+    m.includes("load failed") ||
+    m.includes("timeout") ||
+    m.includes("timed out") ||
+    m.includes("econnreset") ||
+    m.includes("502") ||
+    m.includes("503") ||
+    m.includes("504")
+  );
+}
+
 /**
  * Loads Diffuse orgs and projects using DB-side filters and batched related queries
  * (same idea as analytics: avoid full-table scans and N+1 round trips).
+ *
+ * Retries transient network failures with backoff so a single blip against the
+ * external Diffuse project no longer surfaces as an error to the admin.
  */
 export async function loadDiffuseDashboardData(
   client: SupabaseClient,
   diffuseUserId: string,
 ): Promise<LoadDiffuseDashboardResult> {
-  try {
-    return await loadDiffuseDashboardDataInner(client, diffuseUserId);
-  } catch (e) {
-    console.error("[loadDiffuseDashboardData]", e);
-    return { ok: false, kind: "fetch", message: formatUnknownError(e) };
+  let last: LoadDiffuseDashboardResult = {
+    ok: false,
+    kind: "fetch",
+    message: "Failed to load projects",
+  };
+
+  for (let attempt = 1; attempt <= MAX_LOAD_ATTEMPTS; attempt++) {
+    try {
+      const result = await loadDiffuseDashboardDataInner(client, diffuseUserId);
+      if (result.ok) return result;
+      last = result;
+      // Only retry transient blips; permission/config errors won't fix themselves.
+      if (!isTransientLoadFailure(result.message)) return result;
+    } catch (e) {
+      // Thrown errors are almost always network-level — worth retrying.
+      console.error(`[loadDiffuseDashboardData] attempt ${attempt} failed`, e);
+      last = { ok: false, kind: "fetch", message: formatUnknownError(e) };
+    }
+    if (attempt < MAX_LOAD_ATTEMPTS) {
+      await sleep(attempt === 1 ? 350 : 900);
+    }
   }
+
+  return last;
 }
 
 async function loadDiffuseDashboardDataInner(

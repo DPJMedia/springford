@@ -150,6 +150,9 @@ export default function DiffuseIntegrationPage() {
   } | null>(null);
   const [expandedOrgIds, setExpandedOrgIds] = useState<Set<string>>(new Set());
   const [loadingProjects, setLoadingProjects] = useState(true);
+  // Non-blocking inline notice when the external Diffuse load fails (replaces the
+  // old blocking "Fetch Error" modal that interrupted admins after tenant switches).
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [showOutputSelector, setShowOutputSelector] = useState(false);
   const [outputSelectorData, setOutputSelectorData] = useState<{
     project: ProjectWithWorkspace;
@@ -361,6 +364,7 @@ export default function DiffuseIntegrationPage() {
     if (!connection) return;
 
     setLoadingProjects(true);
+    setProjectsError(null);
 
     try {
       const diffuseClient = createDiffuseClient();
@@ -369,41 +373,23 @@ export default function DiffuseIntegrationPage() {
       if (!result.ok) {
         const message =
           result.kind === "memberships"
-            ? `Error fetching organizations: ${result.message}\n\nPlease check the browser console for details.`
+            ? `Couldn't load your organizations: ${result.message}`
             : result.kind === "workspaces"
-              ? `Error fetching workspace details: ${result.message}`
+              ? `Couldn't load workspace details: ${result.message}`
               : result.message;
-        setConfirmModalData({
-          title: "Fetch Error",
-          message,
-          onConfirm: () => setShowConfirmModal(false),
-        });
-        setShowConfirmModal(true);
+        // Inline, dismissible — no blocking modal on a transient Diffuse blip.
+        setProjectsError(message);
         setLoadingProjects(false);
         return;
       }
 
-      if (result.workspaces.length === 0) {
-        setConfirmModalData({
-          title: "No Organizations",
-          message:
-            "No organizations found. Make sure you're a member of at least one organization in DiffuseAI.",
-          onConfirm: () => setShowConfirmModal(false),
-        });
-        setShowConfirmModal(true);
-      }
-
+      // Empty org list is a normal state — the inline empty-state UI handles it.
       setWorkspaces(result.workspaces);
       setProjectsByWorkspace(result.projectsByWorkspace);
       setLoadingProjects(false);
     } catch (err) {
       console.error("Unexpected error fetching workspaces and projects:", err);
-      setConfirmModalData({
-        title: "Unexpected Error",
-        message: `Unexpected error: ${formatUnknownError(err)}`,
-        onConfirm: () => setShowConfirmModal(false),
-      });
-      setShowConfirmModal(true);
+      setProjectsError(`Unexpected error: ${formatUnknownError(err)}`);
       setLoadingProjects(false);
     }
   }
@@ -1113,12 +1099,36 @@ export default function DiffuseIntegrationPage() {
           </div>
         ) : (
           <>
+            {projectsError ? (
+              <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+                <span className="mt-0.5 shrink-0" aria-hidden>⚠️</span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-amber-200">Couldn’t reach Diffuse just now</p>
+                  <p className="mt-0.5 break-words text-amber-100/80">{projectsError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fetchWorkspacesAndProjects()}
+                  className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-700"
+                >
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProjectsError(null)}
+                  aria-label="Dismiss"
+                  className="shrink-0 rounded-md px-2 py-1.5 text-amber-200/70 transition hover:bg-amber-500/10"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : null}
             {loadingProjects ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
                 <div className="w-8 h-8 border-4 border-[var(--admin-accent)] border-t-transparent rounded-full animate-spin" />
                 <p className="text-sm text-[var(--admin-text-muted)]">Loading projects…</p>
               </div>
-            ) : workspaces.length === 0 && (projectsByWorkspace["private"]?.length ?? 0) === 0 ? (
+            ) : projectsError ? null : workspaces.length === 0 && (projectsByWorkspace["private"]?.length ?? 0) === 0 ? (
               <div className="py-16 text-center rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card-bg)] px-4">
                 <div className="text-7xl mb-6 opacity-50">🏢</div>
                 <h3 className="text-[24px] leading-[1.4] font-semibold text-[var(--admin-text)] mb-3">

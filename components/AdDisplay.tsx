@@ -247,12 +247,21 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent, hidePlace
     const is300x300Sidebar = adSlot === "homepage-sidebar-top";
     const is300x250Sidebar =
       adSlot === "homepage-sidebar-middle" || adSlot === "homepage-sidebar-bottom";
+    const isCalendarSquare =
+      adSlot === "calendar-left-1" || adSlot === "calendar-left-2" ||
+      adSlot === "calendar-right-1" || adSlot === "calendar-right-2";
+    const isCalendarBanner = adSlot === "calendar-bottom-banner";
     const is728x90Banner =
       adSlot.includes("content-top") ||
       adSlot.includes("content-middle");
     const isArticleSidebar =
       adSlot === "article-sidebar-top" || adSlot === "article-sidebar-bottom";
     const isArticleInline = adSlot === "article-inline-1" || adSlot === "article-inline-2";
+    // Desktop homepage sidebar fill: fixed 250px height so SidebarAdFill's height math is exact.
+    const isSidebarFill = adSlot.startsWith("homepage-sidebar-fill-");
+    // Calendar page left/right rails: tall skyscraper format (desktop only).
+    const isCalendarRail =
+      adSlot === "calendar-sidebar-left" || adSlot === "calendar-sidebar-right";
 
     // Container and image sizing — responsive for mobile (min-heights, object-contain so full ad visible)
     let containerClass = "";
@@ -271,6 +280,19 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent, hidePlace
     } else if (is300x250Sidebar) {
       containerClass = "w-full aspect-[300/250]";
       heightClass = "h-full object-cover max-md:object-contain";
+    } else if (isSidebarFill) {
+      containerClass = "w-full h-[250px]";
+      heightClass = "w-full h-full object-cover";
+    } else if (isCalendarRail) {
+      // Skyscraper rail: fills the calendar column height, contain so full ad shows.
+      containerClass = "w-full h-full min-h-[400px]";
+      heightClass = "w-full h-full object-contain";
+    } else if (isCalendarSquare) {
+      containerClass = "w-full aspect-square";
+      heightClass = "h-full object-cover max-md:object-contain";
+    } else if (isCalendarBanner) {
+      containerClass = "w-full aspect-[970/90] max-md:aspect-auto max-md:h-[90px]";
+      heightClass = "w-full h-full object-contain";
     } else if (is728x90Banner || isArticleInline) {
       // 728x90: slot taller (728/108) so full ad visible; full width, object-cover
       containerClass = "w-full aspect-[728/108] max-md:aspect-auto max-md:h-[90px]";
@@ -300,6 +322,10 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent, hidePlace
       isArticleSidebar ||
       is300x300Sidebar ||
       is300x250Sidebar ||
+      isSidebarFill ||
+      isCalendarRail ||
+      isCalendarSquare ||
+      isCalendarBanner ||
       isBanner
         ? ""
         : ad.fill_section_for_slot !== false

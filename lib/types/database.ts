@@ -211,6 +211,31 @@ export interface SavedAdQuote {
   manual_total_override?: boolean | null;
 }
 
+export type CalendarEntryType = 'event' | 'article';
+
+/** Row from public.calendar_events — community calendar entry (tenant-scoped). */
+export interface CalendarEvent {
+  id: string;
+  tenant_id: string;
+  /** YYYY-MM-DD */
+  event_date: string;
+  entry_type: CalendarEntryType;
+  title: string;
+  description: string | null;
+  /** Hex color for the day chip, e.g. #2563eb; null = default. */
+  color: string | null;
+  image_url: string | null;
+  /** Set for entry_type 'article' (links to the published article). */
+  article_id: string | null;
+  /** HH:MM[:SS] */
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {

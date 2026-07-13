@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import Link from "next/link";
@@ -27,7 +28,37 @@ export function Header() {
   const [notificationCount, setNotificationCount] = useState(0);
   const mobileUserMenuRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+  const pathname = usePathname();
+  const [showCalendarDot, setShowCalendarDot] = useState(false);
   const { id: tenantId, name: siteName, section_config: sectionConfig } = useTenant();
+
+  // Calendar "new events" red dot: shows when this tenant has an event created since this
+  // browser last opened the calendar. Persisted per browser (works signed-in or anonymous)
+  // and cleared the moment the calendar page is viewed.
+  useEffect(() => {
+    if (!tenantId || typeof window === "undefined") return;
+    const seenKey = `calendarSeen:${tenantId}`;
+    let active = true;
+    (async () => {
+      const { data } = await supabase
+        .from("calendar_events")
+        .select("created_at")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (!active) return;
+      const latest = (data?.[0] as { created_at?: string } | undefined)?.created_at;
+      if (pathname?.startsWith("/calendar")) {
+        if (latest) localStorage.setItem(seenKey, latest);
+        setShowCalendarDot(false);
+        return;
+      }
+      if (!latest) { setShowCalendarDot(false); return; }
+      const seen = localStorage.getItem(seenKey);
+      setShowCalendarDot(!seen || new Date(latest) > new Date(seen));
+    })();
+    return () => { active = false; };
+  }, [supabase, tenantId, pathname]);
 
   const allNavItems = useMemo(() => {
     if (!Array.isArray(sectionConfig)) return [];
@@ -180,7 +211,7 @@ export function Header() {
       {/* Full two-row header sticks together (LA Times style) */}
       <div className="relative z-30 border-b border-black/10 bg-[color:var(--color-off-white)] backdrop-blur">
         <div className="mx-auto grid w-full max-w-none grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2 sm:px-6 lg:px-8">
-          {/* Left: Search button (all breakpoints) */}
+          {/* Left: Search + Community Calendar (all breakpoints) */}
           <div className="flex min-w-0 items-center justify-start gap-2">
             <button
               onClick={() => { setShowMobileNav(false); setShowSearch(!showSearch); }}
@@ -192,6 +223,19 @@ export function Header() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </button>
+            <Link
+              href="/calendar"
+              aria-label="Community calendar"
+              title="Community calendar"
+              className="relative p-2 rounded-full hover:bg-black/10 transition text-[color:var(--color-dark)]"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {showCalendarDot && (
+                <span className="absolute right-1 top-1 inline-flex h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-[color:var(--color-off-white)]" aria-label="New calendar events" />
+              )}
+            </Link>
           </div>
 
           {/* Center: Logo - dead center; on mobile only, nudge up so aligned with search/hamburger buttons */}
