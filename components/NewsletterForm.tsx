@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useTenant } from '@/lib/tenant/TenantProvider'
 
 export function NewsletterForm() {
-  const { name: siteName } = useTenant()
+  const { id: tenantId, name: siteName } = useTenant()
   const [user, setUser] = useState<any>(null)
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -28,13 +28,16 @@ export function NewsletterForm() {
     const { data: { user: currentUser } } = await supabase.auth.getUser()
     
     if (currentUser) {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('newsletter_subscribed')
-        .eq('id', currentUser.id)
-        .single()
-      
-      setIsSubscribed(profile?.newsletter_subscribed || false)
+      // Per-tenant subscription, not the global user_profiles flag (which would make a
+      // user subscribed on one site look subscribed on every site).
+      const { data: sub } = await supabase
+        .from('tenant_newsletter_subscriptions')
+        .select('subscribed')
+        .eq('user_id', currentUser.id)
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+
+      setIsSubscribed(sub?.subscribed === true)
       setUser(currentUser)
     } else {
       setUser(null)

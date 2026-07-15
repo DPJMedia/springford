@@ -63,9 +63,14 @@ body {
     BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/* Keep the anchor reset inside the base layer so text-* utilities (e.g. `text-white`
+   on link buttons) still win. As an unlayered rule this overrode Tailwind v4's layered
+   utilities, turning white link text dark — e.g. the black "Read today's stories" pill. */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
 .shadow-soft {

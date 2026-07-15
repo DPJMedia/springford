@@ -102,12 +102,16 @@ function SubscribePageContent() {
         data: { user: currentUser },
       } = await supabase.auth.getUser();
       if (currentUser) {
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("newsletter_subscribed")
-          .eq("id", currentUser.id)
+        // Per-tenant subscription — NOT the global user_profiles flag. Reading the
+        // global flag made a user subscribed on one site (e.g. Spring-Ford) show as
+        // "already subscribed" on every other site (e.g. Phoenixville).
+        const { data: sub } = await supabase
+          .from("tenant_newsletter_subscriptions")
+          .select("subscribed")
+          .eq("user_id", currentUser.id)
+          .eq("tenant_id", tenantId)
           .maybeSingle();
-        setIsSubscribed(profile?.newsletter_subscribed ?? false);
+        setIsSubscribed(sub?.subscribed === true);
         setUser(currentUser);
       } else {
         setUser(null);
