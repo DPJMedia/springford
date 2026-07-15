@@ -79,7 +79,13 @@ function SubscribePageContent() {
     checkUserStatus();
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => checkUserStatus());
+    } = supabase.auth.onAuthStateChange(() => {
+      // Defer out of the auth callback: awaiting a Supabase auth call (getUser)
+      // synchronously inside onAuthStateChange deadlocks the client's lock, so
+      // `loading` never flips and the page hangs on the spinner. setTimeout(0)
+      // lets the lock release first. (This was the stuck-spinner on /subscribe.)
+      setTimeout(checkUserStatus, 0);
+    });
     return () => subscription.unsubscribe();
   }, []);
 
@@ -91,22 +97,28 @@ function SubscribePageContent() {
   }, [welcome, user, isSubscribed, loading]);
 
   async function checkUserStatus() {
-    const {
-      data: { user: currentUser },
-    } = await supabase.auth.getUser();
-    if (currentUser) {
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("newsletter_subscribed")
-        .eq("id", currentUser.id)
-        .single();
-      setIsSubscribed(profile?.newsletter_subscribed ?? false);
-      setUser(currentUser);
-    } else {
-      setUser(null);
-      setIsSubscribed(false);
+    try {
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
+      if (currentUser) {
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("newsletter_subscribed")
+          .eq("id", currentUser.id)
+          .maybeSingle();
+        setIsSubscribed(profile?.newsletter_subscribed ?? false);
+        setUser(currentUser);
+      } else {
+        setUser(null);
+        setIsSubscribed(false);
+      }
+    } catch (err) {
+      // Never leave the page stuck on the spinner if auth/profile lookup fails.
+      console.error("[subscribe] checkUserStatus failed:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   function handleClaimClick(e: React.FormEvent) {

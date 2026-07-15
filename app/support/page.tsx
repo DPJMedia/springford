@@ -64,10 +64,10 @@ function SupportPageContent() {
     });
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      supabase.auth.getUser().then(({ data: { user: u } }) =>
-        setUser((u ?? null) as SupportUser | null),
-      );
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Use the session from the event; calling supabase.auth.getUser() inside the
+      // onAuthStateChange callback deadlocks the client's auth lock.
+      setUser((session?.user ?? null) as SupportUser | null);
     });
     return () => subscription.unsubscribe();
   }, [supabase]);

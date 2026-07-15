@@ -17,7 +17,8 @@ export function NewsletterForm() {
     
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      checkUserStatus()
+      // Defer: awaiting a Supabase auth call inside onAuthStateChange deadlocks the client.
+      setTimeout(checkUserStatus, 0)
     })
 
     return () => subscription.unsubscribe()

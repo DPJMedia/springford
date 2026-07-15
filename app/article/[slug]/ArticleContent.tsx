@@ -150,7 +150,7 @@ export function ArticleContent({
     void checkAccess();
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => void checkAccess());
+    } = supabase.auth.onAuthStateChange(() => { setTimeout(() => void checkAccess(), 0); });
     const onFocus = () => void checkAccess();
     window.addEventListener("focus", onFocus);
     return () => {
