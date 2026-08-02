@@ -257,7 +257,7 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent, hidePlace
     const isArticleSidebar =
       adSlot === "article-sidebar-top" || adSlot === "article-sidebar-bottom";
     const isArticleInline = adSlot === "article-inline-1" || adSlot === "article-inline-2";
-    // Desktop homepage sidebar fill: fixed 250px height so SidebarAdFill's height math is exact.
+    // Desktop homepage side-column slots ("Desktop Home Side 1-3"), Medium Rectangle (300x250).
     const isSidebarFill = adSlot.startsWith("homepage-sidebar-fill-");
     // Calendar page left/right rails: tall skyscraper format (desktop only).
     const isCalendarRail =
@@ -281,8 +281,9 @@ export function AdDisplay({ adSlot, className = "", fallbackComponent, hidePlace
       containerClass = "w-full aspect-[300/250]";
       heightClass = "h-full object-cover max-md:object-contain";
     } else if (isSidebarFill) {
-      containerClass = "w-full h-[250px]";
-      heightClass = "w-full h-full object-cover";
+      // Medium Rectangle (300x250) proportion — matches sidebar Tier 6 / Tier 7.
+      containerClass = "w-full aspect-[300/250]";
+      heightClass = "h-full object-cover max-md:object-contain";
     } else if (isCalendarRail) {
       // Skyscraper rail: fills the calendar column height, contain so full ad shows.
       containerClass = "w-full h-full min-h-[400px]";
