@@ -338,6 +338,11 @@ function HomepagePreview({
 
           {/* AD SECTION 4: Sidebar Bottom */}
           {renderAdSlot("homepage-sidebar-bottom", "1200×1000 px", "h-48")}
+
+          {/* Side column: 3 stacked Medium Rectangle (300x250) slots under Tier 7 */}
+          {renderAdSlot("homepage-sidebar-fill-1", "1200×1000 px", "h-48")}
+          {renderAdSlot("homepage-sidebar-fill-2", "1200×1000 px", "h-48")}
+          {renderAdSlot("homepage-sidebar-fill-3", "1200×1000 px", "h-48")}
         </div>
       </div>
 
