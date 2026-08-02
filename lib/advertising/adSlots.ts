@@ -10,17 +10,18 @@
 export const UNASSIGNED_AD_SLOT = "unassigned";
 
 /**
- * Desktop-homepage sidebar "fill" slots (opt-in inventory). `SidebarAdFill` renders
- * as many of these as fit in the leftover whitespace below the sidebar on tall
- * homepages — desktop only, never past the final homepage section. Unsold fill
- * slots render nothing (no gray boxes). Count here is the hard cap.
+ * Three fixed side-column ad slots stacked below the homepage sidebar, directly
+ * under "Desktop Home Tier 7". Rendered by `SidebarAdFill` on desktop only and
+ * always assignable in the Ad Manager ("Desktop Home Side 1-3"). With
+ * hidePlaceholder an unsold slot renders nothing, so tenants without creatives
+ * (everyone but Spring-Ford today) show no empty boxes.
  */
 export const HOMEPAGE_SIDEBAR_FILL_SLOT_IDS: string[] = Array.from(
-  { length: 8 },
+  { length: 3 },
   (_, i) => `homepage-sidebar-fill-${i + 1}`,
 );
 
-/** True for any homepage sidebar fill slot id (used by AdDisplay sizing). */
+/** True for any homepage sidebar side/fill slot id (used by AdDisplay sizing). */
 export function isHomepageSidebarFillSlot(slotId: string): boolean {
   return slotId.startsWith("homepage-sidebar-fill-");
 }
@@ -35,9 +36,9 @@ export const AD_SLOT_LABELS: Record<string, string> = {
   "homepage-sidebar-middle": "Desktop Home 6",
   "homepage-sidebar-bottom": "Desktop Home 7",
   "homepage-banner-bottom": "Desktop Home 8",
-  // Desktop — Home sidebar fill (dynamic, opt-in)
+  // Desktop — Home side column (3 stacked slots under Tier 7)
   ...Object.fromEntries(
-    HOMEPAGE_SIDEBAR_FILL_SLOT_IDS.map((id, i) => [id, `Desktop Home Fill ${i + 1}`]),
+    HOMEPAGE_SIDEBAR_FILL_SLOT_IDS.map((id, i) => [id, `Desktop Home Side ${i + 1}`]),
   ),
   // Mobile — Home (top to bottom)
   "homepage-banner-top-mobile": "Mobile Home 1",
@@ -76,8 +77,8 @@ export const AD_SLOT_IDS_IN_ORDER: string[] = [
   "homepage-sidebar-top",
   "homepage-sidebar-middle",
   "homepage-sidebar-bottom",
-  "homepage-banner-bottom",
   ...HOMEPAGE_SIDEBAR_FILL_SLOT_IDS,
+  "homepage-banner-bottom",
   "article-after-image",
   "article-inline-1",
   "article-inline-2",
@@ -113,7 +114,7 @@ export const AD_SLOT_TABLE_LABELS: Record<string, string> = {
   "homepage-sidebar-bottom": "Desktop Home Tier 7",
   "homepage-banner-bottom": "Desktop Home Tier 8",
   ...Object.fromEntries(
-    HOMEPAGE_SIDEBAR_FILL_SLOT_IDS.map((id, i) => [id, `Desktop Home Fill ${i + 1}`]),
+    HOMEPAGE_SIDEBAR_FILL_SLOT_IDS.map((id, i) => [id, `Desktop Home Side ${i + 1}`]),
   ),
   "homepage-banner-top-mobile": "Mobile Home Tier 1",
   "homepage-mobile-above-most-read": "Mobile Home Tier 2",

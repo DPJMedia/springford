@@ -1017,8 +1017,8 @@ export default function Home() {
                     />
                   </div>
 
-                  {/* Dynamic fill: consume leftover sidebar whitespace with ads (desktop only) */}
-                  <SidebarAdFill mainColRef={mainColRef} />
+                  {/* 3 stacked side-column ad slots under Tier 7 (desktop only) */}
+                  <SidebarAdFill />
                 </aside>
               </div>
 
