@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -273,17 +273,24 @@ function NewsSection({
 }
 
 export default function Home() {
-  const { id: tenantId } = useTenant();
+  const { id: tenantId, section_config: sectionConfig } = useTenant();
   const [heroArticle, setHeroArticle] = useState<Article | null>(null);
   const [featuredArticles, setFeaturedArticles] = useState<Article[]>([]);
   const [editorsPicks, setEditorsPicks] = useState<Article[]>([]);
   const [latestArticles, setLatestArticles] = useState<Article[]>([]);
-  const [springCityArticles, setSpringCityArticles] = useState<Article[]>([]);
-  const [royersfordArticles, setRoyersfordArticles] = useState<Article[]>([]);
-  const [limerickArticles, setLimerickArticles] = useState<Article[]>([]);
-  const [upperProvidenceArticles, setUpperProvidenceArticles] = useState<Article[]>([]);
-  const [schoolDistrictArticles, setSchoolDistrictArticles] = useState<Article[]>([]);
-  const [politicsArticles, setPoliticsArticles] = useState<Article[]>([]);
+  // Homepage section blocks follow this tenant's section_config (array order = display
+  // order); 'hero' is excluded since it drives the top story, not a section block.
+  const sectionEntries = useMemo(() => {
+    if (!Array.isArray(sectionConfig)) return [] as { slug: string; label: string }[];
+    return sectionConfig
+      .map((e) => ({
+        slug: String((e as { slug?: string }).slug || "").toLowerCase().trim(),
+        label: String((e as { label?: string }).label || "").trim(),
+      }))
+      .filter((e) => e.slug && e.slug !== "hero")
+      .map((e) => ({ slug: e.slug, label: e.label || e.slug }));
+  }, [sectionConfig]);
+  const [sectionArticles, setSectionArticles] = useState<Record<string, Article[]>>({});
 
   // Track homepage view (tenant_id stored for admin analytics per site)
   usePageTracking({
@@ -291,9 +298,6 @@ export default function Home() {
     viewType: 'homepage',
     trackScroll: true,
   });
-  const [businessArticles, setBusinessArticles] = useState<Article[]>([]);
-  const [eventsArticles, setEventsArticles] = useState<Article[]>([]);
-  const [opinionArticles, setOpinionArticles] = useState<Article[]>([]);
   const [breakingNews, setBreakingNews] = useState<Article[]>([]);
   const [trendingArticles, setTrendingArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -356,15 +360,6 @@ export default function Home() {
       latestResult,
       trendingWithin5Result,
       trendingFallbackResult,
-      springCityResult,
-      royersfordResult,
-      limerickResult,
-      upperProvidenceResult,
-      schoolDistrictResult,
-      politicsResult,
-      businessResult,
-      eventsResult,
-      opinionResult
     ] = await Promise.race([
       Promise.all([
       // Hero article
@@ -431,96 +426,6 @@ export default function Home() {
         .order("published_at", { ascending: false })
         .limit(5),
       
-      // Section queries (all in parallel)
-      supabase
-        .from("articles")
-        .select(ARTICLE_LIST_COLUMNS)
-        .eq("tenant_id", tenantId)
-        .eq("status", "published")
-        .contains("sections", ["spring-city"])
-        .lte("published_at", now)
-        .order("published_at", { ascending: false })
-        .limit(15),
-      
-      supabase
-        .from("articles")
-        .select(ARTICLE_LIST_COLUMNS)
-        .eq("tenant_id", tenantId)
-        .eq("status", "published")
-        .contains("sections", ["royersford"])
-        .lte("published_at", now)
-        .order("published_at", { ascending: false })
-        .limit(15),
-      
-      supabase
-        .from("articles")
-        .select(ARTICLE_LIST_COLUMNS)
-        .eq("tenant_id", tenantId)
-        .eq("status", "published")
-        .contains("sections", ["limerick"])
-        .lte("published_at", now)
-        .order("published_at", { ascending: false })
-        .limit(15),
-      
-      supabase
-        .from("articles")
-        .select(ARTICLE_LIST_COLUMNS)
-        .eq("tenant_id", tenantId)
-        .eq("status", "published")
-        .contains("sections", ["upper-providence"])
-        .lte("published_at", now)
-        .order("published_at", { ascending: false })
-        .limit(15),
-      
-      supabase
-        .from("articles")
-        .select(ARTICLE_LIST_COLUMNS)
-        .eq("tenant_id", tenantId)
-        .eq("status", "published")
-        .contains("sections", ["school-district"])
-        .lte("published_at", now)
-        .order("published_at", { ascending: false })
-        .limit(15),
-      
-      supabase
-        .from("articles")
-        .select(ARTICLE_LIST_COLUMNS)
-        .eq("tenant_id", tenantId)
-        .eq("status", "published")
-        .contains("sections", ["politics"])
-        .lte("published_at", now)
-        .order("published_at", { ascending: false })
-        .limit(15),
-      
-      supabase
-        .from("articles")
-        .select(ARTICLE_LIST_COLUMNS)
-        .eq("tenant_id", tenantId)
-        .eq("status", "published")
-        .contains("sections", ["business"])
-        .lte("published_at", now)
-        .order("published_at", { ascending: false })
-        .limit(15),
-      
-      supabase
-        .from("articles")
-        .select(ARTICLE_LIST_COLUMNS)
-        .eq("tenant_id", tenantId)
-        .eq("status", "published")
-        .contains("sections", ["events"])
-        .lte("published_at", now)
-        .order("published_at", { ascending: false })
-        .limit(15),
-      
-      supabase
-        .from("articles")
-        .select(ARTICLE_LIST_COLUMNS)
-        .eq("tenant_id", tenantId)
-        .eq("status", "published")
-        .contains("sections", ["opinion"])
-        .lte("published_at", now)
-        .order("published_at", { ascending: false })
-        .limit(15)
     ]),
       timeoutPromise,
     ]);
@@ -587,16 +492,29 @@ export default function Home() {
         : within5;
     setTrendingArticles(trendingMerged as any);
 
-    // Set section articles
-    if (springCityResult.data) setSpringCityArticles(springCityResult.data as any);
-    if (royersfordResult.data) setRoyersfordArticles(royersfordResult.data as any);
-    if (limerickResult.data) setLimerickArticles(limerickResult.data as any);
-    if (upperProvidenceResult.data) setUpperProvidenceArticles(upperProvidenceResult.data as any);
-    if (schoolDistrictResult.data) setSchoolDistrictArticles(schoolDistrictResult.data as any);
-    if (politicsResult.data) setPoliticsArticles(politicsResult.data as any);
-    if (businessResult.data) setBusinessArticles(businessResult.data as any);
-    if (eventsResult.data) setEventsArticles(eventsResult.data as any);
-    if (opinionResult.data) setOpinionArticles(opinionResult.data as any);
+    // Section blocks - one query per section in this tenant's section_config.
+    if (sectionEntries.length > 0) {
+      const sectionResults = await Promise.all(
+        sectionEntries.map((e) =>
+          supabase
+            .from("articles")
+            .select(ARTICLE_LIST_COLUMNS)
+            .eq("tenant_id", tenantId)
+            .eq("status", "published")
+            .contains("sections", [e.slug])
+            .lte("published_at", now)
+            .order("published_at", { ascending: false })
+            .limit(15),
+        ),
+      );
+      const map: Record<string, Article[]> = {};
+      sectionEntries.forEach((e, i) => {
+        map[e.slug] = ((sectionResults[i]?.data as unknown) as Article[]) || [];
+      });
+      setSectionArticles(map);
+    } else {
+      setSectionArticles({});
+    }
     } catch (err) {
       console.error("[Home] fetchArticles failed:", err);
     } finally {
@@ -806,102 +724,27 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Spring City */}
-                  {springCityArticles.length > 0 && (
-                    <NewsSection 
-                      title="Spring City" 
-                      articles={springCityArticles} 
-                      sectionName="spring-city"
-                    />
-                  )}
-
-                  {/* Royersford */}
-                  {royersfordArticles.length > 0 && (
-                    <NewsSection 
-                      title="Royersford" 
-                      articles={royersfordArticles} 
-                      sectionName="royersford"
-                    />
-                  )}
-
-                  {/* AD SECTION 6 - MAIN CONTENT MIDDLE 1 (hidden on mobile) */}
-                  <div className="relative pt-8 hidden lg:block">
-                    <AdSlot 
-                      slot="homepage-content-middle-1" 
-                      className="w-full"
-                    />
-                  </div>
-
-                  {/* Limerick */}
-                  {limerickArticles.length > 0 && (
-                    <NewsSection 
-                      title="Limerick" 
-                      articles={limerickArticles} 
-                      sectionName="limerick"
-                    />
-                  )}
-
-                  {/* Upper Providence */}
-                  {upperProvidenceArticles.length > 0 && (
-                    <NewsSection 
-                      title="Upper Providence" 
-                      articles={upperProvidenceArticles} 
-                      sectionName="upper-providence"
-                    />
-                  )}
-
-                  {/* School District */}
-                  {schoolDistrictArticles.length > 0 && (
-                    <NewsSection 
-                      title="School District" 
-                      articles={schoolDistrictArticles} 
-                      sectionName="school-district"
-                    />
-                  )}
-
-                  {/* AD SECTION 7 - MAIN CONTENT MIDDLE 2 (hidden on mobile) */}
-                  <div className="relative pt-8 hidden lg:block">
-                    <AdSlot 
-                      slot="homepage-content-middle-2" 
-                      className="w-full"
-                    />
-                  </div>
-
-                  {/* Politics */}
-                  {politicsArticles.length > 0 && (
-                    <NewsSection 
-                      title="Politics" 
-                      articles={politicsArticles} 
-                      sectionName="politics"
-                    />
-                  )}
-
-                  {/* Business */}
-                  {businessArticles.length > 0 && (
-                    <NewsSection 
-                      title="Business" 
-                      articles={businessArticles} 
-                      sectionName="business"
-                    />
-                  )}
-
-                  {/* Events */}
-                  {eventsArticles.length > 0 && (
-                    <NewsSection 
-                      title="Events" 
-                      articles={eventsArticles} 
-                      sectionName="events"
-                    />
-                  )}
-
-                  {/* Opinion */}
-                  {opinionArticles.length > 0 && (
-                    <NewsSection 
-                      title="Opinion" 
-                      articles={opinionArticles} 
-                      sectionName="opinion"
-                    />
-                  )}
+                  {/* Sections - driven by this tenant's section_config (array order = display order) */}
+                  {(() => {
+                    const rendered = sectionEntries
+                      .map((e) => ({ ...e, articles: sectionArticles[e.slug] || [] }))
+                      .filter((sec) => sec.articles.length > 0);
+                    // Interleave the two main-content ad slots after the 2nd and 5th section.
+                    const adAfterIndex: Record<number, string> = {
+                      1: "homepage-content-middle-1",
+                      4: "homepage-content-middle-2",
+                    };
+                    return rendered.map((sec, i) => (
+                      <Fragment key={sec.slug}>
+                        <NewsSection title={sec.label} articles={sec.articles} sectionName={sec.slug} />
+                        {adAfterIndex[i] && (
+                          <div className="relative pt-8 hidden lg:block">
+                            <AdSlot slot={adAfterIndex[i]} className="w-full" />
+                          </div>
+                        )}
+                      </Fragment>
+                    ));
+                  })()}
                 </div>
 
                 {/* SIDEBAR */}
