@@ -37,13 +37,8 @@ function SetUsernameContent() {
   async function checkAvailability(value: string): Promise<boolean> {
     if (!value || value.length < MIN_LENGTH) return true;
     if (!userId) return true;
-    const { data } = await supabase
-      .from("user_profiles")
-      .select("id")
-      .eq("username", value.trim())
-      .neq("id", userId)
-      .maybeSingle();
-    return !data;
+    const { data, error } = await supabase.rpc("is_username_available", { candidate: value.trim() });
+    return !error && data === true;
   }
 
   async function handleSubmit(e: React.FormEvent) {

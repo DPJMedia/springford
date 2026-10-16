@@ -1,3 +1,5 @@
+import { requireTenantAdmin } from "@/lib/api/requireTenantAdmin";
+import { getTenantForApiRoute } from "@/lib/tenant/getTenantForApiRoute";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
@@ -28,10 +30,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "campaignId is required" }, { status: 400 });
     }
 
+    const tenant = await getTenantForApiRoute();
+    const access = await requireTenantAdmin(tenant.id); if (!access.ok) return access.response;
+
     const { data: campaign, error: fetchErr } = await supabase
       .from("newsletter_campaigns")
       .select("id, status")
       .eq("id", campaignId)
+      .eq("tenant_id", tenant.id)
       .single();
 
     if (fetchErr || !campaign) {
@@ -53,6 +59,7 @@ export async function POST(request: Request) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", campaignId)
+      .eq("tenant_id", tenant.id)
       .eq("status", "scheduled")
       .select("id");
 

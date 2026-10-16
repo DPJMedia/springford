@@ -17,17 +17,6 @@ export async function cancelSupportSubscription(
     return "noop";
   }
 
-  try {
-    await stripe.subscriptions.update(subscriptionId, {
-      cancel_at_period_end: true,
-    });
-    return "updated";
-  } catch (err) {
-    console.warn(
-      "cancel_at_period_end failed, trying immediate cancel:",
-      err instanceof Error ? err.message : err
-    );
-    await stripe.subscriptions.cancel(subscriptionId);
-    return "updated";
-  }
+  await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+  return "updated";
 }

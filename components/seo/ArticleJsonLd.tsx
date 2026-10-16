@@ -1,3 +1,4 @@
+import { serializeJsonLd } from "@/lib/seo/serializeJsonLd";
 import type { Article, TenantRow } from "@/lib/types/database";
 import { getSiteConfig } from "@/lib/seo/site";
 import { getOptimizedOgImageUrl } from "@/lib/seo/ogImage";
@@ -91,11 +92,11 @@ export function ArticleJsonLd({ article, tenant }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticle) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(newsArticle) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumb) }}
       />
     </>
   );

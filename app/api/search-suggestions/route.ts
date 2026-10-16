@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
   // 2. Article title matches (published only) — include slug and image_url
   if (suggestions.length < 5) {
     const { data: articles } = await supabase
-      .from("articles")
+      .from("article_previews")
       .select("title, slug, image_url")
       .eq("tenant_id", tenant.id)
       .eq("status", "published")
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
   // 3. Tags from published articles (distinct tags that contain q)
   if (suggestions.length < 5) {
     const { data: tagRows } = await supabase
-      .from("articles")
+      .from("article_previews")
       .select("tags")
       .eq("tenant_id", tenant.id)
       .eq("status", "published")

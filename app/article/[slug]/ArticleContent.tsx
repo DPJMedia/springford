@@ -30,6 +30,7 @@ import {
   DIFFUSE_AI_BYLINE_DISPLAY,
 } from "@/lib/branding/diffuse";
 import { normalizeArticleBodyTextForMarkdown } from "@/lib/article/normalizeArticleBodyText";
+import { findPublicAuthor } from "@/lib/user/publicAuthor";
 import { ArticleVideoBlock } from "@/components/ArticleVideoBlock";
 
 type ArticleContentProps = {
@@ -141,11 +142,12 @@ export function ArticleContent({
       } = await supabase.auth.getUser();
       if (!user) return;
       const { data: p } = await supabase
-        .from("user_profiles")
-        .select("newsletter_subscribed")
-        .eq("id", user.id)
+        .from("tenant_newsletter_subscriptions")
+        .select("subscribed")
+        .eq("user_id", user.id)
+        .eq("tenant_id", tenantId)
         .single();
-      if (p?.newsletter_subscribed) router.refresh();
+      if (p?.subscribed) router.refresh();
     }
     void checkAccess();
     const {
@@ -157,7 +159,7 @@ export function ArticleContent({
       subscription.unsubscribe();
       window.removeEventListener("focus", onFocus);
     };
-  }, [subscriberArticlePaywall, router, supabase]);
+  }, [subscriberArticlePaywall, router, supabase, tenantId]);
 
   useEffect(() => {
     // Increment view count
@@ -264,55 +266,7 @@ export function ArticleContent({
             };
           }
 
-          // Try multiple ways to find the author profile
-          let { data: authorProfile } = await supabase
-            .from("user_profiles")
-            .select("avatar_url, full_name, email, username")
-            .eq("full_name", cleanAuthorName)
-            .limit(1)
-            .maybeSingle();
-
-          if (!authorProfile) {
-            const { data: profiles } = await supabase
-              .from("user_profiles")
-              .select("avatar_url, full_name, email, username")
-              .limit(100);
-
-            if (profiles) {
-              authorProfile = profiles.find(
-                (p) => p.full_name?.toLowerCase().trim() === cleanAuthorName.toLowerCase()
-              ) || null;
-            }
-          }
-
-          if (!authorProfile && cleanAuthorName.includes('@')) {
-            const { data: emailProfile } = await supabase
-              .from("user_profiles")
-              .select("avatar_url, full_name, email, username")
-              .eq("email", cleanAuthorName)
-              .limit(1)
-              .maybeSingle();
-
-            if (emailProfile) {
-              authorProfile = emailProfile;
-            }
-          }
-
-          // NOTE: intentionally NO fuzzy/substring matching here. A loose match
-          // (e.g. the byline "Lesley Aronson" CONTAINS a sloppily-saved reader
-          // profile named "Lesley a") would hijack the byline — truncating the
-          // displayed name and linking to the wrong person. Only the exact
-          // full_name / email matches above are trusted.
-
-          // Generate a fallback username if none exists
-          if (authorProfile && !authorProfile.username) {
-            // Generate username from email or full name
-            if (authorProfile.email) {
-              authorProfile.username = authorProfile.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-            } else if (authorProfile.full_name) {
-              authorProfile.username = authorProfile.full_name.toLowerCase().replace(/[^a-z0-9]/g, '');
-            }
-          }
+          const authorProfile = await findPublicAuthor({ name: cleanAuthorName });
 
           // Always display the byline exactly as written on the article. The
           // matched profile only supplies the avatar + link target (username) —
@@ -346,7 +300,7 @@ export function ArticleContent({
     const nonHero = (article.sections || []).filter((s) => String(s).toLowerCase().trim() !== "hero");
     const sectionForRelated = nonHero.length > 0 ? nonHero[0] : article.section;
     supabase
-      .from("articles")
+      .from("article_previews")
       .select(ARTICLE_LIST_COLUMNS)
       .eq("tenant_id", tenantId)
       .eq("status", "published")
@@ -570,12 +524,13 @@ export function ArticleContent({
                     // Credit the real fact-checker (a managed author), independent of
                     // the byline. Falls back to the byline only for legacy AI articles
                     // saved before the fact-checker field existed.
-                    const checkerName = factCheckerName || authorName || article.author_name;
+                    const legacyChecker = authorName || article.author_name;
+                    const checkerName = factCheckerName || (legacyChecker && !/diffuse\.ai/i.test(legacyChecker) ? legacyChecker : null);
                     const checkerUsername = factCheckerName ? factCheckerUsername : authorUsername;
-                    if (!checkerName) return null;
+
                     return (
                       <p className="text-[11px] italic text-[color:var(--color-medium)]/70 leading-snug">
-                        This article was generated with AI assistance. All content was reviewed, edited, and fact-checked by{" "}
+                        This article was generated with AI assistance. {checkerName && <>All content was reviewed, edited, and fact-checked by{" "}
                         {checkerUsername ? (
                           <Link
                             href={`/author/${checkerUsername}`}
@@ -586,7 +541,7 @@ export function ArticleContent({
                         ) : (
                           <span>{checkerName}</span>
                         )}
-                        .
+                        .</>}
                       </p>
                     );
                   })()}

@@ -1,3 +1,5 @@
+import { consumeRateLimit } from "@/lib/rate-limit-server";
+import { isSameOriginRequest } from "@/lib/http/sameOrigin";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { transactionalEmailBrandingFromTenant } from "@/lib/emails/emailBranding";
@@ -11,62 +13,23 @@ const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json();
-
-    if (!email || typeof email !== "string") {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
-    }
-
+    if (!isSameOriginRequest(request)) return NextResponse.json({ error:"Forbidden" },{status:403});
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const tenant = await getTenantForApiRoute();
     const branding = transactionalEmailBrandingFromTenant(tenant);
 
-    const now = new Date().toISOString();
-
-    const { error: profileErr } = await supabase
-      .from("user_profiles")
-      .update({
-        newsletter_subscribed: true,
-        newsletter_subscribed_at: now,
-      })
-      .eq("id", user.id);
-
-    if (profileErr) {
-      console.error("Newsletter subscribe profile update:", profileErr);
-      return NextResponse.json(
-        { error: "Failed to update subscription" },
-        { status: 500 },
-      );
-    }
-
-    const { error: tenantSubErr } = await supabase
-      .from("tenant_newsletter_subscriptions")
-      .upsert(
-        {
-          user_id: user.id,
-          tenant_id: tenant.id,
-          subscribed: true,
-          subscribed_at: now,
-          unsubscribed_at: null,
-        },
-        { onConflict: "user_id,tenant_id" },
-      );
-
-    if (tenantSubErr) {
-      console.error("tenant_newsletter_subscriptions upsert:", tenantSubErr);
-      return NextResponse.json(
-        { error: "Failed to update subscription" },
-        { status: 500 },
-      );
-    }
+    if (!await consumeRateLimit(`newsletter-welcome:${user.id}:${tenant.id}`, 5, 3600)) return NextResponse.json({error:"Please try again later."},{status:429});
+    const { data: changed, error: subscriptionError } = await supabase.rpc("set_newsletter_subscription", { p_tenant: tenant.id, p_subscribed: true });
+    if (subscriptionError) return NextResponse.json({error:"Could not save subscription"},{status:503});
+    if (!changed) return NextResponse.json({ success: true });
 
     const apiKey = process.env.SENDGRID_API_KEY;
     const fromEmail =
@@ -85,7 +48,7 @@ export async function POST(request: Request) {
     const subject = `Thank you for Subscribing! — ${branding.siteName}`;
 
     const body = {
-      personalizations: [{ to: [{ email: email.trim() }], subject }],
+      personalizations: [{ to: [{ email: user.email }], subject }],
       from: { email: fromEmail, name: fromName },
       content: [
         {
@@ -111,10 +74,7 @@ export async function POST(request: Request) {
     if (!res.ok) {
       const errText = await res.text();
       console.error("SendGrid error:", res.status, errText);
-      return NextResponse.json(
-        { error: "Failed to send welcome email" },
-        { status: 500 },
-      );
+      return NextResponse.json({ success: true, emailPending: true });
     }
 
     return NextResponse.json({ success: true });

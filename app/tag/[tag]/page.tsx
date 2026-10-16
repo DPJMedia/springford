@@ -18,7 +18,7 @@ export default function TagPage({ params }: { params: Promise<{ tag: string }> }
   useEffect(() => {
     async function fetchArticlesByTag() {
       const { data } = await supabase
-        .from("articles")
+        .from("article_previews")
         .select(ARTICLE_LIST_COLUMNS)
         .eq("status", "published")
         .contains("tags", [decodedTag])

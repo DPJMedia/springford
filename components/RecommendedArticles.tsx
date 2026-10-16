@@ -23,7 +23,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
       try {
         // First, try to find articles with matching tags
         let { data: taggedArticles } = await supabase
-          .from("articles")
+          .from("article_previews")
           .select(ARTICLE_LIST_COLUMNS)
           .eq("tenant_id", tenantId)
           .eq("status", "published")
@@ -45,7 +45,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
         // If we don't have enough, fill with articles from same section
         if (recommended.length < limit) {
           const { data: sectionArticles } = await supabase
-            .from("articles")
+            .from("article_previews")
             .select(ARTICLE_LIST_COLUMNS)
             .eq("tenant_id", tenantId)
             .eq("status", "published")
@@ -67,7 +67,7 @@ export function RecommendedArticles({ currentArticle, limit = 3 }: RecommendedAr
         // If still not enough, fill with recent articles
         if (recommended.length < limit) {
           const { data: recentArticles } = await supabase
-            .from("articles")
+            .from("article_previews")
             .select(ARTICLE_LIST_COLUMNS)
             .eq("tenant_id", tenantId)
             .eq("status", "published")

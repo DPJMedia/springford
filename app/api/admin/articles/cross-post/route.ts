@@ -1,3 +1,4 @@
+import { requireTenantAdmin } from "@/lib/api/requireTenantAdmin";
 /**
  * Cross-post an article to other Press tenants ("publish to several stations at once").
  *
@@ -66,6 +67,8 @@ export async function POST(request: Request) {
   if (srcErr || !src) {
     return NextResponse.json({ error: "Source article not found" }, { status: 404 });
   }
+
+  const sourceAccess = await requireTenantAdmin(src.tenant_id); if (!sourceAccess.ok) return sourceAccess.response;
 
   const { data: srcTenant } = await admin
     .from("tenants")

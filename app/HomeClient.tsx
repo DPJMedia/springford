@@ -1,0 +1,887 @@
+"use client";
+
+import { useState, useEffect, useRef, useMemo, Fragment, Suspense } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
+import { NewsletterForm } from "@/components/NewsletterForm";
+import { NewsletterPopupBanner } from "@/components/NewsletterPopupBanner";
+import { AdDisplay } from "@/components/AdDisplay";
+import { SidebarAdFill } from "@/components/SidebarAdFill";
+import type { Article } from "@/lib/types/database";
+import Link from "next/link";
+import { ArticleAudienceBookmark } from "@/components/ArticleAudienceBookmark";
+import { usePageTracking } from "@/lib/analytics/usePageTracking";
+import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
+import { type HomeFeed } from "@/lib/articles/homeFeed";
+import { parseStoredSectionConfig } from "@/lib/tenant/sectionConfigStorage";
+import { useTenant } from "@/lib/tenant/TenantProvider";
+
+// Ad slot wrapper component
+function AdSlot({
+  slot,
+  className = ""
+}: {
+  slot: string;
+  className?: string;
+}) {
+  return (
+    <div className="relative">
+      <AdDisplay adSlot={slot} className={className} />
+    </div>
+  );
+}
+
+// Strip HTML from excerpt for display; use with line-clamp-3 for max 3 lines
+function stripExcerptHtml(text: string | null): string {
+  if (!text || typeof text !== "string") return "";
+  return text.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+// Article Card Component
+function ArticleCard({ article, size = "default" }: { article: Article; size?: "hero" | "featured" | "default" | "compact" }) {
+  const formattedDate = article.published_at
+    ? new Date(article.published_at).toLocaleDateString("en-US", {
+        timeZone: "America/New_York",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+
+  if (size === "hero") {
+    return (
+      <Link href={`/article/${article.slug}`} className="block group">
+        <div className="relative h-[500px] overflow-hidden rounded-lg">
+          {article.image_url ? (
+            <img loading="eager" fetchPriority="high" decoding="async" width={1200} height={800}
+              src={article.image_url}
+              alt={article.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+          <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+            {article.is_advertisement && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/15 backdrop-blur text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                <svg className="w-3 h-3 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
+                Advertisement
+              </span>
+            )}
+            {article.is_breaking && (
+              <span className="inline-block bg-red-600 text-white text-xs font-bold px-3 py-1 rounded">
+                BREAKING NEWS
+              </span>
+            )}
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8 text-white">
+            <h1 className="text-2xl font-black leading-tight mb-2 sm:mb-3 sm:text-3xl md:text-4xl group-hover:text-[color:var(--color-riviera-blue)] transition">
+              {article.title}
+            </h1>
+            {article.subtitle && (
+              <p className="text-base sm:text-lg md:text-xl text-gray-200 mb-2 sm:mb-3">{article.subtitle}</p>
+            )}
+            {article.excerpt && (
+              <p className="text-sm sm:text-base text-gray-300 line-clamp-3">{stripExcerptHtml(article.excerpt)}</p>
+            )}
+            <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-400">
+              {article.author_name} • {formattedDate}
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  if (size === "featured") {
+    return (
+      <Link href={`/article/${article.slug}`} className="block group h-full min-w-0">
+        <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition h-full flex flex-col min-w-0">
+          {article.image_url ? (
+            <div className="relative h-48 overflow-hidden flex-shrink-0">
+              <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
+                <ArticleAudienceBookmark visibility={article.visibility} />
+                {article.is_advertisement && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800/70 text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                    Advertisement
+                  </span>
+                )}
+              </div>
+              <img loading="lazy" decoding="async" width={1200} height={800}
+                src={article.image_url}
+                alt={article.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+          ) : (
+            <div className="relative h-48 overflow-hidden flex-shrink-0 bg-gradient-to-br from-blue-100 via-blue-50 to-gray-100 flex items-center justify-center">
+              <div className="absolute top-2 left-2 z-10">
+                <ArticleAudienceBookmark visibility={article.visibility} />
+              </div>
+              <svg className="w-20 h-20 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+              </svg>
+            </div>
+          )}
+          <div className="p-5 flex-1 flex flex-col min-w-0">
+            <h3 className="font-bold text-xl text-[color:var(--color-dark)] mb-2 group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-3 h-[5rem]">
+              {article.title}
+            </h3>
+            {article.excerpt && (
+              <p className="text-sm text-[color:var(--color-medium)] mb-3 flex-1 line-clamp-3">
+                {stripExcerptHtml(article.excerpt)}
+              </p>
+            )}
+            <div className="text-xs text-[color:var(--color-medium)] mt-auto">
+              {article.author_name} • {formattedDate}
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  if (size === "compact") {
+    return (
+      <Link href={`/article/${article.slug}`} className="block group py-3 border-b border-gray-200 last:border-0 relative">
+        <div className="flex gap-3">
+          {article.image_url && (
+            <div className="relative flex-shrink-0 w-20 h-20 overflow-hidden rounded">
+              <div className="absolute top-0.5 left-0.5 z-10 scale-90 origin-top-left">
+                <ArticleAudienceBookmark visibility={article.visibility} />
+              </div>
+              <img loading="lazy" decoding="async" width={1200} height={800}
+                src={article.image_url}
+                alt={article.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              {!article.image_url && (
+                <ArticleAudienceBookmark visibility={article.visibility} />
+              )}
+              {article.is_advertisement && (
+                <span className="text-[9px] font-medium uppercase tracking-wider text-gray-500">Ad</span>
+              )}
+              <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2 flex-1 min-w-0">
+                {article.title}
+              </h4>
+            </div>
+            <div className="text-xs text-[color:var(--color-medium)]">
+              {formattedDate}
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <Link href={`/article/${article.slug}`} className="block group">
+      <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition h-full flex flex-col">
+        {article.image_url ? (
+          <div className="relative h-40 overflow-hidden flex-shrink-0">
+            <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
+              <ArticleAudienceBookmark visibility={article.visibility} />
+              {article.is_advertisement && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-800/70 text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                  Advertisement
+                </span>
+              )}
+            </div>
+            <img loading="lazy" decoding="async" width={1200} height={800}
+              src={article.image_url}
+              alt={article.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          </div>
+        ) : (
+          <div className="relative h-40 overflow-hidden flex-shrink-0 bg-gradient-to-br from-blue-100 via-blue-50 to-gray-100 flex items-center justify-center">
+            <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
+              <ArticleAudienceBookmark visibility={article.visibility} />
+              {article.is_advertisement && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-600/80 text-white/90 text-[10px] font-medium uppercase tracking-wider">
+                  Advertisement
+                </span>
+              )}
+            </div>
+            <svg className="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+            </svg>
+          </div>
+        )}
+        <div className="p-4 flex-1 flex flex-col min-w-0">
+          <h3 className="font-bold text-base text-[color:var(--color-dark)] mb-2 group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2">
+            {article.title}
+          </h3>
+          {article.excerpt && (
+            <p className="text-sm text-[color:var(--color-medium)] mb-2 flex-1 line-clamp-3">
+              {stripExcerptHtml(article.excerpt)}
+            </p>
+          )}
+          <div className="text-xs text-[color:var(--color-medium)] mt-auto">
+            {article.author_name} • {formattedDate}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// Section Component — shows up to 3 articles with a "View All" link to the section page
+function NewsSection({
+  title,
+  articles,
+  sectionName
+}: {
+  title: string;
+  articles: Article[];
+  sectionName: string;
+}) {
+  const isLatest = sectionName.toLowerCase() === "latest";
+  const visibleArticles = isLatest ? articles.slice(0, 6) : articles.slice(0, 3);
+
+  return (
+    <section id={sectionName.toLowerCase()} className="mb-8 scroll-mt-[35vh]">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-black text-[color:var(--color-dark)] pb-2 border-b-4 border-[color:var(--color-riviera-blue)] w-fit">
+          {title}
+        </h2>
+        {!isLatest && articles.length > 0 && (
+          <Link
+            href={`/section/${sectionName.toLowerCase()}`}
+            className="text-sm font-semibold text-[color:var(--color-riviera-blue)] hover:underline"
+          >
+            View All →
+          </Link>
+        )}
+      </div>
+      {articles.length === 0 ? (
+        <div className="bg-white rounded-lg p-8 text-center border-2 border-dashed border-gray-300">
+          <p className="text-[color:var(--color-medium)]">No articles in this section yet</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {visibleArticles.map((article) => (
+            <ArticleCard key={article.id} article={article} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default function Home({ initialFeed }: { initialFeed: HomeFeed | null }) {
+  const { id: tenantId, section_config: sectionConfig } = useTenant();
+  const [heroArticle, setHeroArticle] = useState<Article | null>(initialFeed?.hero ?? null);
+  const [featuredArticles, setFeaturedArticles] = useState<Article[]>(initialFeed?.featured ?? []);
+  const [editorsPicks, setEditorsPicks] = useState<Article[]>(initialFeed?.picks ?? []);
+  const [latestArticles, setLatestArticles] = useState<Article[]>(initialFeed?.latest ?? []);
+  // Homepage section blocks follow this tenant's section_config (array order = display
+  // order); 'hero' is excluded since it drives the top story, not a section block.
+  const sectionEntries = useMemo(() => {
+    return parseStoredSectionConfig(sectionConfig).sections
+      .map((e) => ({
+        slug: String((e as { slug?: string }).slug || "").toLowerCase().trim(),
+        label: String((e as { label?: string }).label || "").trim(),
+      }))
+      .filter((e) => e.slug && e.slug !== "hero")
+      .map((e) => ({ slug: e.slug, label: e.label || e.slug }));
+  }, [sectionConfig]);
+  const [sectionArticles, setSectionArticles] = useState<Record<string, Article[]>>(initialFeed?.sections ?? {});
+
+  // Track homepage view (tenant_id stored for admin analytics per site)
+  usePageTracking({
+    tenantId,
+    viewType: 'homepage',
+    trackScroll: true,
+  });
+  const [breakingNews, setBreakingNews] = useState<Article[]>(initialFeed?.breaking ?? []);
+  const [trendingArticles, setTrendingArticles] = useState<Article[]>(initialFeed?.trending ?? []);
+  const [loading, setLoading] = useState(!initialFeed);
+  const [isAdmin, setIsAdmin] = useState(false);
+  // Ref to the tall main content column — SidebarAdFill measures against its bottom.
+  const mainColRef = useRef<HTMLDivElement>(null);
+  const supabase = createClient();
+
+  // After articles load, scroll to the hash section if one is in the URL
+  useEffect(() => {
+    if (!loading && window.location.hash) {
+      const id = window.location.hash.slice(1);
+      const el = document.getElementById(id);
+      if (el) {
+        setTimeout(() => el.scrollIntoView({ behavior: "smooth" }), 50);
+      }
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    fetchArticles();
+    async function checkAdminStatus() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('is_admin, is_super_admin')
+          .eq('id', user.id)
+          .single();
+        if (profile?.is_admin || profile?.is_super_admin) {
+          setIsAdmin(true);
+        }
+      }
+    }
+    checkAdminStatus();
+  }, [tenantId]);
+
+  async function fetchArticles() {
+    if (!tenantId) {
+      setLoading(false);
+      return;
+    }
+
+    let fetchTimeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      fetchTimeout = setTimeout(
+        () => reject(new Error("Homepage article queries timed out")),
+        45_000,
+      );
+    });
+
+    try {
+    const now = new Date().toISOString();
+
+    // Fetch all main queries in parallel for faster loading
+    const [
+      heroResult,
+      breakingResult,
+      featuredResult,
+      latestResult,
+      trendingWithin5Result,
+      trendingFallbackResult,
+    ] = await Promise.race([
+      Promise.all([
+      // Hero article
+      supabase
+        .from("article_previews")
+        .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
+        .eq("status", "published")
+        .contains("sections", ["hero"])
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(1),
+
+      // Breaking news
+      supabase
+        .from("article_previews")
+        .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
+        .eq("status", "published")
+        .eq("is_breaking", true)
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(10),
+
+      // Featured articles (Top Stories by views; only articles < 10 days old)
+      supabase
+        .from("article_previews")
+        .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
+        .eq("status", "published")
+        .lte("published_at", now)
+        .gte("published_at", new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString())
+        .order("view_count", { ascending: false })
+        .limit(4),
+
+      // Latest articles (newest first; fetch extra for "View more")
+      supabase
+        .from("article_previews")
+        .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
+        .eq("status", "published")
+        .lte("published_at", now)
+        .order("published_at", { ascending: false })
+        .limit(15),
+
+      // Trending Now: within 5 days by views
+      supabase
+        .from("article_previews")
+        .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
+        .eq("status", "published")
+        .lte("published_at", now)
+        .gte("published_at", new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString())
+        .order("view_count", { ascending: false })
+        .limit(5),
+      // Trending Now fallback: 5–10 days, closest to 5-day line (for filling slots)
+      supabase
+        .from("article_previews")
+        .select(ARTICLE_LIST_COLUMNS)
+        .eq("tenant_id", tenantId)
+        .eq("status", "published")
+        .lt("published_at", new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString())
+        .gte("published_at", new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString())
+        .order("published_at", { ascending: false })
+        .limit(5),
+
+    ]),
+      timeoutPromise,
+    ]);
+    if (fetchTimeout) clearTimeout(fetchTimeout);
+
+    // Process results
+    if (heroResult.data && heroResult.data.length > 0) {
+      setHeroArticle(heroResult.data[0] as any);
+    }
+
+    if (breakingResult.data && breakingResult.data.length > 0) {
+      // Filter active breaking news
+      const activeBreaking = breakingResult.data.filter((article: any) => {
+        if (!article.breaking_news_set_at) return true;
+        const setAt = new Date(article.breaking_news_set_at);
+        const duration = article.breaking_news_duration || 24;
+        const expiresAt = new Date(setAt.getTime() + duration * 60 * 60 * 1000);
+        return new Date() < expiresAt;
+      });
+      setBreakingNews(activeBreaking as any);
+    }
+
+    if (featuredResult.data) {
+      setFeaturedArticles(featuredResult.data as any);
+    }
+
+    // Handle Editor's Picks (from DB - visible to all users, persists until removed)
+    const { data: picksRows } = await supabase
+      .from("editors_picks")
+      .select("article_id, position")
+      .eq("tenant_id", tenantId)
+      .order("position", { ascending: true });
+
+    if (picksRows && picksRows.length > 0) {
+      const pickIds = picksRows.map((r: { article_id: string }) => r.article_id);
+      const { data: picksData } = await supabase
+        .from("article_previews")
+        .select("id, title, slug, published_at, excerpt, image_url, author_name, subtitle, section, sections, category, tags, visibility")
+        .eq("tenant_id", tenantId)
+        .in("id", pickIds)
+        .eq("status", "published");
+
+      if (picksData) {
+        const sortedPicks = pickIds
+          .map((id: string) => picksData.find((a: any) => a.id === id))
+          .filter(Boolean);
+        setEditorsPicks(sortedPicks as any);
+      }
+    } else if (featuredResult.data) {
+      setEditorsPicks(featuredResult.data.slice(0, 3) as any);
+    }
+
+    if (latestResult.data) {
+      setLatestArticles(latestResult.data as any);
+    }
+
+    // Trending Now: up to 5 from within 5 days by views; fill with closest to 5-day window if needed
+    const within5 = trendingWithin5Result.data || [];
+    const fallback = trendingFallbackResult.data || [];
+    const needed = Math.max(0, 5 - within5.length);
+    const trendingMerged =
+      needed > 0 && fallback.length > 0
+        ? [...within5, ...fallback.slice(0, needed)]
+        : within5;
+    setTrendingArticles(trendingMerged as any);
+
+    // Section blocks - one query per section in this tenant's section_config.
+    if (sectionEntries.length > 0) {
+      const sectionResults = await Promise.all(
+        sectionEntries.map((e) =>
+          supabase
+            .from("article_previews")
+            .select(ARTICLE_LIST_COLUMNS)
+            .eq("tenant_id", tenantId)
+            .eq("status", "published")
+            .contains("sections", [e.slug])
+            .lte("published_at", now)
+            .order("published_at", { ascending: false })
+            .limit(15),
+        ),
+      );
+      const map: Record<string, Article[]> = {};
+      sectionEntries.forEach((e, i) => {
+        map[e.slug] = ((sectionResults[i]?.data as unknown) as Article[]) || [];
+      });
+      setSectionArticles(map);
+    } else {
+      setSectionArticles({});
+    }
+    } catch (err) {
+      console.error("[Home] fetchArticles failed:", err);
+    } finally {
+      if (fetchTimeout) clearTimeout(fetchTimeout);
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <Header />
+      <Suspense fallback={null}>
+        <NewsletterPopupBanner />
+      </Suspense>
+      <main className="bg-[color:var(--color-surface)] min-h-screen">
+        {/* Breaking News Banner */}
+        {/* Breaking News: strip under menu bar; expires breaking_news_duration hours after article is marked (set in editor, e.g. 48h) */}
+        {breakingNews.length > 0 && (
+          <div className="bg-[#1e3a5f] text-white py-3 border-b-2 border-[color:var(--color-riviera-blue)]">
+            <div className="mx-auto max-w-7xl px-4">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <span className="font-black text-xs tracking-wider bg-red-600 px-2 py-1 rounded flex-shrink-0">BREAKING NEWS</span>
+                <span className="flex-shrink-0 font-semibold">:</span>
+                <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide whitespace-nowrap min-w-0">
+                  {breakingNews.map((article, index) => (
+                    <div key={article.id} className="flex items-center gap-3 flex-shrink-0">
+                      <Link
+                        href={`/article/${article.slug}`}
+                        className="hover:underline font-semibold transition-colors hover:text-[color:var(--color-riviera-blue)]"
+                      >
+                        {article.title}
+                      </Link>
+                      {index < breakingNews.length - 1 && (
+                        <span className="text-[color:var(--color-riviera-blue)] text-2xl font-bold">•</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mx-auto max-w-7xl px-4 py-6">
+          {/* Hero Section */}
+          <section className="mb-6">
+            {loading ? (
+              <div className="h-[500px] rounded-lg overflow-hidden relative bg-gray-200">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+              </div>
+            ) : heroArticle ? (
+              <ArticleCard article={heroArticle} size="hero" />
+            ) : null}
+          </section>
+
+          {/* Newsletter */}
+          <section className="mb-6">
+            <NewsletterForm />
+          </section>
+
+          {/* AD SECTION 1: Desktop = 970x90, Mobile = Section 1.2 (300x150) */}
+          <section className="mb-8">
+            <div className="hidden lg:block">
+              <AdSlot slot="homepage-banner-top" className="w-full" />
+            </div>
+            <div className="lg:hidden">
+              <AdSlot slot="homepage-banner-top-mobile" className="w-full" />
+            </div>
+          </section>
+
+          {loading ? (
+            /* ── Shimmer skeleton replacing the spinning wheel ── */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Main column */}
+              <div className="lg:col-span-8 space-y-8">
+                {/* Top Stories skeleton: 2×2 */}
+                <div>
+                  <div className="h-8 w-36 bg-gray-200 rounded mb-4 animate-[shimmer_1.5s_infinite] bg-[length:200%_100%] bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="rounded-lg overflow-hidden bg-gray-200 relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                        <div className="h-48 w-full" />
+                        <div className="p-5 space-y-2">
+                          <div className="h-5 bg-gray-300/60 rounded w-4/5" />
+                          <div className="h-4 bg-gray-300/60 rounded w-full" />
+                          <div className="h-4 bg-gray-300/60 rounded w-3/4" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Latest News skeleton: 3×2 */}
+                <div>
+                  <div className="h-8 w-36 bg-gray-200 rounded mb-4 animate-[shimmer_1.5s_infinite] bg-[length:200%_100%] bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="rounded-lg overflow-hidden bg-gray-200 relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                        <div className="h-40 w-full" />
+                        <div className="p-4 space-y-2">
+                          <div className="h-4 bg-gray-300/60 rounded w-4/5" />
+                          <div className="h-4 bg-gray-300/60 rounded w-2/3" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {/* Sidebar skeleton */}
+              <div className="hidden lg:block lg:col-span-4 space-y-4 pt-[62px]">
+                <div className="rounded-lg bg-gray-200 relative overflow-hidden h-48">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                </div>
+                <div className="rounded-lg bg-gray-200 relative overflow-hidden h-64">
+                  <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Main Content Grid: Content + Sidebar */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* MAIN CONTENT AREA */}
+                <div ref={mainColRef} className="lg:col-span-8 space-y-8">
+                  {/* Top Stories - same heading/line style as other sections */}
+                  <section id="top-stories" className="scroll-mt-[35vh]">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-2xl font-black text-[color:var(--color-dark)] pb-2 border-b-4 border-[color:var(--color-riviera-blue)] w-fit">
+                        Top Stories
+                      </h2>
+                    </div>
+                    {featuredArticles.length === 0 ? (
+                      <div className="bg-white rounded-lg p-8 text-center border-2 border-dashed border-gray-300">
+                        <p className="text-[color:var(--color-medium)]">
+                          No top stories from the past 10 days.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {featuredArticles.map((article) => (
+                          <ArticleCard key={article.id} article={article} size="featured" />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  {/* AD SECTION 5 - MAIN CONTENT TOP (hidden on mobile) */}
+                  <div className="relative pt-8 hidden lg:block">
+                    <AdSlot
+                      slot="homepage-content-top"
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Latest News */}
+                  <NewsSection
+                    title="Latest News"
+                    articles={[...latestArticles].sort((a, b) => {
+                      const dateA = new Date(a.published_at || a.created_at).getTime();
+                      const dateB = new Date(b.published_at || b.created_at).getTime();
+                      return dateB - dateA; // Newest first (descending)
+                    })}
+                    sectionName="latest"
+                  />
+
+                  {/* Mobile Section 2: 2:1 ad above Trending Now */}
+                  <div className="pt-8 lg:hidden">
+                    <AdSlot slot="homepage-mobile-above-most-read" className="w-full" />
+                  </div>
+
+                  {/* Trending Now - mobile only: appears under Latest News and Section 2 ad */}
+                  <div className="lg:hidden">
+                    <div className="bg-white rounded-lg p-4 shadow-sm">
+                      <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
+                        Trending Now
+                      </h3>
+                      {trendingArticles.length === 0 ? (
+                        <p className="text-sm text-[color:var(--color-medium)] text-center py-4">
+                          No articles yet
+                        </p>
+                      ) : (
+                        <div>
+                          {trendingArticles.map((article, index) => (
+                            <Link
+                              key={article.id}
+                              href={`/article/${article.slug}`}
+                              className="flex gap-3 items-start group py-3 border-b border-gray-200 last:border-0"
+                            >
+                              <span className="inline-flex w-9 shrink-0 justify-center text-2xl font-black tabular-nums text-gray-300">
+                                {index + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2">
+                                  {article.title}
+                                </h4>
+                                <p className="text-xs text-[color:var(--color-medium)] mt-1">
+                                  {article.published_at
+                                    ? new Date(article.published_at).toLocaleDateString("en-US", { timeZone: "America/New_York",
+        month: "short", day: "numeric" })
+                                    : ""}
+                                </p>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sections - driven by this tenant's section_config (array order = display order) */}
+                  {(() => {
+                    const rendered = sectionEntries
+                      .map((e) => ({ ...e, articles: sectionArticles[e.slug] || [] }))
+                      .filter((sec) => sec.articles.length > 0);
+                    // Interleave the two main-content ad slots after the 2nd and 5th section.
+                    const adAfterIndex: Record<number, string> = {
+                      1: "homepage-content-middle-1",
+                      4: "homepage-content-middle-2",
+                    };
+                    return rendered.map((sec, i) => (
+                      <Fragment key={sec.slug}>
+                        <NewsSection title={sec.label} articles={sec.articles} sectionName={sec.slug} />
+                        {adAfterIndex[i] && (
+                          <div className="relative pt-8 hidden lg:block">
+                            <AdSlot slot={adAfterIndex[i]} className="w-full" />
+                          </div>
+                        )}
+                      </Fragment>
+                    ));
+                  })()}
+                </div>
+
+                {/* SIDEBAR */}
+                <aside className="lg:col-span-4">
+                  {/* AD SECTION 2 - SIDEBAR TOP (desktop only)
+                      pt-14 pushes the ad down so its top edge aligns with the Top Stories article cards */}
+                  <div className="pt-[61px] hidden lg:block">
+                    <AdSlot
+                      slot="homepage-sidebar-top"
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Trending Now - desktop only; on mobile shown under Latest News in main column */}
+                  <div className="mt-8 hidden lg:block bg-white rounded-lg p-4 shadow-sm">
+                    <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
+                      Trending Now
+                    </h3>
+                    {trendingArticles.length === 0 ? (
+                      <p className="text-sm text-[color:var(--color-medium)] text-center py-4">
+                        No articles yet
+                      </p>
+                    ) : (
+                      <div>
+                        {trendingArticles.map((article, index) => (
+                          <Link
+                            key={article.id}
+                            href={`/article/${article.slug}`}
+                            className="flex gap-3 items-start group py-3 border-b border-gray-200 last:border-0"
+                          >
+                            <span className="inline-flex w-9 shrink-0 justify-center text-2xl font-black tabular-nums text-gray-300">
+                              {index + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2">
+                                {article.title}
+                              </h4>
+                              <p className="text-xs text-[color:var(--color-medium)] mt-1">
+                                {article.published_at
+                                  ? new Date(article.published_at).toLocaleDateString("en-US", { timeZone: "America/New_York",
+        month: "short", day: "numeric" })
+                                  : ""}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AD SECTION 3 - SIDEBAR MIDDLE (desktop only) */}
+                  <div className="mt-8 hidden lg:block">
+                    <AdSlot
+                      slot="homepage-sidebar-middle"
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* Mobile Section 3: 2:1 ad above Editor’s Picks */}
+                  <div className="relative pt-8 lg:hidden">
+                    <AdSlot slot="homepage-mobile-above-editors-picks" className="w-full" />
+                  </div>
+
+                  {/* Editor's Picks - same styling as Most Read */}
+                  <div className="mt-8 bg-white rounded-lg p-4 shadow-sm">
+                    <h3 className="text-lg font-black text-[color:var(--color-dark)] mb-4 pb-2 border-b-2 border-[color:var(--color-riviera-blue)]">
+                      Editor's Picks
+                    </h3>
+                    {editorsPicks.length === 0 ? (
+                      <p className="text-sm text-[color:var(--color-medium)] text-center py-4">
+                        No editor's picks yet
+                      </p>
+                    ) : (
+                      <div>
+                        {editorsPicks.map((article, index) => (
+                          <Link
+                            key={article.id}
+                            href={`/article/${article.slug}`}
+                            className="flex gap-3 items-start group py-3 border-b border-gray-200 last:border-0"
+                          >
+                            <span className="inline-flex w-9 shrink-0 justify-center text-2xl font-black tabular-nums text-gray-300">
+                              {index + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="mb-1 flex flex-wrap items-center gap-2">
+                                <ArticleAudienceBookmark visibility={(article as Article).visibility} />
+                                <h4 className="text-sm font-bold text-[color:var(--color-dark)] group-hover:text-[color:var(--color-riviera-blue)] transition line-clamp-2 flex-1 min-w-0">
+                                  {article.title}
+                                </h4>
+                              </div>
+                              <p className="text-xs text-[color:var(--color-medium)]">
+                                {new Date(article.published_at || "").toLocaleDateString("en-US", {
+                                  timeZone: "America/New_York",
+        month: "short",
+                                  day: "numeric"
+                                })}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mobile Section 4: 2:1 ad between Editor’s Picks and Footer */}
+                  <div className="relative pt-8 lg:hidden">
+                    <AdSlot slot="homepage-mobile-between-editors-picks-footer" className="w-full" />
+                  </div>
+
+                  {/* AD SECTION 4 - SIDEBAR BOTTOM (desktop only on homepage) */}
+                  <div className="mt-8 hidden lg:block">
+                    <AdSlot
+                      slot="homepage-sidebar-bottom"
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* 3 stacked side-column ad slots under Tier 7 (desktop only) */}
+                  <SidebarAdFill />
+                </aside>
+              </div>
+
+              {/* AD SECTION 8 - BOTTOM BANNER */}
+              <section className="mt-8 relative pt-8 hidden lg:block">
+                <AdSlot
+                  slot="homepage-banner-bottom"
+                  className="w-full"
+                />
+              </section>
+            </>
+          )}
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}

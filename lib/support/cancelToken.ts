@@ -64,6 +64,7 @@ export function verifySupportCancelToken(token: string): SupportCancelTokenPaylo
   } catch {
     return null;
   }
+  try {
   const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
     sub?: string;
     uid?: string;
@@ -81,4 +82,5 @@ export function verifySupportCancelToken(token: string): SupportCancelTokenPaylo
     ...(data.siteUrl ? { siteUrl: data.siteUrl } : {}),
     ...(data.siteName ? { siteName: data.siteName } : {}),
   };
+  } catch { return null; }
 }

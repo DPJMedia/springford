@@ -1,311 +1,55 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { buildEmailHtml, newsletterBrandingFromTenant } from "@/lib/newsletter/buildEmailHtml";
-import type { NewsletterBlock, ArticleLayout } from "@/lib/newsletter/buildEmailHtml";
-import { enrichArticleBlocksWithAdvertisementFlags } from "@/lib/newsletter/enrichArticleBlocksForEmail";
-import {
-  sendGridNewsletterGlobalCategory,
-  sendGridCategoryForCampaign,
-} from "@/lib/newsletter/sendGridCampaign";
-import { getTenantById, getTenantBySlug } from "@/lib/tenant/getTenant";
-import { getSiteConfig } from "@/lib/seo/site";
-
-const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
-
-/** Node runtime: more reliable for long Supabase + SendGrid work than Edge for this route. */
-
-const isProduction =
-  process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
-
-const STALE_SENDING_MS = 30 * 60 * 1000;
-
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getTenantById } from "@/lib/tenant/getTenant";
+import { deliverCampaign } from "@/lib/newsletter/deliverCampaign";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (isProduction) {
-    if (!cronSecret) {
-      console.error("[send-scheduled] CRON_SECRET is required in production");
-      return NextResponse.json(
-        { error: "Server misconfigured" },
-        { status: 503 }
-      );
-    }
-    if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  } else if (cronSecret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-
-  const now = new Date().toISOString();
-  const staleBefore = new Date(Date.now() - STALE_SENDING_MS).toISOString();
-
-  // Recover abandoned "sending" rows (e.g. crash mid-request) so they can retry.
-  const { error: staleErr } = await supabase
-    .from("newsletter_campaigns")
-    .update({ status: "scheduled", updated_at: now })
-    .eq("status", "sending")
-    .lt("updated_at", staleBefore);
-  if (staleErr) {
-    console.error("[send-scheduled] stale reset error:", staleErr);
-  }
-
-  // Find all scheduled campaigns whose scheduled_at has passed
-  const { data: campaigns, error } = await supabase
+  const secret = process.env.CRON_SECRET;
+  if (!secret)
+    return NextResponse.json(
+      { error: "Scheduler is not configured" },
+      { status: 503 },
+    );
+  if (request.headers.get("authorization") !== `Bearer ${secret}`)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const db = createAdminClient();
+  const { data: campaigns, error } = await db
     .from("newsletter_campaigns")
     .select("*")
     .eq("status", "scheduled")
-    .lte("scheduled_at", now);
-
-  if (error) {
-    console.error("[send-scheduled] DB error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-
-  if (!campaigns || campaigns.length === 0) {
-    return NextResponse.json({ success: true, sent: 0, message: "No campaigns due" });
-  }
-
-  const apiKey = process.env.SENDGRID_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json({ error: "SendGrid API key not configured" }, { status: 500 });
-  }
-
-  const results: Array<{ id: string; name: string; success: boolean; error?: string; recipientCount?: number }> = [];
-
-  for (const campaign of campaigns) {
+    .lte("scheduled_at", new Date().toISOString())
+    .order("scheduled_at")
+    .limit(5);
+  if (error)
+    return NextResponse.json(
+      { error: "Could not load campaigns" },
+      { status: 503 },
+    );
+  const results = [];
+  for (const campaign of campaigns ?? []) {
     try {
-      let tenant =
-        campaign.tenant_id != null ? await getTenantById(campaign.tenant_id as string) : null;
-      if (!tenant) {
-        tenant = await getTenantBySlug("spring-ford");
-      }
-      if (!tenant) {
-        results.push({
-          id: campaign.id,
-          name: campaign.name,
-          success: false,
-          error: "Tenant not found for campaign",
-        });
-        continue;
-      }
-
-      const { siteUrl, siteName } = getSiteConfig(tenant);
-      const emailBranding = newsletterBrandingFromTenant(tenant);
-      const fromEmail =
-        tenant.from_email ||
-        process.env.SENDGRID_FROM_EMAIL ||
-        process.env.NEXT_PUBLIC_NEWSLETTER_FROM_EMAIL ||
-        "admin@dpjmedia.com";
-      const fromName =
-        tenant.from_name || process.env.SENDGRID_FROM_NAME || siteName;
-
-      let blocks: NewsletterBlock[] = Array.isArray(campaign.blocks) ? campaign.blocks : [];
-      blocks = await enrichArticleBlocksWithAdvertisementFlags(supabase, blocks, tenant.id);
-      const subject = campaign.subject || `${siteName} Newsletter`;
-      const previewText = campaign.preview_text || "";
-      const recipientsType: string = campaign.recipients_type || "newsletter";
-
-      // Fetch article layout from template settings
-      let articleLayout: ArticleLayout = "stack";
-      if (campaign.template_id) {
-        const { data: template } = await supabase
-          .from("newsletter_templates")
-          .select("settings")
-          .eq("id", campaign.template_id)
-          .single();
-        if (template?.settings) {
-          const s = template.settings as Record<string, unknown>;
-          if (s.articleLayout) articleLayout = s.articleLayout as ArticleLayout;
-        }
-      }
-
-      const unsubscribeUrl = `${siteUrl}/profile?tab=newsletter`;
-      const html = buildEmailHtml(
-        blocks,
-        subject,
-        emailBranding,
-        previewText,
-        unsubscribeUrl,
-        articleLayout,
-      );
-
-      const plainBody = blocks
-        .map((b: NewsletterBlock) => {
-          if (b.type === "hero_text") return [b.headline, b.subheadline, b.introText].filter(Boolean).join("\n\n");
-          if (b.type === "article") return `${b.articleTitle}\n${b.articleExcerpt || ""}\n${siteUrl}/article/${b.articleSlug}`;
-          if (b.type === "text") return [b.textTitle, b.textBody].filter(Boolean).join("\n\n");
-          if (b.type === "button") return `${b.buttonText}: ${b.buttonLink}`;
-          return "";
-        })
-        .filter(Boolean)
-        .join("\n\n---\n\n");
-      const plainText = `${plainBody || subject}\n\n---\nUnsubscribe: ${unsubscribeUrl}`;
-
-      // Fetch recipients
-      let recipients: Array<{ email: string; name?: string }> = [];
-
-      if (recipientsType === "newsletter") {
-        const { data: subs } = await supabase
-          .from("tenant_newsletter_subscriptions")
-          .select("user_id")
-          .eq("tenant_id", tenant.id)
-          .eq("subscribed", true);
-
-        const userIds = (subs || []).map((s) => s.user_id).filter(Boolean);
-        if (userIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from("user_profiles")
-            .select("email, full_name")
-            .in("id", userIds)
-            .not("email", "is", null);
-
-          recipients = (profiles || [])
-            .filter((s) => s.email)
-            .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
-        }
-      } else {
-        let query = supabase.from("user_profiles").select("email, full_name").not("email", "is", null);
-        if (recipientsType === "super_admins") {
-          query = query.eq("is_super_admin", true);
-        }
-        const { data: subscribers } = await query;
-        recipients = (subscribers || [])
-          .filter((s) => s.email)
-          .map((s) => ({ email: s.email as string, name: s.full_name || undefined }));
-      }
-
-      if (recipients.length === 0) {
-        const { error: draftErr } = await supabase
-          .from("newsletter_campaigns")
-          .update({ status: "draft", scheduled_at: null, updated_at: now })
-          .eq("id", campaign.id)
-          .eq("status", "scheduled");
-        if (draftErr) {
-          console.error("[send-scheduled] draft fallback error:", draftErr);
-        }
-        results.push({ id: campaign.id, name: campaign.name, success: false, error: "No recipients found" });
-        continue;
-      }
-
-      // Claim this row so concurrent cron invocations cannot double-send.
-      const { data: claimedRows, error: claimError } = await supabase
-        .from("newsletter_campaigns")
-        .update({ status: "sending", updated_at: now })
-        .eq("id", campaign.id)
-        .eq("status", "scheduled")
-        .select("id");
-
-      if (claimError) {
-        console.error("[send-scheduled] claim error:", claimError);
-        results.push({ id: campaign.id, name: campaign.name, success: false, error: claimError.message });
-        continue;
-      }
-      if (!claimedRows?.length) {
-        results.push({
-          id: campaign.id,
-          name: campaign.name,
-          success: false,
-          error: "Skipped (already claimed or no longer scheduled)",
-        });
-        continue;
-      }
-
-      const categoryTag = sendGridCategoryForCampaign(campaign.id);
-      const globalCategory = sendGridNewsletterGlobalCategory(tenant);
-      const BATCH_SIZE = 1000;
-      let sendError: string | null = null;
-      for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
-        const batch = recipients.slice(i, i + BATCH_SIZE);
-        const body = {
-          personalizations: batch.map((r) => ({
-            to: [{ email: r.email, ...(r.name ? { name: r.name } : {}) }],
-            custom_args: { campaign_id: campaign.id },
-          })),
-          from: { email: fromEmail, name: fromName },
-          subject,
-          categories: [globalCategory, categoryTag],
-          content: [
-            { type: "text/plain", value: plainText || subject },
-            { type: "text/html", value: html },
-          ],
-        };
-
-        const res = await fetch(SENDGRID_API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify(body),
-        });
-
-        if (!res.ok) {
-          const errText = await res.text();
-          sendError = `SendGrid ${res.status}: ${errText}`;
-          console.error("[send-scheduled] SendGrid error:", sendError);
-          break;
-        }
-      }
-
-      if (sendError) {
-        const { error: revertErr } = await supabase
-          .from("newsletter_campaigns")
-          .update({ status: "scheduled", updated_at: now })
-          .eq("id", campaign.id)
-          .eq("status", "sending");
-        if (revertErr) {
-          console.error("[send-scheduled] revert after SendGrid failure:", revertErr);
-        }
-        results.push({ id: campaign.id, name: campaign.name, success: false, error: sendError });
-        continue;
-      }
-
-      const { error: sentErr } = await supabase
-        .from("newsletter_campaigns")
-        .update({
-          status: "sent",
-          sent_at: now,
-          scheduled_at: null,
-          recipient_count: recipients.length,
-          updated_at: now,
-        })
-        .eq("id", campaign.id)
-        .eq("status", "sending");
-
-      if (sentErr) {
-        console.error("[send-scheduled] final sent update error:", sentErr);
-        const { error: revertErr } = await supabase
-          .from("newsletter_campaigns")
-          .update({ status: "scheduled", updated_at: now })
-          .eq("id", campaign.id)
-          .eq("status", "sending");
-        if (revertErr) {
-          console.error("[send-scheduled] revert after sent update failure:", revertErr);
-        }
-        results.push({ id: campaign.id, name: campaign.name, success: false, error: sentErr.message });
-        continue;
-      }
-
-      results.push({ id: campaign.id, name: campaign.name, success: true, recipientCount: recipients.length });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[send-scheduled] Error processing campaign ${campaign.id}:`, msg);
-      await supabase
-        .from("newsletter_campaigns")
-        .update({ status: "scheduled", updated_at: now })
-        .eq("id", campaign.id)
-        .eq("status", "sending");
-      results.push({ id: campaign.id, name: campaign.name, success: false, error: msg });
+      const tenant = campaign.tenant_id
+        ? await getTenantById(campaign.tenant_id)
+        : null;
+      if (!tenant) throw new Error("Campaign has no active publication");
+      results.push({
+        id: campaign.id,
+        success: true,
+        ...(await deliverCampaign(db, campaign, tenant, true)),
+      });
+    } catch (error) {
+      console.error("Scheduled newsletter failed", campaign.id, error);
+      results.push({
+        id: campaign.id,
+        success: false,
+        error: error instanceof Error ? error.message : "Delivery failed",
+      });
     }
   }
-
-  const sentCount = results.filter((r) => r.success).length;
-  return NextResponse.json({ success: true, sent: sentCount, results, timestamp: now });
+  return NextResponse.json({
+    success: results.every((r) => r.success),
+    sent: results.filter((r) => r.success).length,
+    results,
+  });
 }

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { ArticleJsonLd } from "@/components/seo/ArticleJsonLd";
 import { ArticleContent } from "./ArticleContent";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import {
   canReadFullArticleContent,
@@ -26,13 +26,14 @@ export async function generateMetadata({
   const supabase = await createClient();
 
   const { data: article } = await supabase
-    .from("articles")
+    .from("article_previews")
     .select(
       "title, meta_title, meta_description, excerpt, image_url, slug, published_at, updated_at, canonical_url"
     )
     .eq("slug", slug)
     .eq("tenant_id", tenant.id)
     .eq("status", "published")
+    .lte("published_at", new Date().toISOString())
     .single();
 
   if (!article) {
@@ -117,16 +118,17 @@ export default async function ArticlePage({
   const tenant = await loadTenantForPage();
   const supabase = await createClient();
 
-  const { data: article, error } = await supabase
+  const { data: article, error } = await (await import("@/lib/supabase/admin")).createAdminClient()
     .from("articles")
     .select("*")
     .eq("slug", slug)
     .eq("tenant_id", tenant.id)
     .eq("status", "published")
+    .lte("published_at", new Date().toISOString())
     .single();
 
   if (error || !article) {
-    redirect("/");
+    notFound();
   }
 
   const visibility = normalizeVisibility(article.visibility);
@@ -142,9 +144,15 @@ export default async function ArticlePage({
       .select("newsletter_subscribed, is_admin, is_super_admin")
       .eq("id", user.id)
       .single();
-    newsletterSubscribed = profile?.newsletter_subscribed ?? false;
-    isAdminUser = !!(profile?.is_admin || profile?.is_super_admin);
+    const { data: subscription } = await supabase.from("tenant_newsletter_subscriptions")
+      .select("subscribed").eq("user_id", user.id).eq("tenant_id", tenant.id).maybeSingle();
+    newsletterSubscribed = subscription?.subscribed === true;
+    const { data: membership } = await supabase.from("tenant_memberships").select("role")
+      .eq("user_id", user.id).eq("tenant_id", tenant.id).maybeSingle();
+    isAdminUser = !!profile?.is_super_admin || ["admin", "editor"].includes(membership?.role ?? "");
   }
+
+  if (visibility === "admin_only" && !isAdminUser) notFound();
 
   const canReadFull = canReadFullArticleContent(visibility, {
     newsletterSubscribed,
@@ -155,11 +163,11 @@ export default async function ArticlePage({
   const subscriberArticlePaywall =
     visibility === "newsletter_subscribers" && !canReadFull;
 
-  const articleForClient = article;
+  const articleForClient = canReadFull ? article : { ...article, content: "", content_blocks: [] };
 
   return (
     <>
-      <ArticleJsonLd article={article} tenant={tenant} />
+      <ArticleJsonLd article={articleForClient} tenant={tenant} />
       <ArticleContent
         initialArticle={articleForClient}
         slug={slug}

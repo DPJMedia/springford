@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
   // Use full-text search RPC (word-boundary matching: "car" matches "car" not "carbon"/"scar")
   const { data, error } = await supabase.rpc("search_articles", {
     search_query: q,
+    p_tenant_id: tenant.id,
   });
 
   if (error) {
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 
   const ids = rows.map((r) => r.id);
   const { data: scoped } = await supabase
-    .from("articles")
+    .from("article_previews")
     .select("id")
     .eq("tenant_id", tenant.id)
     .in("id", ids);
@@ -73,12 +74,12 @@ async function fallbackSearch(
   tenantId: string,
 ) {
   const now = new Date().toISOString();
-  const escaped = q.replace(/'/g, "''");
-  const searchableFields = ["title", "excerpt", "content", "meta_title", "meta_description", "category"];
+  const escaped = q.replace(/[,()%_*]/g, " ").slice(0,200);
+  const searchableFields = ["title", "excerpt", "meta_title", "meta_description", "category"];
   const orConditions = searchableFields.map((f) => `${f}.ilike.%${escaped}%`).join(",");
 
   const { data, error } = await supabase
-    .from("articles")
+    .from("article_previews")
     .select("id, title, slug, excerpt, image_url, author_name, published_at, category")
     .eq("tenant_id", tenantId)
     .eq("status", "published")

@@ -1,3 +1,4 @@
+import { requireTenantAdmin } from "@/lib/api/requireTenantAdmin";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import {
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
     }
 
     const tenant = await getTenantForApiRoute();
+    const access = await requireTenantAdmin(tenant.id); if (!access.ok) return access.response;
 
     const { searchParams } = new URL(request.url);
     const timeRange = searchParams.get("timeRange") || "30d";

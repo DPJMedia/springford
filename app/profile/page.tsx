@@ -13,7 +13,8 @@ import {
 import { useTenant } from "@/lib/tenant/TenantProvider";
 
 export default function ProfilePage() {
-  const { name: siteName } = useTenant();
+  const tenant = useTenant();
+  const { name: siteName } = tenant;
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -79,7 +80,16 @@ export default function ProfilePage() {
       .single();
 
     setUser(currentUser);
-    setProfile(profileData);
+    const { data: tenantSub } = await supabase.from("tenant_newsletter_subscriptions").select("subscribed").eq("user_id", currentUser.id).eq("tenant_id", tenant.id).maybeSingle();
+    const { data: support } = await supabase.from("support_subscriptions").select("profile").eq("user_id",currentUser.id).eq("tenant_id",tenant.id).order("updated_at",{ascending:false}).limit(1).maybeSingle();
+    const publicationSupport = support?.profile || (tenant.slug === "spring-ford" ? {} : {
+      stripe_support_subscription_id: null, support_subscription_status: null,
+      support_subscription_interval: null, support_subscription_plan: null,
+      support_subscription_amount_cents: null, support_subscription_current_period_end: null,
+      support_subscription_cancel_at: null, support_subscription_cancel_at_period_end: null,
+      support_subscription_started_at: null,
+    });
+    setProfile({ ...profileData, ...publicationSupport, newsletter_subscribed: tenantSub?.subscribed === true });
     setEditedName(profileData?.full_name || "");
     setEditedUsername(profileData?.username || "");
     setAvatarPreview(normalizeAvatarUrl(profileData?.avatar_url));
@@ -159,19 +169,14 @@ export default function ProfilePage() {
   async function checkUsernameAvailability(username: string): Promise<boolean> {
     if (!username || username.trim() === '') return true;
     
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('username', username.trim())
-      .neq('id', user.id)
-      .maybeSingle();
+    const { data, error } = await supabase.rpc("is_username_available", { candidate: username.trim() });
 
     if (error) {
       console.error('Error checking username:', error);
       return false;
     }
 
-    return !data;
+    return data === true;
   }
 
   async function saveName() {

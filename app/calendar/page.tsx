@@ -136,7 +136,7 @@ export default function CalendarPage() {
     const articleIds = [...new Set(rows.map((r) => r.article_id).filter(Boolean))] as string[];
     if (articleIds.length > 0) {
       const { data: arts } = await supabase
-        .from("articles")
+        .from("article_previews")
         .select("id, slug, title, image_url")
         .eq("tenant_id", tenantId)
         .in("id", articleIds);
@@ -526,7 +526,7 @@ function EntryEditor({
     let active = true;
     const t = setTimeout(async () => {
       const { data } = await supabase
-        .from("articles")
+        .from("article_previews")
         .select("id, slug, title, image_url")
         .eq("tenant_id", tenantId)
         .eq("status", "published")

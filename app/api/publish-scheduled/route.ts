@@ -1,6 +1,7 @@
+import { requireTenantAdmin } from "@/lib/api/requireTenantAdmin";
+import { getTenantForApiRoute } from "@/lib/tenant/getTenantForApiRoute";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 /** Node runtime: cookie-based admin auth for browser; cron uses CRON_SECRET bearer. */
@@ -38,7 +39,9 @@ async function authorize(request: NextRequest): Promise<NextResponse | null> {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  return null;
+  const tenant = await getTenantForApiRoute();
+  const access = await requireTenantAdmin(tenant.id);
+  return access.ok ? null : access.response;
 }
 
 export async function GET(request: NextRequest) {
@@ -53,8 +56,8 @@ export async function GET(request: NextRequest) {
 
     const now = new Date().toISOString();
 
-    const h = await headers();
-    const tenantFromHeader = h.get("x-tenant-id");
+    const isCron = !!process.env.CRON_SECRET && request.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
+    const tenantFromHeader = isCron ? null : (await getTenantForApiRoute()).id;
 
     let articlesQuery = supabase
       .from("articles")
@@ -100,7 +103,8 @@ export async function GET(request: NextRequest) {
           published_at: article.scheduled_for,
           updated_at: now,
         })
-        .eq("id", article.id);
+        .eq("id", article.id)
+        .eq("status", "scheduled");
 
       if (updateError) {
         console.error(`Error publishing article ${article.id}:`, updateError);

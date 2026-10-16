@@ -1,3 +1,4 @@
+import { requireTenantAdmin } from "@/lib/api/requireTenantAdmin";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTenantForApiRoute } from "@/lib/tenant/getTenantForApiRoute";
@@ -231,6 +232,7 @@ export async function GET(request: NextRequest) {
     const { chartStartIso, chartEndIso, granularity, bucketCount } = computeChart(chartTimeRange);
 
     const tenant = await getTenantForApiRoute();
+    const access = await requireTenantAdmin(tenant.id); if (!access.ok) return access.response;
 
     const admin = createAdminClient();
 

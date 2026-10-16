@@ -38,11 +38,8 @@ export function AuthorSelector({ value, onChange }: AuthorSelectorProps) {
   }, [mentionQuery, admins])
 
   async function fetchAdmins() {
-    const { data } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .or('is_admin.eq.true,is_super_admin.eq.true')
-      .order('full_name', { ascending: true })
+    const response = await fetch("/api/admin/legacy-authors");
+    const data = response.ok ? (await response.json()).authors : [];
 
     if (data) {
       setAdmins(data)

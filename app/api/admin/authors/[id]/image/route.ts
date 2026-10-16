@@ -1,3 +1,5 @@
+import { requireTenantAdmin } from "@/lib/api/requireTenantAdmin";
+import { getTenantForApiRoute } from "@/lib/tenant/getTenantForApiRoute";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
@@ -43,6 +45,12 @@ export async function POST(
   if (!auth.ok) return auth.response;
 
   const { id } = await ctx.params;
+  const tenant = await getTenantForApiRoute();
+  const access = await requireTenantAdmin(tenant.id); if (!access.ok) return access.response;
+  const db = createAdminClient();
+  const { data: association, error: associationError } = await db.from("author_tenants").select("author_id").eq("author_id", id).eq("tenant_id", tenant.id).maybeSingle();
+  if (associationError) return NextResponse.json({error:"Could not verify author access"},{status:503});
+  if (!access.isSuperAdmin && !association) return NextResponse.json({error:"Forbidden"},{status:403});
   const form = await request.formData();
   const file = form.get("file");
   const kind = String(form.get("kind") ?? "avatar");
@@ -86,7 +94,8 @@ export async function POST(
 
   // Persist on the author row immediately so the form sees the result on save.
   const column = kind === "avatar" ? "avatar_url" : "cover_image_url";
-  await admin.from("authors").update({ [column]: url }).eq("id", id);
+  const { error: saveError } = await admin.from("authors").update({ [column]: url }).eq("id", id);
+  if (saveError) return NextResponse.json({error:"Could not save author image"},{status:503});
 
   return NextResponse.json({ url, path });
 }

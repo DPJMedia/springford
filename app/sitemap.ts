@@ -20,6 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries: MetadataRoute.Sitemap = [
     { url: base, lastModified: now, changeFrequency: "hourly", priority: 1 },
     { url: `${base}/subscribe`, lastModified: now, changeFrequency: "weekly", priority: 0.9 },
+    { url: `${base}/calendar`, lastModified: now, changeFrequency: "daily", priority: 0.6 },
     { url: `${base}/search`, lastModified: now, changeFrequency: "weekly", priority: 0.6 },
     { url: `${base}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/contact`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
@@ -27,7 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/advertise`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/privacy-policy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${base}/terms-of-service`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
-    ...sectionSlugs.map((slug) => ({
+    ...sectionSlugs.filter(slug => !["hero", "latest"].includes(slug)).map((slug) => ({
       url: `${base}/section/${slug}`,
       lastModified: now,
       changeFrequency: "daily" as const,
@@ -37,8 +38,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const supabase = await createClient();
   const { data: articles } = await supabase
-    .from("articles")
+    .from("article_previews")
     .select("slug, updated_at")
+    .eq("tenant_id", tenantRow.id)
     .eq("status", "published")
     .not("published_at", "is", null)
     .lte("published_at", new Date().toISOString())

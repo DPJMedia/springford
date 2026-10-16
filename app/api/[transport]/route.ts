@@ -17,7 +17,7 @@
  */
 
 import { createMcpHandler } from "mcp-handler";
-import { z } from "zod";
+import { z } from "zod/v4";
 import type { NextRequest } from "next/server";
 import { resolveTenantFromHeaders } from "@/lib/tenant/resolveTenantFromRequest";
 import { getSiteConfig } from "@/lib/seo/site";
@@ -59,13 +59,13 @@ function buildHandler(tenant: TenantRow) {
             `Search published ${siteName} local-news articles by keyword, optionally ` +
             `filtered by section/area and/or date range. Returns headline, summary, ` +
             `sections, publish date, and a canonical link to read the full story.`,
-          inputSchema: {
+          inputSchema: z.object({
             query: z.string().optional().describe("Keywords to match against title, subtitle, excerpt, category, and tags."),
             section: z.string().optional().describe(`Filter to one section/area. ${sectionHint}`),
             from: z.string().optional().describe("ISO date/datetime lower bound on publish date (inclusive)."),
             to: z.string().optional().describe("ISO date/datetime upper bound on publish date (inclusive)."),
             limit: z.number().int().optional().describe("Max results, 1-50 (default 10)."),
-          },
+          }),
         },
         async ({ query, section, from, to, limit }) => {
           const rows = await searchArticles(tenant, { query, section, from, to, limit });
@@ -83,11 +83,11 @@ function buildHandler(tenant: TenantRow) {
           description:
             `The most recently published ${siteName} articles, optionally filtered by ` +
             `section/area and/or a since-date. Returns headline, summary, and canonical link.`,
-          inputSchema: {
+          inputSchema: z.object({
             section: z.string().optional().describe(`Filter to one section/area. ${sectionHint}`),
             since: z.string().optional().describe("ISO date/datetime lower bound on publish date (inclusive)."),
             limit: z.number().int().optional().describe("Max results, 1-50 (default 10)."),
-          },
+          }),
         },
         async ({ section, since, limit }) => {
           const rows = await getLatestArticles(tenant, { section, since, limit });
@@ -106,9 +106,9 @@ function buildHandler(tenant: TenantRow) {
             `Fetch one published ${siteName} article in full (headline, byline, publish ` +
             `date, sections, and the full body text) by its slug. The slug is the last ` +
             `path segment of the article URL.`,
-          inputSchema: {
+          inputSchema: z.object({
             slug: z.string().describe("Article slug, e.g. the last path segment of /article/<slug>."),
-          },
+          }),
         },
         async ({ slug }) => {
           const a = await getArticleBySlug(tenant, slug);
@@ -163,10 +163,6 @@ function buildHandler(tenant: TenantRow) {
         `${siteName} read-only article server. Use it to find and cite current local-news ` +
         `coverage for ${siteUrl}. Prefer search_articles / get_latest_articles to discover ` +
         `stories, then get_article for full text. Always link readers to the canonical URL.`,
-    },
-    {
-      basePath: "/api",
-      maxDuration: 60,
       verboseLogs: process.env.NODE_ENV !== "production",
     },
   );

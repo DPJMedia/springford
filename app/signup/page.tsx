@@ -142,13 +142,9 @@ function SignupPageContent() {
       return;
     }
 
-    const { data: taken } = await supabase
-      .from("user_profiles")
-      .select("id")
-      .eq("username", trimmedUsername)
-      .maybeSingle();
-    if (taken) {
-      setError("This username is already taken");
+    const { data: available, error: availabilityError } = await supabase.rpc("is_username_available", { candidate: trimmedUsername });
+    if (availabilityError || !available) {
+      setError(availabilityError ? "Could not check username. Please try again." : "This username is already taken");
       setLoading(false);
       return;
     }

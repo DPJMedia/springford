@@ -104,7 +104,10 @@ export default function ArticlesManagementPage() {
 
     // First, auto-publish any scheduled articles whose time has arrived
     try {
-      const { data: publishResult } = await supabase.rpc('auto_publish_scheduled_articles');
+      const response = await fetch("/api/publish-scheduled", { credentials: "same-origin", cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not publish scheduled articles");
+      const publishResult = result.published_count;
       if (publishResult && publishResult > 0) {
         console.log(`Auto-published ${publishResult} scheduled article(s)`);
       }

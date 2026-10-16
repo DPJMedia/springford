@@ -1,4 +1,11 @@
-import { createClient } from "@/lib/supabase/client";
+let analyticsSession: Promise<Response> | undefined;
+async function sendAnalytics(event: string, data: Record<string, unknown>) {
+  analyticsSession ??= fetch("/api/analytics", { credentials: "same-origin" });
+  const initialized = await analyticsSession;
+  if (!initialized.ok) { analyticsSession = undefined; return; }
+  await fetch("/api/analytics", { method: "POST", credentials: "same-origin", keepalive: true,
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event, data }) });
+}
 
 // Cache location data in memory to avoid repeated API calls
 let cachedLocation: {
@@ -108,7 +115,6 @@ export async function trackPageView(data: {
   articleId?: string;
   userId?: string;
 }) {
-  const supabase = createClient();
   const sessionId = getSessionId();
   const deviceType = getDeviceType();
   const { source: trafficSource, referrer } = getTrafficSource();
@@ -116,7 +122,7 @@ export async function trackPageView(data: {
   const location = await getLocation();
   
   try {
-    await supabase.from('page_views').insert({
+    await sendAnalytics('page_views', {
       tenant_id: data.tenantId,
       article_id: data.articleId || null,
       user_id: data.userId || null,
@@ -150,35 +156,11 @@ export async function updatePageView(data: {
   maxScrollDepth: number;
   completedArticle: boolean;
 }) {
-  const supabase = createClient();
   
   try {
-    // Find the most recent page view for this session and article
-    // Use .is for null article_id — .eq(..., null) becomes invalid PostgREST (article_id=eq.null)
-    let pageViewsQuery = supabase
-      .from('page_views')
-      .select('id')
-      .eq('tenant_id', data.tenantId)
-      .eq('session_id', data.sessionId);
-    pageViewsQuery = data.articleId
-      ? pageViewsQuery.eq('article_id', data.articleId)
-      : pageViewsQuery.is('article_id', null);
-    const { data: pageViews } = await pageViewsQuery
-      .order('viewed_at', { ascending: false })
-      .limit(1);
-    
-    if (pageViews && pageViews.length > 0) {
-      await supabase
-        .from('page_views')
-        .update({
-          time_spent_seconds: data.timeSpentSeconds,
-          scroll_depth_percent: data.scrollDepthPercent,
-          max_scroll_depth: data.maxScrollDepth,
-          completed_article: data.completedArticle,
-          exit_page: true,
-        })
-        .eq('id', pageViews[0].id);
-    }
+    await sendAnalytics("page_view_update", { article_id: data.articleId || null,
+      time_spent_seconds: data.timeSpentSeconds, scroll_depth_percent: data.scrollDepthPercent,
+      max_scroll_depth: data.maxScrollDepth, completed_article: data.completedArticle });
   } catch (error) {
     console.error('Failed to update page view:', error);
   }
@@ -195,10 +177,9 @@ export async function trackArticleScrollData(data: {
   timeSpentSeconds: number;
   abandonedAtPercent: number;
 }) {
-  const supabase = createClient();
   
   try {
-    await supabase.from('article_scroll_data').insert({
+    await sendAnalytics('article_scroll_data', {
       tenant_id: data.tenantId,
       article_id: data.articleId,
       session_id: data.sessionId,
@@ -224,13 +205,12 @@ export async function trackAdImpression(data: {
   viewportPosition?: 'above-fold' | 'mid-page' | 'below-fold';
   scrollDepthWhenViewed?: number;
 }) {
-  const supabase = createClient();
   const sessionId = getSessionId();
   const deviceType = getDeviceType();
   const location = await getLocation();
   
   try {
-    await supabase.from('ad_impressions').insert({
+    await sendAnalytics('ad_impressions', {
       tenant_id: data.tenantId,
       ad_id: data.adId,
       ad_slot: data.adSlot,
@@ -260,12 +240,11 @@ export async function trackAdClick(data: {
   userId?: string;
   destinationUrl: string;
 }) {
-  const supabase = createClient();
   const sessionId = getSessionId();
   const deviceType = getDeviceType();
   
   try {
-    await supabase.from('ad_clicks').insert({
+    await sendAnalytics('ad_clicks', {
       tenant_id: data.tenantId,
       ad_id: data.adId,
       ad_slot: data.adSlot,
@@ -288,11 +267,10 @@ export async function trackAuthorClick(data: {
   articleId?: string;
   userId?: string;
 }) {
-  const supabase = createClient();
   const sessionId = getSessionId();
   
   try {
-    await supabase.from('author_clicks').insert({
+    await sendAnalytics('author_clicks', {
       tenant_id: data.tenantId,
       author_name: data.authorName,
       clicked_from_page: data.clickedFromPage,
@@ -312,11 +290,10 @@ export async function trackSectionClick(data: {
   clickedFromPage: string;
   userId?: string;
 }) {
-  const supabase = createClient();
   const sessionId = getSessionId();
   
   try {
-    await supabase.from('section_clicks').insert({
+    await sendAnalytics('section_clicks', {
       tenant_id: data.tenantId,
       section_name: data.sectionName,
       clicked_from_page: data.clickedFromPage,
@@ -349,6 +326,6 @@ export function calculateScrollDepth(): number {
   const documentHeight = document.documentElement.scrollHeight;
   const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
   
-  const scrollPercent = (scrollTop / (documentHeight - windowHeight)) * 100;
-  return Math.min(Math.round(scrollPercent), 100);
+  const scrollPercent = documentHeight <= windowHeight ? 100 : (scrollTop / (documentHeight - windowHeight)) * 100;
+  return Math.max(0, Math.min(Math.round(scrollPercent), 100));
 }

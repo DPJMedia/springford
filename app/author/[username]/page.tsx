@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Avatar } from "@/components/Avatar";
+import { findPublicAuthor, type PublicAuthorProfile } from "@/lib/user/publicAuthor";
 import type { Article, AuthorRow, UserProfile } from "@/lib/types/database";
 import { ARTICLE_LIST_COLUMNS } from "@/lib/supabase/articleQueries";
 import {
@@ -30,7 +31,7 @@ export default function AuthorPage({
 
   // Either-or: a row from the new `authors` table OR a legacy user_profiles row.
   const [managedAuthor, setManagedAuthor] = useState<AuthorRow | null>(null);
-  const [legacyAuthor, setLegacyAuthor] = useState<UserProfile | null>(null);
+  const [legacyAuthor, setLegacyAuthor] = useState<PublicAuthorProfile | null>(null);
   const [source, setSource] = useState<ResolvedSource | null>(null);
 
   const [articles, setArticles] = useState<Article[]>([]);
@@ -103,7 +104,7 @@ export default function AuthorPage({
           `author_name.ilike.%${managed.name}%`,
         ].join(",");
         const { data: rows } = await supabase
-          .from("articles")
+          .from("article_previews")
           .select(ARTICLE_LIST_COLUMNS)
           .eq("status", "published")
           .eq("tenant_id", tenantId)
@@ -130,9 +131,10 @@ export default function AuthorPage({
         } as UserProfile);
         setSource("diffuse");
         const { data: rows } = await supabase
-          .from("articles")
+          .from("article_previews")
           .select(ARTICLE_LIST_COLUMNS)
           .eq("status", "published")
+          .eq("tenant_id", tenantId)
           .or(
             "author_name.ilike.%Powered by diffuse.ai%,author_name.ilike.%diffuse.ai%",
           )
@@ -143,40 +145,7 @@ export default function AuthorPage({
         return;
       }
 
-      // 3. LEGACY FALLBACK — look up a real Supabase user.
-      let { data: authorData } = await supabase
-        .from("user_profiles")
-        .select("*")
-        .eq("username", username)
-        .single();
-
-      if (!authorData) {
-        const { data: profiles } = await supabase
-          .from("user_profiles")
-          .select("*")
-          .or(`email.ilike.${username}%,full_name.ilike.%${username}%`);
-        if (profiles && profiles.length > 0) authorData = profiles[0];
-      }
-
-      if (!authorData) {
-        const { data: allProfiles } = await supabase
-          .from("user_profiles")
-          .select("*")
-          .in("is_admin", [true])
-          .or("is_super_admin.eq.true");
-        if (allProfiles) {
-          authorData =
-            allProfiles.find((profile) => {
-              const generatedUsername = profile.email
-                ? profile.email
-                    .split("@")[0]
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]/g, "")
-                : profile.full_name?.toLowerCase().replace(/[^a-z0-9]/g, "");
-              return generatedUsername === username;
-            }) || null;
-        }
-      }
+      const authorData = await findPublicAuthor({ username });
 
       if (authorData) {
         // One final check: if a managed author exists with the same display
@@ -204,7 +173,7 @@ export default function AuthorPage({
               `author_name.ilike.%${managedTwin.name}%`,
             ].join(",");
             const { data: rows } = await supabase
-              .from("articles")
+              .from("article_previews")
               .select(ARTICLE_LIST_COLUMNS)
               .eq("status", "published")
               .eq("tenant_id", tenantId)
@@ -220,10 +189,11 @@ export default function AuthorPage({
         setLegacyAuthor(authorData);
         setSource("user_profile");
         const { data: rows } = await supabase
-          .from("articles")
+          .from("article_previews")
           .select(ARTICLE_LIST_COLUMNS)
           .eq("status", "published")
-          .or(`author_id.eq.${authorData.id},author_name.ilike.%${authorData.full_name}%`)
+          .eq("tenant_id", tenantId)
+          .or(`author_id.eq.${authorData.id},author_name.ilike.%${String(authorData.full_name ?? "").replace(/[,()%]/g, " ")}%`)
           .lte("published_at", new Date().toISOString())
           .order("published_at", { ascending: false });
         setArticles((rows ?? []) as Article[]);
@@ -534,7 +504,7 @@ function DiffuseAIHero({
   author,
   articleCount,
 }: {
-  author: UserProfile;
+  author: PublicAuthorProfile;
   articleCount: number;
 }) {
   return (
@@ -589,7 +559,7 @@ function LegacyAuthorHero({
   author,
   articleCount,
 }: {
-  author: UserProfile;
+  author: PublicAuthorProfile;
   articleCount: number;
 }) {
   return (

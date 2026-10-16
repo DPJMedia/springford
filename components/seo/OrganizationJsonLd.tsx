@@ -1,3 +1,4 @@
+import { serializeJsonLd } from "@/lib/seo/serializeJsonLd";
 import { getSiteConfig, SITE_KEYWORDS } from "@/lib/seo/site";
 import type { TenantRow } from "@/lib/types/database";
 
@@ -43,11 +44,11 @@ export function OrganizationJsonLd({ tenant }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(org) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(org) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(website) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(website) }}
       />
     </>
   );

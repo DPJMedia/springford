@@ -1,5 +1,6 @@
 "use client";
 
+import { useDialogFocus } from "@/lib/accessibility/useDialogFocus";
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
@@ -46,7 +47,7 @@ export function NewsletterPopupBanner({
    */
   variant?: Variant;
 } = {}) {
-  const { name: siteName } = useTenant();
+  const { name: siteName, id: tenantId } = useTenant();
   const searchParams = useSearchParams();
   /** Bypass dismiss cookie for QA: add ?show_newsletter_popup=1 to the URL */
   const forceShow = searchParams.get("show_newsletter_popup") === "1";
@@ -86,11 +87,12 @@ export function NewsletterPopupBanner({
         return { show: true, hasAccount: false };
       }
       const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("newsletter_subscribed")
-        .eq("id", user.id)
+        .from("tenant_newsletter_subscriptions")
+        .select("subscribed")
+        .eq("user_id", user.id)
+        .eq("tenant_id", tenantId)
         .single();
-      if (profile?.newsletter_subscribed) {
+      if (profile?.subscribed) {
         return { show: false, hasAccount: true };
       }
       return { show: true, hasAccount: true };
@@ -116,7 +118,7 @@ export function NewsletterPopupBanner({
       mounted = false;
       clearTimeout(timer);
     };
-  }, [forceShow, variant, isMobile]);
+  }, [forceShow, variant, isMobile, tenantId]);
 
   function handleDismiss() {
     setVisible(false);
@@ -126,6 +128,7 @@ export function NewsletterPopupBanner({
     }, 400);
   }
 
+  const dialogRef = useDialogFocus(show && !checking && variant === "full", handleDismiss);
   if (!show || checking) return null;
 
   const ctaHref = hasAccount ? "/subscribe" : "/signup?returnTo=/subscribe";
@@ -152,6 +155,7 @@ export function NewsletterPopupBanner({
       }}
     >
       <div
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label="Subscribe to our newsletter" tabIndex={-1}
         className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-[0_30px_60px_-15px_rgba(15,23,42,0.45)] ring-1 ring-black/[0.06]"
         style={{
           opacity: visible ? 1 : 0,
@@ -258,6 +262,7 @@ function CompactBottomSheet({
   visible: boolean;
   onDismiss: () => void;
 }) {
+  const dialogRef = useDialogFocus(true, onDismiss);
   // Drag-to-dismiss state
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -335,7 +340,8 @@ function CompactBottomSheet({
       onClick={onDismiss}
     >
       <div
-        ref={sheetRef}
+        ref={(node) => { sheetRef.current = node; dialogRef.current = node; }}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Subscribe to our newsletter"

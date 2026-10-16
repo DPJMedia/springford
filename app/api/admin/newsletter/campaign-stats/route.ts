@@ -1,3 +1,5 @@
+import { requireTenantAdmin } from "@/lib/api/requireTenantAdmin";
+import { getTenantForApiRoute } from "@/lib/tenant/getTenantForApiRoute";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import {
@@ -37,10 +39,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "campaignId is required" }, { status: 400 });
     }
 
+    const tenant = await getTenantForApiRoute();
+    const access = await requireTenantAdmin(tenant.id); if (!access.ok) return access.response;
+
     const { data: campaign, error: campErr } = await supabase
       .from("newsletter_campaigns")
       .select("id, name, subject, status, sent_at, recipient_count")
       .eq("id", campaignId)
+      .eq("tenant_id", tenant.id)
       .single();
 
     if (campErr || !campaign) {

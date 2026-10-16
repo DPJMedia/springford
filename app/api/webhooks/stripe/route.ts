@@ -1,3 +1,4 @@
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import {
@@ -43,6 +44,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  const db=createAdminClient();
+  const {data: claimed,error: claimError}=await db.rpc("claim_stripe_webhook_event",{p_id:event.id,p_type:event.type});
+  if(claimError)return NextResponse.json({error:"Could not claim webhook"},{status:503});
+  if(!claimed){const {data,error}=await db.from("stripe_webhook_events").select("processed_at").eq("event_id",event.id).maybeSingle();return !error&&data?.processed_at?NextResponse.json({received:true}):NextResponse.json({error:"Webhook is processing"},{status:503});}
+  try{
+    const response=await processStripeEvent(event);
+    if(response.status>=400)throw new Error("Webhook processing failed");
+    const {error}=await db.from("stripe_webhook_events").update({processed_at:new Date().toISOString()}).eq("event_id",event.id);
+    if(error)throw new Error("Could not record webhook completion");
+    return response;
+  }catch(error){console.error("Stripe webhook processing failed",event.id,error);await db.from("stripe_webhook_events").delete().eq("event_id",event.id).is("processed_at",null);return NextResponse.json({error:"Please retry webhook delivery"},{status:503});}
+}
+async function processStripeEvent(event: Stripe.Event) {
   if (event.type === "customer.subscription.deleted") {
     await clearStripeSubscriptionFromProfile((event.data.object as Stripe.Subscription).id);
     return NextResponse.json({ received: true });
@@ -114,7 +128,7 @@ export async function POST(request: NextRequest) {
       ) {
         const months = parseInt(fullSub.metadata.duration_months, 10);
         if (!Number.isNaN(months) && months >= 1 && months <= 36) {
-          const cancelAt = addMonths(new Date(), months);
+          const cancelAt = addMonths(new Date(fullSub.created * 1000), months);
           const cancelAtUnix = Math.floor(cancelAt.getTime() / 1000);
           try {
             await stripe.subscriptions.update(subId, { cancel_at: cancelAtUnix });
@@ -122,7 +136,7 @@ export async function POST(request: NextRequest) {
               expand: ["latest_invoice", "latest_invoice.payment_intent"],
             });
           } catch (e) {
-            console.error("Failed to set subscription cancel_at:", e);
+            throw e;
           }
         }
       }
@@ -161,7 +175,7 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (e) {
-      console.warn("Could not retrieve subscription / receipt:", e);
+      throw e;
     }
   } else if (session.payment_intent) {
     try {
@@ -189,8 +203,7 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.SENDGRID_API_KEY;
 
   if (!apiKey) {
-    console.warn("SENDGRID_API_KEY not set; skipping thank-you email");
-    return NextResponse.json({ received: true });
+    throw new Error("Email sending is not configured; receipt delivery must be retried");
   }
 
   const subject = isSubscription
@@ -210,6 +223,15 @@ export async function POST(request: NextRequest) {
 
   const plainText = `Thank you for your contribution to ${branding.siteName}.\n\nAmount: ${amountDollars}${plainRecurring}\n\n${receiptUrl ? `View your receipt: ${receiptUrl}\n\n` : ""}— The ${branding.siteName} team\n\n${buildStandardEmailFooterPlain(branding)}`;
 
+  const db = createAdminClient();
+  const receiptId = `receipt:${sessionId}`;
+  const {error: receiptClaimError} = await db.from("stripe_webhook_events").insert({event_id:receiptId,event_type:"support_receipt"});
+  if (receiptClaimError) {
+    if (receiptClaimError.code !== "23505") throw new Error("Could not record receipt delivery");
+    const {data,error}=await db.from("stripe_webhook_events").select("processed_at").eq("event_id",receiptId).maybeSingle();
+    if (!error && data?.processed_at) return NextResponse.json({received:true});
+    throw new Error("Receipt delivery outcome needs review before retrying");
+  }
   try {
     const res = await fetch(SENDGRID_API_URL, {
       method: "POST",
@@ -228,12 +250,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("SendGrid thank-you email error:", res.status, errText);
+      await db.from("stripe_webhook_events").delete().eq("event_id",receiptId);
+      console.error("SendGrid thank-you email error:", res.status);
+      throw new Error("Receipt email was rejected");
     }
   } catch (e) {
-    console.error("Failed to send thank-you email:", e);
+    throw e;
   }
 
+  const {error:receiptSaveError}=await db.from("stripe_webhook_events").update({processed_at:new Date().toISOString()}).eq("event_id",receiptId);
+  if(receiptSaveError)throw new Error("Receipt accepted but confirmation could not be saved");
   return NextResponse.json({ received: true });
+
 }

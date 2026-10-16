@@ -1,3 +1,6 @@
+import { consumeRateLimit } from "@/lib/rate-limit-server";
+import { getClientIp } from "@/lib/rate-limit";
+import { isSameOriginRequest } from "@/lib/http/sameOrigin";
 import { NextRequest, NextResponse } from "next/server";
 import { escapeHtml } from "@/lib/emails/emailLayout";
 import { sendTeamInboxEmail } from "@/lib/emails/sendTeamInboxEmail";
@@ -11,6 +14,10 @@ function str(v: unknown, max: number): string {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isSameOriginRequest(request)) return NextResponse.json({error:"Forbidden"},{status:403});
+  try {
+    if (!await consumeRateLimit(`inquiry:contact:${getClientIp(request)}`, 10, 3600)) return NextResponse.json({error:"Please try again later."},{status:429,headers:{"Retry-After":"3600"}});
+  } catch { return NextResponse.json({error:"Please try again shortly."},{status:503}); }
   let tenantId: string;
   try {
     tenantId = getTenantFromHeaders(request.headers).tenantId;
@@ -28,7 +35,9 @@ export async function POST(request: NextRequest) {
 
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    const text = await request.text();
+    if (text.length > 20000) return NextResponse.json({error:"Message is too large"},{status:413});
+    body = JSON.parse(text);
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }

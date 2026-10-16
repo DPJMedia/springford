@@ -10,7 +10,7 @@ export function canReadFullArticleContent(
   opts: { newsletterSubscribed: boolean; isAdmin: boolean }
 ): boolean {
   if (visibility === "public") return true;
-  if (visibility === "newsletter_subscribers") return opts.newsletterSubscribed;
+  if (visibility === "newsletter_subscribers") return opts.isAdmin || opts.newsletterSubscribed;
   if (visibility === "admin_only") return opts.isAdmin;
   return true;
 }

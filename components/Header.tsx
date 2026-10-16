@@ -1,4 +1,5 @@
 "use client";
+import { parseStoredSectionConfig } from "@/lib/tenant/sectionConfigStorage";
 
 import { useEffect, useState, useRef, useMemo } from "react";
 import { usePathname } from "next/navigation";
@@ -61,8 +62,7 @@ export function Header() {
   }, [supabase, tenantId, pathname]);
 
   const allNavItems = useMemo(() => {
-    if (!Array.isArray(sectionConfig)) return [];
-    return sectionConfig
+    return parseStoredSectionConfig(sectionConfig).sections
       .filter((entry) => String((entry as { slug?: string }).slug || "").toLowerCase().trim() !== "hero")
       .map((entry) => {
         const slug = String((entry as { slug?: string }).slug || "").trim();
@@ -81,7 +81,7 @@ export function Header() {
   useEffect(() => {
     async function fetchSectionsWithContent() {
       const { data } = await supabase
-        .from("articles")
+        .from("article_previews")
         .select("sections")
         .eq("status", "published")
         .eq("tenant_id", tenantId);
@@ -121,7 +121,8 @@ export function Header() {
               profile = { ...profile, username: metaU };
             }
             setIsAdmin(profile.is_admin || profile.is_super_admin);
-            setNewsletterSubscribed(profile.newsletter_subscribed || false);
+            const {data: tenantSub} = await supabase.from("tenant_newsletter_subscriptions").select("subscribed").eq("user_id", user.id).eq("tenant_id", tenantId).maybeSingle();
+            setNewsletterSubscribed(tenantSub?.subscribed === true);
             setUserName(profile.full_name || user.email?.split("@")[0] || "User");
             setUserUsername(profile.username || "");
             setUserAvatar(normalizeAvatarUrl(profile.avatar_url));
@@ -154,7 +155,8 @@ export function Header() {
               profile = { ...profile, username: metaU };
             }
             setIsAdmin(profile.is_admin || profile.is_super_admin);
-            setNewsletterSubscribed(profile.newsletter_subscribed || false);
+            const {data: tenantSub} = await supabase.from("tenant_newsletter_subscriptions").select("subscribed").eq("user_id", session.user.id).eq("tenant_id", tenantId).maybeSingle();
+            setNewsletterSubscribed(tenantSub?.subscribed === true);
             setUserName(profile.full_name || session.user.email?.split("@")[0] || "User");
             setUserUsername(profile.username || "");
             setUserAvatar(normalizeAvatarUrl(profile.avatar_url));

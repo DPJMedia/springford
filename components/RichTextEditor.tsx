@@ -42,7 +42,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   useEffect(() => {
     async function fetchArticles() {
       const { data } = await supabase
-        .from("articles")
+        .from("article_previews")
         .select("id, title, slug")
         .eq("status", "published")
         .order("published_at", { ascending: false })

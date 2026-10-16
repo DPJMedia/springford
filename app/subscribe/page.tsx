@@ -138,39 +138,9 @@ function SubscribePageContent() {
     if (!user) return;
     setConfirming(true);
     try {
-      const subscribedAt = new Date().toISOString();
-      const { error: updateError } = await supabase
-        .from("user_profiles")
-        .update({
-          newsletter_subscribed: true,
-          newsletter_subscribed_at: subscribedAt,
-        })
-        .eq("id", user.id);
-      if (updateError) throw updateError;
-
-      const { error: tenantSubErr } = await supabase
-        .from("tenant_newsletter_subscriptions")
-        .upsert(
-          {
-            user_id: user.id,
-            tenant_id: tenantId,
-            subscribed: true,
-            subscribed_at: subscribedAt,
-            unsubscribed_at: null,
-          },
-          { onConflict: "user_id,tenant_id" },
-        );
-      if (tenantSubErr) throw tenantSubErr;
+      const response = await fetch("/api/newsletter/subscribe", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({}) });
+      if (!response.ok) throw new Error("Could not save subscription");
       setShowConfirmModal(false);
-      try {
-        await fetch("/api/newsletter/subscribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: user.email }),
-        });
-      } catch {
-        // non-blocking
-      }
       setIsSubscribed(true);
       setShowSuccessModal(true);
     } catch {
